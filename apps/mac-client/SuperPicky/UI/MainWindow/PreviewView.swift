@@ -6,16 +6,9 @@ struct PreviewView: View {
     var body: some View {
         VStack(spacing: 0) {
             if let photo {
-                ZStack {
-                    Color(nsColor: .controlBackgroundColor)
-                    VStack {
-                        Image(systemName: "photo.fill")
-                            .font(.system(size: 64))
-                            .foregroundStyle(.secondary)
-                        Text(photo.filename)
-                            .foregroundStyle(.secondary)
-                    }
-                }
+                // Photo preview
+                AsyncPreviewImage(filePath: photo.filePath)
+                    .accessibilityIdentifier("PhotoPreview")
                 InfoBarView(photo: photo)
             } else {
                 VStack(spacing: 12) {
@@ -25,11 +18,58 @@ struct PreviewView: View {
                     Text("Select a photo to preview")
                         .font(.title3)
                         .foregroundStyle(.tertiary)
-                    Text("Process a folder with + to get started")
-                        .font(.caption)
-                        .foregroundStyle(.quaternary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+    }
+}
+
+/// Loads a full-size preview image asynchronously.
+struct AsyncPreviewImage: View {
+    let filePath: String
+    @State private var image: NSImage?
+
+    var body: some View {
+        ZStack {
+            Color(nsColor: .controlBackgroundColor)
+            if let image {
+                Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .padding(8)
+            } else {
+                ProgressView()
+            }
+        }
+        .task(id: filePath) {
+            image = nil
+            image = await loadImage()
+        }
+    }
+
+    private func loadImage() async -> NSImage? {
+        let url = URL(fileURLWithPath: filePath)
+        guard FileManager.default.fileExists(atPath: filePath) else { return nil }
+
+        return await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                // For preview, use a larger size (max 2000px)
+                let options: [CFString: Any] = [
+                    kCGImageSourceThumbnailMaxPixelSize: 2000,
+                    kCGImageSourceCreateThumbnailFromImageAlways: true,
+                    kCGImageSourceCreateThumbnailWithTransform: true,
+                ]
+                guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+                continuation.resume(returning: nsImage)
             }
         }
     }
@@ -72,9 +112,14 @@ struct InfoBarView: View {
             }
 
             Spacer()
+
+            Text(photo.filename)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(.bar)
+        .accessibilityIdentifier("InfoBar")
     }
 }
