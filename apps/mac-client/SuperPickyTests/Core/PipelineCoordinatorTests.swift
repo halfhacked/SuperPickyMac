@@ -42,7 +42,7 @@ struct MockInferenceClient: InferenceClient {
         CGImageDestinationFinalize(dest)
     }
 
-    @Test func noBirdDetectedRatesMinusOne() async throws {
+    @Test func noBirdDetectedRatesZero() async throws {
         let tempDir = try makeTempDir()
         let jpegURL = tempDir.appendingPathComponent("test.jpg")
         createTestJPEG(at: jpegURL)
@@ -56,7 +56,7 @@ struct MockInferenceClient: InferenceClient {
         let db = try ReportDatabase(folderPath: tempDir)
         let photos = try db.fetchAllPhotos()
         #expect(photos.count == 1)
-        #expect(photos[0].starRating == -1)
+        #expect(photos[0].starRating == 0)
     }
 
     @Test func birdDetectedRatesCorrectly() async throws {
