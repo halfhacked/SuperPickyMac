@@ -7,7 +7,7 @@ struct SpeciesMatch: Codable, Identifiable, Sendable {
     let confidence: Float
     let cnName: String?
     let pinyin: String?
-    let thresholdUsed: Float?
+    let thresholdUsed: String?
 
     enum CodingKeys: String, CodingKey {
         case scientificName = "name"
