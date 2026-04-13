@@ -41,7 +41,7 @@ struct AsyncPreviewImage: View {
 
     var body: some View {
         ZStack {
-            Color(nsColor: .controlBackgroundColor)
+            Color(nsColor: .darkGray)
             if let image {
                 ZoomableImageView(image: image, zoomState: zoomState)
             } else {
