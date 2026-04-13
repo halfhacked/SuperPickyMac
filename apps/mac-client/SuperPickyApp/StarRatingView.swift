@@ -4,10 +4,10 @@ struct StarRatingView: View {
     let rating: Int
 
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 1) {
             ForEach(1...5, id: \.self) { star in
                 Image(systemName: star <= rating ? "star.fill" : "star")
-                    .font(.caption2)
+                    .font(.system(size: 7))
                     .foregroundStyle(color)
             }
         }

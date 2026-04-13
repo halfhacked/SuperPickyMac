@@ -19,7 +19,6 @@ struct ThumbnailStripView: View {
                 .padding(.horizontal, 4)
                 .padding(.vertical, 2)
             }
-            .onScrollWheelVerticalToHorizontal()
             .background(.bar)
             .onChange(of: selectedPhotoID) { _, newValue in
                 if let id = newValue {
@@ -37,22 +36,28 @@ struct ThumbnailCell: View {
     let isSelected: Bool
 
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
+        ZStack {
             AsyncThumbnailImage(filePath: photo.filePath)
                 .aspectRatio(3/2, contentMode: .fit)
                 .clipped()
 
-            HStack(spacing: 2) {
-                StarRatingView(rating: photo.starRating)
-                if photo.isPick {
-                    Image(systemName: "flag.fill")
-                        .font(.caption2)
-                        .foregroundStyle(.primary)
-                }
+            // Flag top-left
+            if photo.isPick {
+                Image(systemName: "flag.fill")
+                    .font(.system(size: 8))
+                    .foregroundStyle(.primary)
+                    .padding(3)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 2))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(2)
             }
-            .padding(2)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 3))
-            .padding(2)
+
+            // Stars bottom-left
+            StarRatingView(rating: photo.starRating)
+                .padding(2)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 2))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                .padding(2)
         }
         .clipShape(RoundedRectangle(cornerRadius: 4))
         .overlay(
@@ -116,47 +121,7 @@ struct AsyncThumbnailImage: View {
     }
 }
 
-// MARK: - Vertical-to-horizontal scroll wheel adapter
+// No custom scroll wheel adapter needed — removed complex NSView approaches.
+// Vertical scroll on the thumbnail strip is handled by the system when
+// shift is held, or users can use left/right arrow keys to navigate.
 
-private struct VerticalToHorizontalScrollModifier: ViewModifier {
-    func body(content: Content) -> some View {
-        content.background(
-            VerticalScrollInterceptor()
-        )
-    }
-}
-
-private struct VerticalScrollInterceptor: NSViewRepresentable {
-    func makeNSView(context: Context) -> ScrollInterceptorView {
-        ScrollInterceptorView()
-    }
-    func updateNSView(_ nsView: ScrollInterceptorView, context: Context) {}
-}
-
-private class ScrollInterceptorView: NSView {
-    override func scrollWheel(with event: NSEvent) {
-        if abs(event.deltaY) > abs(event.deltaX) {
-            guard let cg = event.cgEvent else {
-                super.scrollWheel(with: event)
-                return
-            }
-            // Swap: vertical scroll becomes horizontal
-            let dy = cg.getDoubleValueField(.scrollWheelEventDeltaAxis1)
-            cg.setDoubleValueField(.scrollWheelEventDeltaAxis1, value: 0)
-            cg.setDoubleValueField(.scrollWheelEventDeltaAxis2, value: dy)
-            if let converted = NSEvent(cgEvent: cg) {
-                super.scrollWheel(with: converted)
-            } else {
-                super.scrollWheel(with: event)
-            }
-        } else {
-            super.scrollWheel(with: event)
-        }
-    }
-}
-
-extension View {
-    func onScrollWheelVerticalToHorizontal() -> some View {
-        modifier(VerticalToHorizontalScrollModifier())
-    }
-}
