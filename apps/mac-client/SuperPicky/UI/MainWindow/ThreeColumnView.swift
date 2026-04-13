@@ -8,7 +8,6 @@ final class AppState {
     var photos: [Photo] = []
     var ratingCounts: [Int: Int] = [:]
     var speciesList: [(name: String, count: Int)] = []
-    var isProcessing = false
 
     var selectedPhoto: Photo? {
         guard let id = selectedPhotoID else { return nil }
@@ -21,8 +20,17 @@ final class AppState {
 }
 
 struct MainView: View {
+    @Environment(CullingConfig.self) private var config
+    @Environment(ProcessManager.self) private var processManager
     @State private var appState = AppState()
-    @State private var showProcessingSheet = false
+    @State private var showProgressSheet = false
+    @State private var pipeline: PipelineCoordinator?
+    @State private var processingTask: Task<Void, Never>?
+    @State private var processingFolderName = ""
+
+    private var isTestMode: Bool {
+        ProcessInfo.processInfo.environment["TEST_MODE"] == "1"
+    }
 
     var body: some View {
         NavigationSplitView {
@@ -31,12 +39,12 @@ struct MainView: View {
                 folders: $appState.folders,
                 ratingCounts: appState.ratingCounts,
                 speciesList: appState.speciesList,
-                onAddFolder: { showProcessingSheet = true }
+                onAddFolder: { pickAndProcess() }
             )
             .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 300)
         } detail: {
             if appState.isEmpty {
-                EmptyStateView { showProcessingSheet = true }
+                EmptyStateView { pickAndProcess() }
             } else {
                 ContentView(
                     photos: appState.photos,
@@ -46,18 +54,76 @@ struct MainView: View {
             }
         }
         .navigationTitle("")
-        .sheet(isPresented: $showProcessingSheet) {
-            ProcessingSheet(prefilledFolder: nil) { completedFolder in
-                if !appState.folders.contains(completedFolder) {
-                    appState.folders.append(completedFolder)
-                }
-                appState.sidebarSelection = .folder(completedFolder)
+        .sheet(isPresented: $showProgressSheet) {
+            if let pipeline {
+                ProcessingSheet(
+                    pipeline: pipeline,
+                    folderName: processingFolderName,
+                    onCancel: { processingTask?.cancel() },
+                    onDone: {}
+                )
             }
         }
         .onAppear {
-            if ProcessInfo.processInfo.environment["TEST_FOLDER"] != nil {
-                showProcessingSheet = true
+            if let testFolder = ProcessInfo.processInfo.environment["TEST_FOLDER"] {
+                let url = URL(fileURLWithPath: testFolder)
+                startProcessing(folder: url)
             }
+        }
+    }
+
+    private func pickAndProcess() {
+        // In test mode, use TEST_FOLDER env var
+        if isTestMode, let testFolder = ProcessInfo.processInfo.environment["TEST_FOLDER"] {
+            startProcessing(folder: URL(fileURLWithPath: testFolder))
+            return
+        }
+
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.message = "Select a folder with bird photos to process"
+        panel.prompt = "Process"
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        startProcessing(folder: url)
+    }
+
+    private func startProcessing(folder: URL) {
+        guard isTestMode || processManager.isReady else { return }
+
+        let client: InferenceClient = isTestMode
+            ? MockInferenceClientForUI()
+            : HTTPInferenceClient(port: processManager.port)
+
+        let coord = PipelineCoordinator(inferenceClient: client)
+        pipeline = coord
+        processingFolderName = folder.lastPathComponent
+
+        let ratingConfig = RatingEngine.Config(
+            sharpnessThreshold: config.sharpnessThreshold,
+            aestheticsThreshold: config.aestheticsThreshold
+        )
+        let exposureEnabled = config.exposureDetectionEnabled
+        let exposureThreshold = config.exposureThreshold
+        let autoOrganize = config.autoOrganize
+
+        showProgressSheet = true
+
+        processingTask = Task {
+            await coord.process(
+                folder: folder,
+                ratingConfig: ratingConfig,
+                exposureEnabled: exposureEnabled,
+                exposureThreshold: exposureThreshold,
+                autoOrganize: autoOrganize
+            )
+            if !appState.folders.contains(folder) {
+                appState.folders.append(folder)
+            }
+            appState.sidebarSelection = .folder(folder)
+            if !isTestMode { NSSound.beep() }
         }
     }
 }
@@ -70,11 +136,9 @@ struct ContentView: View {
 
     var body: some View {
         VSplitView {
-            // Preview area (top, takes most space)
             PreviewView(photo: selectedPhoto)
                 .frame(minHeight: 300)
 
-            // Horizontal thumbnail strip (bottom)
             ThumbnailStripView(
                 photos: photos,
                 selectedPhotoID: $selectedPhotoID
