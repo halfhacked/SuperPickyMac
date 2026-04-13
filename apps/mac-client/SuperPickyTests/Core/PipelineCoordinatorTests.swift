@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import CoreGraphics
+import ImageIO
 @testable import SuperPicky
 
 struct MockInferenceClient: InferenceClient {
