@@ -46,7 +46,7 @@ struct ThumbnailCell: View {
                 if photo.isPick {
                     Image(systemName: "flag.fill")
                         .font(.caption2)
-                        .foregroundStyle(.purple)
+                        .foregroundStyle(.primary)
                 }
             }
             .padding(2)
