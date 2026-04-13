@@ -85,49 +85,7 @@ struct SourceListView: View {
             if !speciesEntries.isEmpty {
                 Section("Species") {
                     ForEach(speciesEntries) { species in
-                        if species.burstGroups.isEmpty {
-                            // No bursts — flat row, no disclosure arrow
-                            HStack {
-                                Text(species.name)
-                                Spacer()
-                                Text("\(species.count)")
-                                    .foregroundStyle(.secondary)
-                            }
-                            .tag(SidebarSelection.species(species.name))
-                        } else {
-                            // Has bursts — expandable
-                            DisclosureGroup {
-                                ForEach(species.burstGroups) { burst in
-                                    HStack {
-                                        Image(systemName: "rectangle.stack")
-                                            .foregroundStyle(.orange)
-                                        Text("Burst")
-                                        Spacer()
-                                        Text("\(burst.count)")
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    .tag(SidebarSelection.burstGroup(burst.id))
-                                }
-                                if species.singlePhotos > 0 {
-                                    HStack {
-                                        Image(systemName: "photo")
-                                            .foregroundStyle(.secondary)
-                                        Text("Singles")
-                                        Spacer()
-                                        Text("\(species.singlePhotos)")
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                            } label: {
-                                HStack {
-                                    Text(species.name)
-                                    Spacer()
-                                    Text("\(species.count)")
-                                        .foregroundStyle(.secondary)
-                                }
-                                .tag(SidebarSelection.species(species.name))
-                            }
-                        }
+                        SpeciesRow(species: species, selection: $selection)
                     }
                 }
             }
@@ -175,6 +133,76 @@ struct SourceListView: View {
         case 1: .yellow
         case 0: .secondary
         default: .secondary
+        }
+    }
+}
+
+struct SpeciesRow: View {
+    let species: SpeciesEntry
+    @Binding var selection: SidebarSelection?
+    @State private var isExpanded = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Species header — clicking filters AND toggles expand
+            HStack {
+                if species.burstGroups.isEmpty {
+                    // No bursts — no chevron
+                    Image(systemName: "bird")
+                        .foregroundStyle(.secondary)
+                        .frame(width: 16)
+                } else {
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .foregroundStyle(.secondary)
+                        .font(.caption2)
+                        .frame(width: 16)
+                }
+                Text(species.name)
+                Spacer()
+                Text("\(species.count)")
+                    .foregroundStyle(.secondary)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                selection = .species(species.name)
+                if !species.burstGroups.isEmpty {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isExpanded.toggle()
+                    }
+                }
+            }
+            .tag(SidebarSelection.species(species.name))
+
+            // Burst children (when expanded)
+            if isExpanded {
+                ForEach(species.burstGroups) { burst in
+                    HStack {
+                        Image(systemName: "rectangle.stack")
+                            .foregroundStyle(.orange)
+                        Text("Burst")
+                        Spacer()
+                        Text("\(burst.count)")
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.leading, 20)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        selection = .burstGroup(burst.id)
+                    }
+                    .tag(SidebarSelection.burstGroup(burst.id))
+                }
+                if species.singlePhotos > 0 {
+                    HStack {
+                        Image(systemName: "photo")
+                            .foregroundStyle(.secondary)
+                        Text("Singles")
+                        Spacer()
+                        Text("\(species.singlePhotos)")
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.leading, 20)
+                }
+            }
         }
     }
 }
