@@ -330,6 +330,19 @@ struct ContentView: View {
             }
             return .handled
         }
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showExifPanel.toggle()
+                    }
+                } label: {
+                    Image(systemName: showExifPanel ? "info.circle.fill" : "info.circle")
+                }
+                .accessibilityIdentifier("ExifToggle")
+                .help("Toggle EXIF Info (I)")
+            }
+        }
     }
 }
 
