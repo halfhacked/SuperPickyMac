@@ -66,7 +66,7 @@ struct BurstDetector: Sendable {
         var timestamp = date.timeIntervalSince1970
 
         // Add subsecond precision if available
-        if let subsec = exif["SubSecTimeOriginal"] as? String,
+        if let subsec = (exif["SubsecTimeOriginal"] ?? exif["SubSecTimeOriginal"]) as? String,
            let subsecFloat = Double("0.\(subsec)") {
             timestamp += subsecFloat
         }
