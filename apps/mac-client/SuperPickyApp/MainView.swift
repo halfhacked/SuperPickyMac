@@ -266,29 +266,23 @@ struct MainView: View {
         appState.processingProgress = 0
 
         processingTask = Task {
-            // Observe pipeline progress
-            let progressTask = Task {
-                while !Task.isCancelled {
-                    await MainActor.run {
-                        if pipeline.totalCount > 0 {
-                            appState.processingProgress = Double(pipeline.processedCount) / Double(pipeline.totalCount)
-                        }
-                        appState.processingFilename = pipeline.currentFilename
-                    }
-                    try? await Task.sleep(for: .milliseconds(200))
-                }
-            }
-
             await pipeline.process(
                 folder: folder,
                 ratingConfig: ratingConfig,
                 exposureEnabled: exposureEnabled,
                 exposureThreshold: exposureThreshold,
+                onPhotoProcessed: {
+                    await MainActor.run {
+                        if pipeline.totalCount > 0 {
+                            appState.processingProgress = Double(pipeline.processedCount) / Double(pipeline.totalCount)
+                        }
+                        appState.processingFilename = pipeline.currentFilename
+                        appState.loadPhotos(for: folder)
+                    }
+                }
             )
 
-            progressTask.cancel()
-
-            // Processing done — load results on MainActor
+            // Final reload (includes burst detection results)
             await MainActor.run {
                 appState.processingFolder = nil
                 appState.processingProgress = 0
