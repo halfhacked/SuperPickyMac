@@ -51,8 +51,12 @@ struct ThreeColumnView: View {
             }
         }
         .sheet(isPresented: $showProcessingSheet) {
-            Text("Processing Sheet — coming soon")
-                .frame(width: 500, height: 400)
+            ProcessingSheet(prefilledFolder: nil) { completedFolder in
+                if !appState.folders.contains(completedFolder) {
+                    appState.folders.append(completedFolder)
+                }
+                appState.sidebarSelection = .folder(completedFolder)
+            }
         }
     }
 }
