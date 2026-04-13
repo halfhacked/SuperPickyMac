@@ -196,8 +196,9 @@ final class PipelineCoordinator {
         // Bird ID — identify species from cropped region (GPS-boosted when available)
         do {
             let exif = EXIFReader.read(from: fileURL.path)
+            // Send full image — preen handles YOLO detection + smart crop internally
             let species = try await inferenceClient.identify(
-                image: birdCrop, topK: 1, temperature: 0.9,
+                image: image, topK: 1, temperature: 0.9,
                 latitude: exif?.latitude, longitude: exif?.longitude
             )
             if let top = species.first {
