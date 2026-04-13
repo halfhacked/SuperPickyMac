@@ -123,7 +123,16 @@ final class ProcessingFlowUITests: XCTestCase {
         try? FileManager.default.removeItem(atPath: testDir)
         try! FileManager.default.createDirectory(atPath: testDir, withIntermediateDirectories: true)
 
-        let sourceDir = "/Users/dazhen/projects/SuperPickyMac/test-photos"
+        // Use #filePath to find project root at compile time
+        // This file is at: .../SuperPickyMac/apps/mac-client/SuperPickyUITests/ProcessingFlowUITests.swift
+        // test-photos is at: .../SuperPickyMac/test-photos
+        let thisFile = URL(fileURLWithPath: #filePath)
+        let projectRoot = thisFile
+            .deletingLastPathComponent() // SuperPickyUITests/
+            .deletingLastPathComponent() // mac-client/
+            .deletingLastPathComponent() // apps/
+            .deletingLastPathComponent() // SuperPickyMac/
+        let sourceDir = projectRoot.appendingPathComponent("test-photos").path
 
         if FileManager.default.fileExists(atPath: sourceDir) {
             let photos = try! FileManager.default.contentsOfDirectory(atPath: sourceDir)

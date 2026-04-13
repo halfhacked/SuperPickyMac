@@ -6,12 +6,15 @@ echo "=== G1: Static Analysis ==="
 (cd apps/mac-client && swift build 2>&1 | tail -5) &
 PID_SWIFT=$!
 
-# Python: flake8 (skip if not installed)
-if command -v flake8 &>/dev/null; then
+# Python: flake8 via venv
+if [ -f "python-server/.venv/bin/flake8" ]; then
+    (cd python-server && .venv/bin/flake8 --max-line-length=120 --ignore=E501,W503 superpicky_server.py inference/ 2>&1) &
+    PID_PYTHON=$!
+elif command -v flake8 &>/dev/null; then
     (cd python-server && flake8 --max-line-length=120 --ignore=E501,W503 superpicky_server.py inference/ 2>&1) &
     PID_PYTHON=$!
 else
-    echo "SKIP: flake8 not installed"
+    echo "SKIP: flake8 not installed (pip install flake8 in python-server/.venv)"
     PID_PYTHON=""
 fi
 
