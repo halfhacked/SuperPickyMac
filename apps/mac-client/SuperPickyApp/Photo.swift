@@ -42,7 +42,7 @@ struct Photo: Identifiable, Codable, Sendable, FetchableRecord, PersistableRecor
         self.folderPath = folderPath
         self.dateCreated = dateCreated
         self.isFlying = false
-        self.starRating = -1
+        self.starRating = 0
         self.isPick = false
         self.isBurstBest = false
     }
