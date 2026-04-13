@@ -13,7 +13,7 @@ class KeypointPredictor:
     def __init__(self, model_path: str):
         self.device = get_best_device()
         from core.keypoint_detector import KeypointDetector
-        self.detector = KeypointDetector(model_path=model_path, device=self.device)
+        self.detector = KeypointDetector(model_path=model_path)
 
     def predict(self, image_bytes: bytes) -> dict:
         image = Image.open(BytesIO(image_bytes)).convert("RGB")

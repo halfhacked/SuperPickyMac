@@ -12,7 +12,8 @@ class FlightPredictor:
     def __init__(self, model_path: str):
         self.device = get_best_device()
         from core.flight_detector import FlightDetector
-        self.detector = FlightDetector(model_path=model_path, device=self.device)
+        self.detector = FlightDetector(model_path=model_path)
+        self.detector.load_model()
 
     def predict(self, image_bytes: bytes) -> dict:
         image = Image.open(BytesIO(image_bytes)).convert("RGB")
