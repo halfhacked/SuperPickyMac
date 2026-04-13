@@ -37,7 +37,7 @@ import ImageIO
         let pipeline = PipelineCoordinator(inferenceClient: mockClient)
         let config = RatingEngine.Config(sharpnessThreshold: 380, aestheticsThreshold: 4.8)
 
-        await pipeline.process(folder: tempDir, ratingConfig: config, exposureEnabled: false, exposureThreshold: 0.10, autoOrganize: false)
+        await pipeline.process(folder: tempDir, ratingConfig: config, exposureEnabled: false, exposureThreshold: 0.10)
 
         let db = try ReportDatabase(folderPath: tempDir)
         let photos = try db.fetchAllPhotos()
@@ -59,7 +59,7 @@ import ImageIO
         let pipeline = PipelineCoordinator(inferenceClient: mockClient)
         let config = RatingEngine.Config(sharpnessThreshold: 380, aestheticsThreshold: 4.8)
 
-        await pipeline.process(folder: tempDir, ratingConfig: config, exposureEnabled: false, exposureThreshold: 0.10, autoOrganize: false)
+        await pipeline.process(folder: tempDir, ratingConfig: config, exposureEnabled: false, exposureThreshold: 0.10)
 
         let db = try ReportDatabase(folderPath: tempDir)
         let photos = try db.fetchAllPhotos()
@@ -90,7 +90,7 @@ import ImageIO
         let pipeline = PipelineCoordinator(inferenceClient: mockClient)
         let config = RatingEngine.Config(sharpnessThreshold: 380, aestheticsThreshold: 4.8)
 
-        await pipeline.process(folder: tempDir, ratingConfig: config, exposureEnabled: false, exposureThreshold: 0.10, autoOrganize: false)
+        await pipeline.process(folder: tempDir, ratingConfig: config, exposureEnabled: false, exposureThreshold: 0.10)
 
         let db = try ReportDatabase(folderPath: tempDir)
         let photos = try db.fetchAllPhotos()
@@ -104,20 +104,6 @@ import ImageIO
 
     // MARK: - Scenario: Process folder with auto-organize
 
-    @Test func autoOrganizeMovesFiles() async throws {
-        let tempDir = try makeTempDir()
-        createTestJPEG(at: tempDir.appendingPathComponent("good.jpg"))
-
-        // Mock returns no birds → rating -1, file stays (only rating >= 0 gets organized)
-        let mockClient = StubInferenceClient()
-        let pipeline = PipelineCoordinator(inferenceClient: mockClient)
-        let config = RatingEngine.Config(sharpnessThreshold: 380, aestheticsThreshold: 4.8)
-
-        await pipeline.process(folder: tempDir, ratingConfig: config, exposureEnabled: false, exposureThreshold: 0.10, autoOrganize: true)
-
-        // -1 rated photos are NOT organized (only >= 0)
-        #expect(FileManager.default.fileExists(atPath: tempDir.appendingPathComponent("good.jpg").path))
-    }
 
     // MARK: - Scenario: Processing is cancellable
 
@@ -133,7 +119,7 @@ import ImageIO
         let config = RatingEngine.Config(sharpnessThreshold: 380, aestheticsThreshold: 4.8)
 
         let task = Task {
-            await pipeline.process(folder: tempDir, ratingConfig: config, exposureEnabled: false, exposureThreshold: 0.10, autoOrganize: false)
+            await pipeline.process(folder: tempDir, ratingConfig: config, exposureEnabled: false, exposureThreshold: 0.10)
         }
 
         // Let it start, then cancel
@@ -155,7 +141,7 @@ import ImageIO
         let pipeline = PipelineCoordinator(inferenceClient: mockClient)
         let config = RatingEngine.Config(sharpnessThreshold: 380, aestheticsThreshold: 4.8)
 
-        await pipeline.process(folder: tempDir, ratingConfig: config, exposureEnabled: false, exposureThreshold: 0.10, autoOrganize: false)
+        await pipeline.process(folder: tempDir, ratingConfig: config, exposureEnabled: false, exposureThreshold: 0.10)
 
         // .report.db should exist in the folder
         let dbPath = tempDir.appendingPathComponent(".report.db").path
