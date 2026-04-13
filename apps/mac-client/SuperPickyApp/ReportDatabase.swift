@@ -37,7 +37,7 @@ final class ReportDatabase: Sendable {
                 t.column("sharpnessScore", .double)
                 t.column("exposureStatus", .text)
                 t.column("focusPointStatus", .text)
-                t.column("starRating", .integer).notNull().defaults(to: -1)
+                t.column("starRating", .integer).notNull().defaults(to: 0)
                 t.column("isPick", .boolean).notNull().defaults(to: false)
                 t.column("speciesScientificName", .text)
                 t.column("speciesCommonName", .text)
@@ -49,6 +49,12 @@ final class ReportDatabase: Sendable {
             try db.create(indexOn: "photos", columns: ["starRating"])
             try db.create(indexOn: "photos", columns: ["speciesScientificName"])
             try db.create(indexOn: "photos", columns: ["burstGroupID"])
+        }
+        migrator.registerMigration("v2") { db in
+            try db.alter(table: "photos") { t in
+                t.add(column: "isManualRating", .boolean).notNull().defaults(to: false)
+            }
+            try db.execute(sql: "UPDATE photos SET starRating = 0 WHERE starRating = -1")
         }
         try migrator.migrate(dbQueue)
     }

@@ -30,7 +30,7 @@ struct RatingEngine: Sendable {
         config: Config
     ) -> RatingResult {
         guard detected else {
-            return RatingResult(rating: -1, isPick: false, reason: "No bird detected")
+            return RatingResult(rating: 0, isPick: false, reason: "No bird detected")
         }
 
         guard confidence >= 0.5 else {
@@ -56,13 +56,23 @@ struct RatingEngine: Sendable {
             adjAesthetics *= 1.1
         }
 
-        var rating: Int
-        let sharpHigh = adjSharpness >= config.sharpnessThreshold
-        let aestheticsHigh = adjAesthetics >= config.aestheticsThreshold
+        let moderateSharpness = (Self.minimumSharpness + config.sharpnessThreshold) / 2
+        let moderateAesthetics = (Self.minimumAesthetics + config.aestheticsThreshold) / 2
 
-        if sharpHigh && aestheticsHigh {
+        let sharpAboveThreshold = adjSharpness >= config.sharpnessThreshold
+        let aestheticsAboveThreshold = adjAesthetics >= config.aestheticsThreshold
+        let sharpAboveModerate = adjSharpness >= moderateSharpness
+        let aestheticsAboveModerate = adjAesthetics >= moderateAesthetics
+
+        var rating: Int
+
+        if sharpAboveThreshold && aestheticsAboveThreshold {
+            rating = 5
+        } else if (sharpAboveThreshold || aestheticsAboveThreshold) && (sharpAboveModerate && aestheticsAboveModerate) {
+            rating = 4
+        } else if sharpAboveModerate && aestheticsAboveModerate {
             rating = 3
-        } else if sharpHigh || aestheticsHigh {
+        } else if sharpAboveModerate || aestheticsAboveModerate {
             rating = 2
         } else {
             rating = 1
@@ -72,7 +82,7 @@ struct RatingEngine: Sendable {
             rating = max(0, rating - 1)
         }
 
-        let isPick = rating == 3 && sharpHigh && aestheticsHigh
+        let isPick = rating == 5
 
         return RatingResult(rating: rating, isPick: isPick, reason: "Rating: \(rating)")
     }

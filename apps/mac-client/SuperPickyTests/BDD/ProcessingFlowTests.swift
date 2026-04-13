@@ -48,7 +48,7 @@ import ImageIO
 
     // MARK: - Scenario: Process folder with photos, no birds detected
 
-    @Test func noBirdsDetectedAllRatedMinusOne() async throws {
+    @Test func noBirdsDetectedAllRatedZero() async throws {
         let tempDir = try makeTempDir()
         for i in 0..<3 {
             createTestJPEG(at: tempDir.appendingPathComponent("IMG_\(i).jpg"))
@@ -65,7 +65,7 @@ import ImageIO
         let photos = try db.fetchAllPhotos()
         #expect(photos.count == 3)
         for photo in photos {
-            #expect(photo.starRating == -1)
+            #expect(photo.starRating == 0)
         }
     }
 
