@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AA1B2C3D4E5F60718293A4B5 /* EXIFReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB2C3D4E5F60718293A4B5C6 /* EXIFReader.swift */; };
+		CC3D4E5F60718293A4B5C6D7 /* ExifPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD4E5F60718293A4B5C6D7E8 /* ExifPanelView.swift */; };
 		013134A36705408051D6EB93 /* GeneralTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = E283097C3245E4C2533065B6 /* GeneralTab.swift */; };
 		03847CC9F325793585FF6A08 /* ProcessManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EF40EDEEEB854B306374ECC /* ProcessManager.swift */; };
 		04AFCB4EB5F25BCE9F245A56 /* SuperPickyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8F78B4A7BDCFE1CE3947F19 /* SuperPickyApp.swift */; };
@@ -64,6 +66,8 @@
 		383C2AE26F03BE2BA8C8AF84 /* InferenceClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InferenceClient.swift; sourceTree = "<group>"; };
 		4DB5E6511A425B77A9DE0E1A /* SpeciesMatch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeciesMatch.swift; sourceTree = "<group>"; };
 		4EAD42F7354C92EFBAC2DD94 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		BB2C3D4E5F60718293A4B5C6 /* EXIFReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EXIFReader.swift; sourceTree = "<group>"; };
+		DD4E5F60718293A4B5C6D7E8 /* ExifPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExifPanelView.swift; sourceTree = "<group>"; };
 		51D9ED12BDAF2634C06DA741 /* ExposureDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExposureDetector.swift; sourceTree = "<group>"; };
 		56C15A4232D9374F66F0B0DF /* HTTPInferenceClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPInferenceClient.swift; sourceTree = "<group>"; };
 		5EAEF125F85AE85042A82314 /* Photo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Photo.swift; sourceTree = "<group>"; };
@@ -112,6 +116,8 @@
 				FCE975693ABAA78E1853356C /* CullingTab.swift */,
 				BF0F99AF6C3E80F1945915C6 /* DetectionResult.swift */,
 				950F762228EBD7BA89B8B2C0 /* DirectoryScanner.swift */,
+				BB2C3D4E5F60718293A4B5C6 /* EXIFReader.swift */,
+				DD4E5F60718293A4B5C6D7E8 /* ExifPanelView.swift */,
 				51D9ED12BDAF2634C06DA741 /* ExposureDetector.swift */,
 				CD58D52864274CD6EF36539F /* FullscreenViewer.swift */,
 				E283097C3245E4C2533065B6 /* GeneralTab.swift */,
@@ -264,6 +270,8 @@
 				25E22E7829DC2B6ABA77729C /* CullingTab.swift in Sources */,
 				2CF05E13A2B84DFB79CE7DD0 /* DetectionResult.swift in Sources */,
 				2537E1B585BD0EFF83728969 /* DirectoryScanner.swift in Sources */,
+				AA1B2C3D4E5F60718293A4B5 /* EXIFReader.swift in Sources */,
+				CC3D4E5F60718293A4B5C6D7 /* ExifPanelView.swift in Sources */,
 				51CF230EF9AB98F2CBCE07C7 /* ExposureDetector.swift in Sources */,
 				B81DEDB967D4E2E4525BCB91 /* FullscreenViewer.swift in Sources */,
 				013134A36705408051D6EB93 /* GeneralTab.swift in Sources */,

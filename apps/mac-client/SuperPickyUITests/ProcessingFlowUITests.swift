@@ -141,8 +141,121 @@ final class ProcessingFlowUITests: XCTestCase {
         XCTAssertGreaterThan(Self.app.images.count, 0, "All thumbnails should return after clicking folder")
     }
 
-    /// 12: Remove folder — counts reset to 0, empty state returns
-    func test12_RemoveFolderClearsCounts() throws {
+    // MARK: - EXIF Panel
+
+    /// 12: Press I to open EXIF panel — panel appears
+    func test12_PressIOpensExifPanel() throws {
+        // Click a thumbnail first to ensure a photo is selected and content area has focus
+        let images = Self.app.images.allElementsBoundByIndex
+        if let first = images.first { first.click() }
+        sleep(1)
+
+        Self.app.typeKey("i", modifierFlags: [])
+        let panel = Self.app.scrollViews["ExifPanel"]
+        XCTAssertTrue(panel.waitForExistence(timeout: 3), "EXIF panel should appear after pressing I")
+    }
+
+    /// 13: Panel shows camera make
+    func test13_ExifPanelShowsCameraMake() throws {
+        let makeField = Self.app.staticTexts["Exif_Make"]
+        XCTAssertTrue(makeField.waitForExistence(timeout: 3), "Make field should be visible")
+        XCTAssertFalse(makeField.label.isEmpty, "Make should not be empty")
+    }
+
+    /// 14: Panel shows camera model
+    func test14_ExifPanelShowsModel() throws {
+        let modelField = Self.app.staticTexts["Exif_Model"]
+        XCTAssertTrue(modelField.exists, "Model field should be visible")
+    }
+
+    /// 15: Panel shows lens
+    func test15_ExifPanelShowsLens() throws {
+        let lensField = Self.app.staticTexts["Exif_Lens"]
+        XCTAssertTrue(lensField.exists, "Lens field should be visible")
+    }
+
+    /// 16: Panel shows focal length with "mm"
+    func test16_ExifPanelShowsFocalLength() throws {
+        let field = Self.app.staticTexts["Exif_Focal Length"]
+        XCTAssertTrue(field.exists, "Focal Length should be visible")
+        XCTAssertTrue(field.label.contains("mm"), "Focal length should contain 'mm'")
+    }
+
+    /// 17: Panel shows aperture with "f/"
+    func test17_ExifPanelShowsAperture() throws {
+        let field = Self.app.staticTexts["Exif_Aperture"]
+        XCTAssertTrue(field.exists, "Aperture should be visible")
+        XCTAssertTrue(field.label.contains("f/"), "Aperture should contain 'f/'")
+    }
+
+    /// 18: Panel shows shutter speed
+    func test18_ExifPanelShowsShutter() throws {
+        let field = Self.app.staticTexts["Exif_Shutter"]
+        XCTAssertTrue(field.exists, "Shutter should be visible")
+        let value = field.label
+        XCTAssertTrue(value.contains("1/") || value.contains("s"),
+                      "Shutter speed should be fraction or seconds, got: \(value)")
+    }
+
+    /// 19: Panel shows ISO
+    func test19_ExifPanelShowsISO() throws {
+        let field = Self.app.staticTexts["Exif_ISO"]
+        XCTAssertTrue(field.exists, "ISO should be visible")
+    }
+
+    /// 20: Panel shows GPS coordinates
+    func test20_ExifPanelShowsGPS() throws {
+        let field = Self.app.staticTexts["Exif_GPS"]
+        XCTAssertTrue(field.exists, "GPS field should be visible")
+        XCTAssertTrue(field.label.contains("°"), "GPS should contain degree symbol")
+    }
+
+    /// 21: Panel shows location (city, state, country)
+    func test21_ExifPanelShowsLocation() throws {
+        let field = Self.app.staticTexts["Exif_Location"]
+        XCTAssertTrue(field.exists, "Location field should be visible")
+        XCTAssertFalse(field.label.isEmpty, "Location should not be empty")
+    }
+
+    /// 22: Panel shows IPTC keywords
+    func test22_ExifPanelShowsKeywords() throws {
+        let field = Self.app.staticTexts["Exif_Keywords"]
+        XCTAssertTrue(field.exists, "Keywords field should be visible")
+        XCTAssertFalse(field.label.isEmpty, "Keywords should not be empty")
+    }
+
+    /// 23: Click different thumbnail — panel updates
+    func test23_ExifPanelUpdatesOnSelectionChange() throws {
+        let modelField = Self.app.staticTexts["Exif_Model"]
+        guard modelField.exists else {
+            XCTFail("Model field should be visible before changing selection")
+            return
+        }
+
+        // Click a different thumbnail
+        let images = Self.app.images.allElementsBoundByIndex
+        guard images.count >= 2 else { return }
+        images.last!.click()
+        sleep(1)
+
+        // Panel should still be visible with model field
+        let panel = Self.app.scrollViews["ExifPanel"]
+        XCTAssertTrue(panel.exists, "Panel should remain visible after selection change")
+        XCTAssertTrue(Self.app.staticTexts["Exif_Model"].exists, "Model should still be visible")
+    }
+
+    /// 24: Press I again to hide panel
+    func test24_PressIHidesExifPanel() throws {
+        Self.app.typeKey("i", modifierFlags: [])
+        sleep(1)
+        let panel = Self.app.scrollViews["ExifPanel"]
+        XCTAssertFalse(panel.exists, "EXIF panel should hide after pressing I again")
+    }
+
+    // MARK: - Cleanup
+
+    /// 25: Remove folder — counts reset to 0, empty state returns
+    func test25_RemoveFolderClearsCounts() throws {
         let folderName = (Self.testDir! as NSString).lastPathComponent
         let folderLabel = Self.app.staticTexts[folderName]
 
