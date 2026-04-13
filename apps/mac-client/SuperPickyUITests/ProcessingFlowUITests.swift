@@ -91,24 +91,40 @@ final class ProcessingFlowUITests: XCTestCase {
         XCTAssertTrue(Self.app.staticTexts["Reject"].exists)
     }
 
-    /// 08: Click Excellent to filter — app doesn't crash, selection works
-    func test08_FilterByExcellent() throws {
+    /// 08: Bird species names appear in sidebar
+    func test08_SpeciesVisible() throws {
+        // After processing real bird photos, at least one species name should appear
+        // Look for any text containing "Kingfisher" or other common bird names
+        // Or just check that the sidebar has more text items than the basic ratings
+        let speciesFound = Self.app.staticTexts.allElementsBoundByIndex.contains {
+            let label = $0.label
+            return label.contains("Kingfisher") || label.contains("Hummingbird") ||
+                   label.contains("Eagle") || label.contains("Owl") ||
+                   label.contains("Parrot") || label.contains("Pelican") ||
+                   label.contains("Robin") || label.contains("Flamingo") ||
+                   label.contains("Species")
+        }
+        XCTAssertTrue(speciesFound, "At least one bird species should appear in sidebar after processing")
+    }
+
+    /// 09: Click Excellent to filter — app doesn't crash, selection works
+    func test09_FilterByExcellent() throws {
         Self.app.staticTexts["Excellent"].click()
         sleep(1)
         // Still running, sidebar still visible
         XCTAssertTrue(Self.app.staticTexts["Excellent"].exists)
     }
 
-    /// 09: Click folder again to show all photos
-    func test09_ClickFolderShowsAll() throws {
+    /// 10: Click folder again to show all photos
+    func test10_ClickFolderShowsAll() throws {
         let folderName = (Self.testDir! as NSString).lastPathComponent
         Self.app.staticTexts[folderName].click()
         sleep(1)
         XCTAssertGreaterThan(Self.app.images.count, 0, "All thumbnails should return after clicking folder")
     }
 
-    /// 10: Remove folder — counts reset to 0, empty state returns
-    func test10_RemoveFolderClearsCounts() throws {
+    /// 11: Remove folder — counts reset to 0, empty state returns
+    func test11_RemoveFolderClearsCounts() throws {
         let folderName = (Self.testDir! as NSString).lastPathComponent
         let folderLabel = Self.app.staticTexts[folderName]
 

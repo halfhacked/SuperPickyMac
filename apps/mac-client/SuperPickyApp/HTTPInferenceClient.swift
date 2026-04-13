@@ -42,7 +42,11 @@ final class HTTPInferenceClient: InferenceClient {
     func identify(image: CGImage, topK: Int = 5, temperature: Float = 1.0) async throws -> [SpeciesMatch] {
         let data = try jpegData(from: image)
         let responseData = try await postMultipart(
-            endpoint: "identify?top_k=\(topK)&temperature=\(temperature)",
+            endpoint: "identify",
+            queryItems: [
+                URLQueryItem(name: "top_k", value: "\(topK)"),
+                URLQueryItem(name: "temperature", value: "\(temperature)"),
+            ],
             imageData: data
         )
         let response = try decode(IdentifyResponse.self, from: responseData)
@@ -58,8 +62,10 @@ final class HTTPInferenceClient: InferenceClient {
         return try decode(ServerHealth.self, from: data)
     }
 
-    private func postMultipart(endpoint: String, imageData: Data) async throws -> Data {
-        let url = baseURL.appendingPathComponent(endpoint)
+    private func postMultipart(endpoint: String, queryItems: [URLQueryItem] = [], imageData: Data) async throws -> Data {
+        var components = URLComponents(url: baseURL.appendingPathComponent(endpoint), resolvingAgainstBaseURL: false)!
+        if !queryItems.isEmpty { components.queryItems = queryItems }
+        let url = components.url!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
 
