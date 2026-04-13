@@ -14,7 +14,6 @@ struct SourceListView: View {
     @Binding var folders: [URL]
     let ratingCounts: [Int: Int]
     let speciesEntries: [SpeciesEntry]
-    let activeFolder: URL?
     let processingFolder: URL?
     let processingProgress: Double
     @Environment(ProcessManager.self) private var processManager
@@ -28,7 +27,6 @@ struct SourceListView: View {
                 ForEach(folders, id: \.self) { folder in
                     FolderRow(
                         folder: folder,
-                        isActive: activeFolder == folder,
                         isProcessing: processingFolder == folder,
                         progress: processingFolder == folder ? processingProgress : 0
                     )
@@ -199,14 +197,12 @@ struct SourceListView: View {
 
 struct FolderRow: View {
     let folder: URL
-    let isActive: Bool
     let isProcessing: Bool
     let progress: Double
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Label(folder.lastPathComponent, systemImage: isActive ? "folder.fill" : "folder")
-                .fontWeight(isActive ? .medium : .regular)
+            Label(folder.lastPathComponent, systemImage: "folder")
             if isProcessing {
                 ProgressView(value: progress)
                     .progressViewStyle(.linear)
