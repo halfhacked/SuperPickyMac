@@ -54,9 +54,11 @@ final class PipelineCoordinator {
 
             currentFilename = fileURL.lastPathComponent
 
-            // Skip already-processed photos
+            // Skip already-processed photos (preserve manual ratings)
             if let existing = try? db.fetchByFilePath(fileURL.path) {
-                _ = existing
+                if existing.isManualRating {
+                    logger.info("Skipping \(fileURL.lastPathComponent): manual rating preserved")
+                }
                 processedCount += 1
                 await onPhotoProcessed?()
                 continue
