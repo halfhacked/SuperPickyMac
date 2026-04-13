@@ -6,6 +6,8 @@ struct ExifPanelView: View {
     @State private var exifData: EXIFData?
     @State private var loaded = false
 
+    private let labelWidth: CGFloat = 100
+
     var body: some View {
         ScrollView {
             if loaded, let data = exifData, !data.isEmpty {
@@ -13,91 +15,61 @@ struct ExifPanelView: View {
                     // Camera section
                     if data.cameraMake != nil || data.cameraModel != nil || data.lensModel != nil {
                         sectionHeader("Camera")
-                        VStack(alignment: .leading, spacing: 6) {
-                            if let make = data.cameraMake, let model = data.cameraModel {
-                                exifRow(label: "Body", value: "\(make) \(model)")
-                            } else if let model = data.cameraModel {
-                                exifRow(label: "Body", value: model)
-                            } else if let make = data.cameraMake {
-                                exifRow(label: "Make", value: make)
-                            }
-                            if let lens = data.lensModel {
-                                exifRow(label: "Lens", value: lens)
-                            }
+                        if let make = data.cameraMake, let model = data.cameraModel {
+                            exifRow(label: "Camera", value: "\(make) \(model)")
+                        } else if let model = data.cameraModel {
+                            exifRow(label: "Camera", value: model)
+                        } else if let make = data.cameraMake {
+                            exifRow(label: "Camera", value: make)
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 10)
+                        if let lens = data.lensModel {
+                            exifRow(label: "Lens", value: lens)
+                        }
                     }
 
                     // Exposure section
                     if data.focalLength != nil || data.aperture != nil || data.shutterSpeed != nil || data.iso != nil {
                         sectionHeader("Exposure")
-                        VStack(alignment: .leading, spacing: 4) {
-                            // Compact exposure line: 800mm  f/6.3  1/2000  ISO 1600
-                            HStack(spacing: 12) {
-                                if let focal = data.focalLength {
-                                    exposureBadge("\(formatNumber(focal))mm")
-                                }
-                                if let aperture = data.aperture {
-                                    exposureBadge("f/\(formatNumber(aperture))")
-                                }
-                                if let shutter = data.shutterSpeed {
-                                    exposureBadge(shutter)
-                                }
-                                if let iso = data.iso {
-                                    exposureBadge("ISO \(iso)")
-                                }
-                            }
-                            .padding(.horizontal, 12)
-
-                            VStack(alignment: .leading, spacing: 6) {
-                                if let bias = data.exposureBias {
-                                    let sign = bias >= 0 ? "+" : ""
-                                    exifRow(label: "EV", value: "\(sign)\(formatNumber(bias))")
-                                }
-                                if let metering = data.meteringMode {
-                                    exifRow(label: "Metering", value: metering)
-                                }
-                                if let wb = data.whiteBalance {
-                                    exifRow(label: "WB", value: wb)
-                                }
-                            }
-                            .padding(.horizontal, 12)
+                        if let focal = data.focalLength {
+                            exifRow(label: "Focal Length", value: "\(formatNumber(focal)) mm")
                         }
-                        .padding(.bottom, 10)
+                        // Combine exposure like Lightroom: "1/2000 at f/6.3, ISO 1600"
+                        exifRow(label: "Exposure", value: formatExposure(data))
+                        if let bias = data.exposureBias, bias != 0 {
+                            let sign = bias >= 0 ? "+" : ""
+                            exifRow(label: "Exp Comp", value: "\(sign)\(formatNumber(bias)) EV")
+                        }
+                        if let metering = data.meteringMode {
+                            exifRow(label: "Metering", value: metering)
+                        }
+                        if let wb = data.whiteBalance {
+                            exifRow(label: "White Balance", value: wb)
+                        }
                     }
 
                     // Image section
                     if data.imageWidth != nil || data.dateTimeOriginal != nil {
                         sectionHeader("Image")
-                        VStack(alignment: .leading, spacing: 6) {
-                            if let w = data.imageWidth, let h = data.imageHeight {
-                                exifRow(label: "Size", value: "\(w) \u{00D7} \(h)")
-                            }
-                            if let date = data.dateTimeOriginal {
-                                exifRow(label: "Date", value: formatDate(date))
-                            }
+                        if let date = data.dateTimeOriginal {
+                            exifRow(label: "Capture Date", value: formatDate(date))
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 10)
+                        if let w = data.imageWidth, let h = data.imageHeight {
+                            exifRow(label: "Dimensions", value: "\(w) \u{00D7} \(h)")
+                        }
                     }
 
                     // Location section
                     if data.latitude != nil || data.city != nil {
                         sectionHeader("Location")
-                        VStack(alignment: .leading, spacing: 6) {
-                            if let location = formatLocation(data) {
-                                exifRow(label: "Place", value: location)
-                            }
-                            if let coords = formatCoordinates(data) {
-                                exifRow(label: "GPS", value: coords)
-                            }
-                            if let alt = data.altitude {
-                                exifRow(label: "Alt", value: "\(Int(alt)) m")
-                            }
+                        if let location = formatLocation(data) {
+                            exifRow(label: "Place", value: location)
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 10)
+                        if let coords = formatCoordinates(data) {
+                            exifRow(label: "GPS", value: coords)
+                        }
+                        if let alt = data.altitude {
+                            exifRow(label: "Altitude", value: "\(Int(alt)) m")
+                        }
                     }
 
                     // Keywords section
@@ -106,7 +78,7 @@ struct ExifPanelView: View {
                         FlowLayout(spacing: 4) {
                             ForEach(data.keywords, id: \.self) { keyword in
                                 Text(keyword)
-                                    .font(.caption)
+                                    .font(.system(size: 11))
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 3)
                                     .background(.quaternary)
@@ -115,12 +87,12 @@ struct ExifPanelView: View {
                         }
                         .accessibilityIdentifier("Exif_Keywords")
                         .padding(.horizontal, 12)
-                        .padding(.bottom, 10)
+                        .padding(.vertical, 6)
                     }
                 }
-                .padding(.vertical, 8)
+                .padding(.vertical, 4)
             } else if loaded {
-                VStack {
+                VStack(spacing: 8) {
                     Spacer()
                     Image(systemName: "camera.metering.unknown")
                         .font(.system(size: 24))
@@ -135,7 +107,7 @@ struct ExifPanelView: View {
                 .padding()
             }
         }
-        .frame(width: 260)
+        .frame(width: 270)
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .shadow(color: .black.opacity(0.2), radius: 8, x: -2, y: 2)
@@ -153,32 +125,34 @@ struct ExifPanelView: View {
     // MARK: - Components
 
     private func sectionHeader(_ title: String) -> some View {
-        Text(title.uppercased())
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundStyle(.tertiary)
-            .tracking(0.8)
-            .padding(.horizontal, 12)
-            .padding(.top, 6)
-            .padding(.bottom, 4)
-    }
-
-    private func exifRow(label: String, value: String) -> some View {
-        HStack(alignment: .top) {
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .frame(width: 55, alignment: .trailing)
-            Text(value)
-                .font(.callout)
-                .foregroundStyle(.primary)
-                .accessibilityIdentifier("Exif_\(label)")
+        VStack(spacing: 0) {
+            Divider()
+                .padding(.horizontal, 12)
+            Text(title.uppercased())
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.tertiary)
+                .tracking(0.8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
         }
     }
 
-    private func exposureBadge(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 12, weight: .medium, design: .monospaced))
-            .foregroundStyle(.primary)
+    private func exifRow(label: String, value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(label)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .frame(width: labelWidth, alignment: .trailing)
+                .lineLimit(1)
+            Text(value)
+                .font(.system(size: 12, weight: .regular))
+                .foregroundStyle(.primary)
+                .accessibilityIdentifier("Exif_\(label)")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 3)
     }
 
     // MARK: - Formatters
@@ -190,13 +164,47 @@ struct ExifPanelView: View {
         return String(format: "%.1f", value)
     }
 
-    private func formatDate(_ raw: String) -> String {
-        // "2025:03:15 07:30:22" → "2025-03-15  07:30"
-        let cleaned = raw.replacingOccurrences(of: ":", with: "-", range: raw.startIndex..<raw.index(raw.startIndex, offsetBy: min(10, raw.count)))
-        if cleaned.count > 16 {
-            return String(cleaned.prefix(16))
+    private func formatExposure(_ data: EXIFData) -> String {
+        var parts: [String] = []
+        if let shutter = data.shutterSpeed { parts.append(shutter) }
+        if let aperture = data.aperture { parts.append("f/\(formatNumber(aperture))") }
+        if let iso = data.iso { parts.append("ISO \(iso)") }
+        if parts.isEmpty { return "—" }
+        // "1/2000 at f/6.3, ISO 1600"
+        if parts.count >= 2, data.shutterSpeed != nil, data.aperture != nil {
+            let shutter = parts.removeFirst()
+            let aperture = parts.removeFirst()
+            var result = "\(shutter) at \(aperture)"
+            if !parts.isEmpty { result += ", \(parts.joined(separator: ", "))" }
+            return result
         }
-        return cleaned
+        return parts.joined(separator: ", ")
+    }
+
+    private func formatDate(_ raw: String) -> String {
+        // "2025:03:15 07:30:22" → "Mar 15, 2025  07:30"
+        let parts = raw.split(separator: " ")
+        guard let datePart = parts.first else { return raw }
+        let dateComponents = datePart.split(separator: ":")
+        guard dateComponents.count == 3,
+              let year = Int(dateComponents[0]),
+              let month = Int(dateComponents[1]),
+              let day = Int(dateComponents[2]) else { return raw }
+
+        let months = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        let monthName = month >= 1 && month <= 12 ? months[month] : "\(month)"
+
+        var result = "\(monthName) \(day), \(year)"
+        if parts.count > 1 {
+            let time = String(parts[1])
+            // Drop seconds: "07:30:22" → "07:30"
+            let timeParts = time.split(separator: ":")
+            if timeParts.count >= 2 {
+                result += "  \(timeParts[0]):\(timeParts[1])"
+            }
+        }
+        return result
     }
 
     private func formatLocation(_ data: EXIFData) -> String? {
