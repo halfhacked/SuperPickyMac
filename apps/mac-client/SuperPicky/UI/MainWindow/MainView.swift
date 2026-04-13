@@ -134,8 +134,14 @@ final class AppState {
         case .picks:
             photos = allPhotos.filter { $0.isPick }
         case .species(let name):
-            photos = allPhotos.filter {
-                $0.speciesCommonName == name || $0.speciesScientificName == name
+            // Find the entry to check if it's the unidentified group
+            let isUnidentified = speciesEntries.first { $0.name == name }?.isUnidentified ?? false
+            if isUnidentified {
+                photos = allPhotos.filter { $0.speciesScientificName == nil }
+            } else {
+                photos = allPhotos.filter {
+                    $0.speciesCommonName == name || $0.speciesScientificName == name
+                }
             }
         case .burstGroup(let groupID):
             photos = allPhotos.filter { $0.burstGroupID == groupID }
