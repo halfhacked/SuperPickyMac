@@ -78,7 +78,7 @@ final class PipelineCoordinator {
                 )
             } catch {
                 logger.error("Failed to process \(fileURL.lastPathComponent): \(error)")
-                photo.starRating = -1
+                photo.starRating = 0
             }
 
             do {
@@ -121,7 +121,7 @@ final class PipelineCoordinator {
 
         let detection = try await inferenceClient.detect(image: image)
         guard let bird = detection.birds.first else {
-            photo.starRating = -1
+            photo.starRating = 0
             return
         }
         photo.birdConfidence = bird.confidence
