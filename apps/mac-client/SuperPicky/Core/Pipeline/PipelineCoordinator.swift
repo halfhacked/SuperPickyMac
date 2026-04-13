@@ -7,6 +7,7 @@ final class PipelineCoordinator {
     private let inferenceClient: InferenceClient
     private let ratingEngine = RatingEngine()
     private let exposureDetector = ExposureDetector()
+    private let burstDetector = BurstDetector()
     private let rawConverter = RAWConverter()
     private let scanner = DirectoryScanner()
     private let logger = Logger(subsystem: "com.superpicky.mac", category: "Pipeline")
@@ -76,6 +77,25 @@ final class PipelineCoordinator {
                 logger.error("Failed to save photo: \(error)")
             }
             processedCount += 1
+        }
+
+        // Burst detection — group similar consecutive photos
+        do {
+            let allPhotos = try db.fetchAllPhotos()
+            let burstGroups = burstDetector.detect(photos: allPhotos)
+            for group in burstGroups {
+                for photo in group.photos {
+                    var updated = photo
+                    updated.burstGroupID = group.id
+                    updated.isBurstBest = (photo.id == group.bestPhotoID)
+                    try db.save(&updated)
+                }
+            }
+            if !burstGroups.isEmpty {
+                logger.info("Detected \(burstGroups.count) burst groups")
+            }
+        } catch {
+            logger.error("Burst detection failed: \(error)")
         }
     }
 
