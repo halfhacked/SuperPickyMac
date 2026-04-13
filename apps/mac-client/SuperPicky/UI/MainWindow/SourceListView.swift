@@ -13,6 +13,8 @@ struct SourceListView: View {
     @Binding var folders: [URL]
     let ratingCounts: [Int: Int]
     let speciesList: [(name: String, count: Int)]
+    let processingFolder: URL?
+    let processingProgress: Double
     @Environment(ProcessManager.self) private var processManager
 
     let onAddFolder: () -> Void
@@ -21,15 +23,19 @@ struct SourceListView: View {
         List(selection: $selection) {
             Section {
                 ForEach(folders, id: \.self) { folder in
-                    Label(folder.lastPathComponent, systemImage: "folder")
-                        .tag(SidebarSelection.folder(folder))
-                        .contextMenu {
-                            Button(role: .destructive) {
-                                removeFolder(folder)
-                            } label: {
-                                Label("Remove", systemImage: "trash")
-                            }
+                    FolderRow(
+                        folder: folder,
+                        isProcessing: processingFolder == folder,
+                        progress: processingFolder == folder ? processingProgress : 0
+                    )
+                    .tag(SidebarSelection.folder(folder))
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            removeFolder(folder)
+                        } label: {
+                            Label("Remove", systemImage: "trash")
                         }
+                    }
                 }
             } header: {
                 HStack {
@@ -60,7 +66,8 @@ struct SourceListView: View {
                                 .foregroundStyle(.secondary)
                         }
                     } icon: {
-                        Image(systemName: rating > 0 ? "star.fill" : "xmark")
+                        Image(systemName: ratingIcon(rating))
+                            .foregroundStyle(ratingColor(rating))
                     }
                     .tag(SidebarSelection.rating(rating))
                 }
@@ -109,6 +116,43 @@ struct SourceListView: View {
         case 1: "Average"
         case 0: "Reject"
         default: "Unknown"
+        }
+    }
+
+    private func ratingIcon(_ rating: Int) -> String {
+        switch rating {
+        case 3: "star.fill"
+        case 2: "star.leadinghalf.filled"
+        case 1: "star"
+        case 0: "xmark"
+        default: "questionmark"
+        }
+    }
+
+    private func ratingColor(_ rating: Int) -> Color {
+        switch rating {
+        case 3: .green
+        case 2: .blue
+        case 1: .yellow
+        case 0: .secondary
+        default: .secondary
+        }
+    }
+}
+
+struct FolderRow: View {
+    let folder: URL
+    let isProcessing: Bool
+    let progress: Double
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label(folder.lastPathComponent, systemImage: "folder")
+            if isProcessing {
+                ProgressView(value: progress)
+                    .progressViewStyle(.linear)
+                    .scaleEffect(y: 0.5)
+            }
         }
     }
 }
