@@ -76,7 +76,8 @@ struct ExifPanelView: View {
                                     .foregroundStyle(.primary)
                                     .accessibilityIdentifier("Exif_GPS")
                                 Button {
-                                    let url = URL(string: "maps://?ll=\(lat),\(lon)&z=14")!
+                                    let label = formatLocation(data) ?? "Photo Location"
+                                    let url = URL(string: "https://maps.apple.com/?ll=\(lat),\(lon)&q=\(label.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "Photo")&z=14")!
                                     NSWorkspace.shared.open(url)
                                 } label: {
                                     Image(systemName: "map")
