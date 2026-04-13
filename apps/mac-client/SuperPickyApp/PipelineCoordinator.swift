@@ -185,9 +185,13 @@ final class PipelineCoordinator {
         photo.starRating = ratingResult.rating
         photo.isPick = ratingResult.isPick
 
-        // Bird ID — identify species from cropped region
+        // Bird ID — identify species from cropped region (GPS-boosted when available)
         do {
-            let species = try await inferenceClient.identify(image: birdCrop, topK: 1, temperature: 1.0, latitude: nil, longitude: nil)
+            let exif = EXIFReader.read(from: fileURL.path)
+            let species = try await inferenceClient.identify(
+                image: birdCrop, topK: 1, temperature: 0.9,
+                latitude: exif?.latitude, longitude: exif?.longitude
+            )
             if let top = species.first {
                 photo.speciesScientificName = top.scientificName
                 photo.speciesCommonName = top.commonName
