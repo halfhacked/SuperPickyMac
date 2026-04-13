@@ -21,10 +21,10 @@
 		3889D1E2499F4D32B9C4F63A /* MockUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FC42B7AF80A2E12BBE315A0 /* MockUITests.swift */; };
 		3B30B50F73D434EB0A32456A /* ReportDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = E726094A2C453F4B243141FD /* ReportDatabase.swift */; };
 		3CF0A61756D0E53E2AB156EB /* BirdIDTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F8BAFBDC2ECC98859327100 /* BirdIDTab.swift */; };
-		42EFEC995B4C5AFCEB4B2B12 /* ThreeColumnView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4982640A58C44554D117E89 /* ThreeColumnView.swift */; };
 		51CF230EF9AB98F2CBCE07C7 /* ExposureDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51D9ED12BDAF2634C06DA741 /* ExposureDetector.swift */; };
 		544D0CBD6A8C7E9409283DB2 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 62ECFA7A1CE3D41AAF0C1F85 /* GRDB */; };
 		628781342964039FC54E5D63 /* ThumbnailStripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFB7F185F169F5E033B697F1 /* ThumbnailStripView.swift */; };
+		695F2025AFDDC5D1103DCC06 /* BurstDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17855935BCC43C84A3B8B1B6 /* BurstDetector.swift */; };
 		72593C01A639B74395F129D0 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2035E1F0D51979F7D9BD4857 /* SettingsView.swift */; };
 		743E98D2D106B2DC4CD9A375 /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = D16D64E760C59FE88930FB6D /* Logger.swift */; };
 		89C5F718D714A0B2823140A1 /* ProcessingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EE3D418E8A088CA34CDEE29 /* ProcessingSheet.swift */; };
@@ -37,6 +37,7 @@
 		D846F6D40E95F052E6E6CCD5 /* RAWConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 197514D16AE317EA0B6F2795 /* RAWConverter.swift */; };
 		E0EE37CCF733B5B791B59CC5 /* SourceListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C1BBBB42C2CD216C1D02DAF /* SourceListView.swift */; };
 		E677528D1FD37ED911F5B009 /* HTTPInferenceClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56C15A4232D9374F66F0B0DF /* HTTPInferenceClient.swift */; };
+		EB526AFC3879286A8B692A21 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978BD285BA4245F2711720E0 /* MainView.swift */; };
 		EEE71D9CDEA197DC1AB1542F /* InferenceClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 383C2AE26F03BE2BA8C8AF84 /* InferenceClient.swift */; };
 		F0E93BA6594B7964B23E6005 /* RatingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0252F59F2B2852A81A8FB56F /* RatingEngine.swift */; };
 /* End PBXBuildFile section */
@@ -55,6 +56,7 @@
 		0252F59F2B2852A81A8FB56F /* RatingEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RatingEngine.swift; sourceTree = "<group>"; };
 		0C60DBF0C5CDD2912B0F3E06 /* AdvancedTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvancedTab.swift; sourceTree = "<group>"; };
 		0D2B2B609758193D81A70C8A /* SuperPickyUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SuperPickyUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		17855935BCC43C84A3B8B1B6 /* BurstDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BurstDetector.swift; sourceTree = "<group>"; };
 		197514D16AE317EA0B6F2795 /* RAWConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RAWConverter.swift; sourceTree = "<group>"; };
 		2035E1F0D51979F7D9BD4857 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		2E6F8B5A1F51928F3F226F23 /* StarRatingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarRatingView.swift; sourceTree = "<group>"; };
@@ -70,10 +72,10 @@
 		7FC42B7AF80A2E12BBE315A0 /* MockUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockUITests.swift; sourceTree = "<group>"; };
 		93BD233E1B5ECE7A7C1FDAB1 /* PipelineCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineCoordinator.swift; sourceTree = "<group>"; };
 		950F762228EBD7BA89B8B2C0 /* DirectoryScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectoryScanner.swift; sourceTree = "<group>"; };
+		978BD285BA4245F2711720E0 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		9EE3D418E8A088CA34CDEE29 /* ProcessingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessingSheet.swift; sourceTree = "<group>"; };
 		9F8BAFBDC2ECC98859327100 /* BirdIDTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BirdIDTab.swift; sourceTree = "<group>"; };
 		A116EA5C6473F4DDDF1E4CFB /* ProcessingFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessingFlowUITests.swift; sourceTree = "<group>"; };
-		B4982640A58C44554D117E89 /* ThreeColumnView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThreeColumnView.swift; sourceTree = "<group>"; };
 		BF0F99AF6C3E80F1945915C6 /* DetectionResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectionResult.swift; sourceTree = "<group>"; };
 		C8F78B4A7BDCFE1CE3947F19 /* SuperPickyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuperPickyApp.swift; sourceTree = "<group>"; };
 		CD58D52864274CD6EF36539F /* FullscreenViewer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullscreenViewer.swift; sourceTree = "<group>"; };
@@ -105,6 +107,7 @@
 				0C60DBF0C5CDD2912B0F3E06 /* AdvancedTab.swift */,
 				4EAD42F7354C92EFBAC2DD94 /* AppDelegate.swift */,
 				9F8BAFBDC2ECC98859327100 /* BirdIDTab.swift */,
+				17855935BCC43C84A3B8B1B6 /* BurstDetector.swift */,
 				FB57DBDFB0D5675A8F620572 /* CullingConfig.swift */,
 				FCE975693ABAA78E1853356C /* CullingTab.swift */,
 				BF0F99AF6C3E80F1945915C6 /* DetectionResult.swift */,
@@ -115,6 +118,7 @@
 				56C15A4232D9374F66F0B0DF /* HTTPInferenceClient.swift */,
 				383C2AE26F03BE2BA8C8AF84 /* InferenceClient.swift */,
 				D16D64E760C59FE88930FB6D /* Logger.swift */,
+				978BD285BA4245F2711720E0 /* MainView.swift */,
 				5EAEF125F85AE85042A82314 /* Photo.swift */,
 				93BD233E1B5ECE7A7C1FDAB1 /* PipelineCoordinator.swift */,
 				D354E8BFE2BB6211ADAA855F /* PreviewView.swift */,
@@ -129,7 +133,6 @@
 				4DB5E6511A425B77A9DE0E1A /* SpeciesMatch.swift */,
 				2E6F8B5A1F51928F3F226F23 /* StarRatingView.swift */,
 				C8F78B4A7BDCFE1CE3947F19 /* SuperPickyApp.swift */,
-				B4982640A58C44554D117E89 /* ThreeColumnView.swift */,
 				EFB7F185F169F5E033B697F1 /* ThumbnailStripView.swift */,
 			);
 			path = SuperPickyApp;
@@ -256,6 +259,7 @@
 				22B8D6F1C555998C06BDD1F3 /* AdvancedTab.swift in Sources */,
 				BFD6DCFD7A7D8700EB577954 /* AppDelegate.swift in Sources */,
 				3CF0A61756D0E53E2AB156EB /* BirdIDTab.swift in Sources */,
+				695F2025AFDDC5D1103DCC06 /* BurstDetector.swift in Sources */,
 				23B283FEAAAFA6DF2A6EB966 /* CullingConfig.swift in Sources */,
 				25E22E7829DC2B6ABA77729C /* CullingTab.swift in Sources */,
 				2CF05E13A2B84DFB79CE7DD0 /* DetectionResult.swift in Sources */,
@@ -266,6 +270,7 @@
 				E677528D1FD37ED911F5B009 /* HTTPInferenceClient.swift in Sources */,
 				EEE71D9CDEA197DC1AB1542F /* InferenceClient.swift in Sources */,
 				743E98D2D106B2DC4CD9A375 /* Logger.swift in Sources */,
+				EB526AFC3879286A8B692A21 /* MainView.swift in Sources */,
 				04EF6C1DD4443AF13BA6722D /* Photo.swift in Sources */,
 				D0CB8BD3324BE76EE0E716B4 /* PipelineCoordinator.swift in Sources */,
 				93DFF6C1F94162A500AB340A /* PreviewView.swift in Sources */,
@@ -280,7 +285,6 @@
 				A757D28A8C7C16F77F9BF61D /* SpeciesMatch.swift in Sources */,
 				D26E06E986C669DB868B7F06 /* StarRatingView.swift in Sources */,
 				04AFCB4EB5F25BCE9F245A56 /* SuperPickyApp.swift in Sources */,
-				42EFEC995B4C5AFCEB4B2B12 /* ThreeColumnView.swift in Sources */,
 				628781342964039FC54E5D63 /* ThumbnailStripView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

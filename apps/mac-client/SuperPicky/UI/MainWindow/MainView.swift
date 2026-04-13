@@ -1,12 +1,27 @@
 import SwiftUI
 
+/// Species with its burst groups for the sidebar hierarchy.
+struct SpeciesEntry: Identifiable {
+    let name: String
+    let count: Int
+    let burstGroups: [BurstGroupEntry]
+    let singlePhotos: Int // photos not in any burst
+    var id: String { name }
+}
+
+struct BurstGroupEntry: Identifiable {
+    let id: UUID
+    let count: Int
+    let bestFilename: String?
+}
+
 @Observable
 final class AppState {
     var sidebarSelection: SidebarSelection?
     var selectedPhotoID: UUID?
     var folders: [URL] = []
     var ratingCounts: [Int: Int] = [:]
-    var speciesList: [(name: String, count: Int)] = []
+    var speciesEntries: [SpeciesEntry] = []
 
     // All photos from the current folder (unfiltered)
     private var allPhotos: [Photo] = []
@@ -37,25 +52,55 @@ final class AppState {
             let db = try ReportDatabase(folderPath: folder)
             allPhotos = try db.fetchAllPhotos()
             ratingCounts = try db.ratingCounts()
+            buildSpeciesHierarchy()
 
-            var speciesMap: [String: Int] = [:]
-            for photo in allPhotos {
-                if let name = photo.speciesCommonName ?? photo.speciesScientificName {
-                    speciesMap[name, default: 0] += 1
-                }
-            }
-            speciesList = speciesMap.map { (name: $0.key, count: $0.value) }
-                .sorted { $0.count > $1.count }
-
-            // Show all photos initially
             photos = allPhotos
             selectedPhotoID = photos.first?.id
         } catch {
             allPhotos = []
             photos = []
             ratingCounts = [:]
-            speciesList = []
+            speciesEntries = []
         }
+    }
+
+    /// Build species → burst group hierarchy from loaded photos.
+    private func buildSpeciesHierarchy() {
+        // Group photos by species
+        var bySpecies: [String: [Photo]] = [:]
+        for photo in allPhotos {
+            let name = photo.speciesCommonName ?? photo.speciesScientificName ?? "Unknown"
+            bySpecies[name, default: []].append(photo)
+        }
+
+        speciesEntries = bySpecies.map { name, photos in
+            // Find burst groups within this species
+            var burstMap: [UUID: [Photo]] = [:]
+            var singleCount = 0
+            for photo in photos {
+                if let groupID = photo.burstGroupID {
+                    burstMap[groupID, default: []].append(photo)
+                } else {
+                    singleCount += 1
+                }
+            }
+
+            let burstGroups = burstMap.map { groupID, groupPhotos in
+                let best = groupPhotos.first { $0.isBurstBest }
+                return BurstGroupEntry(
+                    id: groupID,
+                    count: groupPhotos.count,
+                    bestFilename: best?.filename ?? groupPhotos.first?.filename
+                )
+            }.sorted { $0.count > $1.count }
+
+            return SpeciesEntry(
+                name: name,
+                count: photos.count,
+                burstGroups: burstGroups,
+                singlePhotos: singleCount
+            )
+        }.sorted { $0.count > $1.count }
     }
 
     /// Clear all photo data (when folder is removed).
@@ -63,7 +108,7 @@ final class AppState {
         allPhotos = []
         photos = []
         ratingCounts = [:]
-        speciesList = []
+        speciesEntries = []
         selectedPhotoID = nil
         currentFolder = nil
     }
@@ -83,6 +128,8 @@ final class AppState {
             photos = allPhotos.filter {
                 $0.speciesCommonName == name || $0.speciesScientificName == name
             }
+        case .burstGroup(let groupID):
+            photos = allPhotos.filter { $0.burstGroupID == groupID }
         case nil:
             photos = allPhotos
         }
@@ -109,7 +156,7 @@ struct MainView: View {
                 selection: $appState.sidebarSelection,
                 folders: $appState.folders,
                 ratingCounts: appState.ratingCounts,
-                speciesList: appState.speciesList,
+                speciesEntries: appState.speciesEntries,
                 processingFolder: appState.processingFolder,
                 processingProgress: appState.processingProgress,
                 onAddFolder: { pickAndProcess() },
@@ -136,7 +183,7 @@ struct MainView: View {
             switch newValue {
             case .folder(let url):
                 appState.loadPhotos(for: url)
-            case .rating, .flying, .picks, .species:
+            case .rating, .flying, .picks, .species, .burstGroup:
                 appState.applyFilter()
             case nil:
                 break

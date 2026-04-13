@@ -6,13 +6,14 @@ enum SidebarSelection: Hashable {
     case flying
     case picks
     case species(String)
+    case burstGroup(UUID)
 }
 
 struct SourceListView: View {
     @Binding var selection: SidebarSelection?
     @Binding var folders: [URL]
     let ratingCounts: [Int: Int]
-    let speciesList: [(name: String, count: Int)]
+    let speciesEntries: [SpeciesEntry]
     let processingFolder: URL?
     let processingProgress: Double
     @Environment(ProcessManager.self) private var processManager
@@ -81,16 +82,42 @@ struct SourceListView: View {
                     .tag(SidebarSelection.picks)
             }
 
-            if !speciesList.isEmpty {
+            if !speciesEntries.isEmpty {
                 Section("Species") {
-                    ForEach(speciesList, id: \.name) { species in
-                        HStack {
-                            Text(species.name)
-                            Spacer()
-                            Text("\(species.count)")
-                                .foregroundStyle(.secondary)
+                    ForEach(speciesEntries) { species in
+                        DisclosureGroup {
+                            // Burst groups as children
+                            ForEach(species.burstGroups) { burst in
+                                HStack {
+                                    Image(systemName: "rectangle.stack")
+                                        .foregroundStyle(.orange)
+                                    Text("Burst")
+                                    Spacer()
+                                    Text("\(burst.count)")
+                                        .foregroundStyle(.secondary)
+                                }
+                                .tag(SidebarSelection.burstGroup(burst.id))
+                            }
+                            // Single (non-burst) photos count
+                            if species.singlePhotos > 0 {
+                                HStack {
+                                    Image(systemName: "photo")
+                                        .foregroundStyle(.secondary)
+                                    Text("Singles")
+                                    Spacer()
+                                    Text("\(species.singlePhotos)")
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text(species.name)
+                                Spacer()
+                                Text("\(species.count)")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .tag(SidebarSelection.species(species.name))
                         }
-                        .tag(SidebarSelection.species(species.name))
                     }
                 }
             }

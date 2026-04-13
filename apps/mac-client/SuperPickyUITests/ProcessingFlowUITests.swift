@@ -65,11 +65,11 @@ final class ProcessingFlowUITests: XCTestCase {
         sleep(1) // Let UI settle
     }
 
-    /// 04: All 8 photos remain in folder (no auto-organize)
+    /// 04: All photos remain in folder (no auto-organize)
     func test04_PhotosNotMoved() throws {
         let photos = try! FileManager.default.contentsOfDirectory(atPath: Self.testDir)
             .filter { $0.hasSuffix(".jpg") }
-        XCTAssertEqual(photos.count, 8, "All 8 photos should remain in folder")
+        XCTAssertEqual(photos.count, 15, "All 15 photos should remain in folder")
     }
 
     /// 05: Thumbnails are visible in the strip
