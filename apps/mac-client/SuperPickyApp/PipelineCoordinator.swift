@@ -1,5 +1,7 @@
 import Foundation
 import CoreGraphics
+import ImageIO
+import UniformTypeIdentifiers
 import os
 
 @Observable
@@ -127,7 +129,28 @@ final class PipelineCoordinator {
     ) async throws {
         let image = try rawConverter.convert(fileURL: fileURL)
 
-        let detection = try await inferenceClient.detect(image: image)
+        // Downsample for detect/aesthetics/keypoints/flight (1280px is sufficient)
+        let smallImage: CGImage = {
+            let maxDim = 1280
+            if image.width <= maxDim && image.height <= maxDim { return image }
+            guard let source = CGImageSourceCreateWithData(
+                NSMutableData() as CFMutableData, nil
+            ) else { return image }
+            // Use thumbnail API for fast downscale
+            let data = NSMutableData()
+            guard let dest = CGImageDestinationCreateWithData(data, "public.jpeg" as CFString, 1, nil) else { return image }
+            CGImageDestinationAddImage(dest, image, [kCGImageDestinationLossyCompressionQuality: 0.8] as CFDictionary)
+            CGImageDestinationFinalize(dest)
+            guard let src = CGImageSourceCreateWithData(data, nil) else { return image }
+            let opts: [CFString: Any] = [
+                kCGImageSourceThumbnailMaxPixelSize: maxDim,
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+            ]
+            return CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary) ?? image
+        }()
+
+        let detection = try await inferenceClient.detect(image: smallImage)
         guard let bird = detection.birds.first else {
             photo.starRating = 0
             return
@@ -135,17 +158,17 @@ final class PipelineCoordinator {
         photo.birdConfidence = bird.confidence
 
         let cropRect = CGRect(
-            x: bird.bbox.origin.x * CGFloat(image.width),
-            y: bird.bbox.origin.y * CGFloat(image.height),
-            width: bird.bbox.size.width * CGFloat(image.width),
-            height: bird.bbox.size.height * CGFloat(image.height)
+            x: bird.bbox.origin.x * CGFloat(smallImage.width),
+            y: bird.bbox.origin.y * CGFloat(smallImage.height),
+            width: bird.bbox.size.width * CGFloat(smallImage.width),
+            height: bird.bbox.size.height * CGFloat(smallImage.height)
         )
-        guard let birdCrop = image.cropping(to: cropRect) else {
+        guard let birdCrop = smallImage.cropping(to: cropRect) else {
             photo.starRating = 0
             return
         }
 
-        async let aestheticsResponse = inferenceClient.aesthetics(image: image)
+        async let aestheticsResponse = inferenceClient.aesthetics(image: smallImage)
         async let keypointResult = inferenceClient.keypoints(image: birdCrop)
         async let flightResult = inferenceClient.flight(image: birdCrop)
 
