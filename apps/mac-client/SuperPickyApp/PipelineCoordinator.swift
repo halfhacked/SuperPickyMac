@@ -9,7 +9,6 @@ final class PipelineCoordinator {
     private let exposureDetector = ExposureDetector()
     private let rawConverter = RAWConverter()
     private let scanner = DirectoryScanner()
-    private let organizer = FileOrganizer()
     private let logger = Logger(subsystem: "com.superpicky.mac", category: "Pipeline")
 
     var totalCount = 0
@@ -26,7 +25,6 @@ final class PipelineCoordinator {
         ratingConfig: RatingEngine.Config,
         exposureEnabled: Bool,
         exposureThreshold: Float,
-        autoOrganize: Bool
     ) async {
         isProcessing = true
         defer { isProcessing = false }
@@ -78,20 +76,6 @@ final class PipelineCoordinator {
                 logger.error("Failed to save photo: \(error)")
             }
             processedCount += 1
-        }
-
-        if autoOrganize {
-            do {
-                let allPhotos = try db.fetchAllPhotos()
-                for photo in allPhotos where photo.starRating >= 0 {
-                    let fileURL = URL(fileURLWithPath: photo.filePath)
-                    if FileManager.default.fileExists(atPath: fileURL.path) {
-                        try organizer.organize(file: fileURL, starRating: photo.starRating, inFolder: folder)
-                    }
-                }
-            } catch {
-                logger.error("Failed to organize: \(error)")
-            }
         }
     }
 

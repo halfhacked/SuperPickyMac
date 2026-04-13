@@ -95,7 +95,19 @@ struct MainView: View {
         }
         .onAppear {
             if let testFolder = ProcessInfo.processInfo.environment["TEST_FOLDER"] {
-                startProcessing(folder: URL(fileURLWithPath: testFolder))
+                let folder = URL(fileURLWithPath: testFolder)
+                // Wait for server to be ready before auto-processing
+                Task {
+                    if !isTestMode {
+                        for _ in 0..<30 {
+                            if processManager.isReady { break }
+                            try? await Task.sleep(for: .seconds(1))
+                        }
+                    }
+                    await MainActor.run {
+                        startProcessing(folder: folder)
+                    }
+                }
             }
         }
     }
@@ -133,7 +145,6 @@ struct MainView: View {
         )
         let exposureEnabled = config.exposureDetectionEnabled
         let exposureThreshold = config.exposureThreshold
-        let autoOrganize = config.autoOrganize
 
         // Add folder to sidebar immediately
         if !appState.folders.contains(folder) {
@@ -162,15 +173,16 @@ struct MainView: View {
                 ratingConfig: ratingConfig,
                 exposureEnabled: exposureEnabled,
                 exposureThreshold: exposureThreshold,
-                autoOrganize: autoOrganize
             )
 
             progressTask.cancel()
 
-            // Processing done — load results
-            appState.processingFolder = nil
-            appState.processingProgress = 0
-            appState.loadPhotos(for: folder)
+            // Processing done — load results on MainActor
+            await MainActor.run {
+                appState.processingFolder = nil
+                appState.processingProgress = 0
+                appState.loadPhotos(for: folder)
+            }
             if !isTestMode { NSSound.beep() }
         }
     }

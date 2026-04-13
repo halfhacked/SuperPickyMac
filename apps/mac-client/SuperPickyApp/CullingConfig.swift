@@ -53,7 +53,6 @@ final class CullingConfig {
     var exposureDetectionEnabled: Bool { didSet { save() } }
     var exposureThreshold: Float { didSet { save() } }
     var burstDetectionEnabled: Bool { didSet { save() } }
-    var autoOrganize: Bool { didSet { save() } }
     var namingStandard: NamingStandard { didSet { save() } }
     var backendPort: Int { didSet { save() } }
 
@@ -66,7 +65,6 @@ final class CullingConfig {
         self.exposureDetectionEnabled = defaults.object(forKey: "exposureDetectionEnabled") as? Bool ?? true
         self.exposureThreshold = defaults.object(forKey: "exposureThreshold") as? Float ?? 0.10
         self.burstDetectionEnabled = defaults.object(forKey: "burstDetectionEnabled") as? Bool ?? true
-        self.autoOrganize = defaults.object(forKey: "autoOrganize") as? Bool ?? false
         self.namingStandard = NamingStandard(rawValue: defaults.string(forKey: "namingStandard") ?? "") ?? .osea
         self.backendPort = defaults.object(forKey: "backendPort") as? Int ?? 8420
     }
@@ -79,7 +77,6 @@ final class CullingConfig {
         defaults.set(exposureDetectionEnabled, forKey: "exposureDetectionEnabled")
         defaults.set(exposureThreshold, forKey: "exposureThreshold")
         defaults.set(burstDetectionEnabled, forKey: "burstDetectionEnabled")
-        defaults.set(autoOrganize, forKey: "autoOrganize")
         defaults.set(namingStandard.rawValue, forKey: "namingStandard")
         defaults.set(backendPort, forKey: "backendPort")
     }

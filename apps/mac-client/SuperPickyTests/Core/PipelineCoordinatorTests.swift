@@ -51,7 +51,7 @@ struct MockInferenceClient: InferenceClient {
         let config = RatingEngine.Config(sharpnessThreshold: 380, aestheticsThreshold: 4.8)
         let pipeline = PipelineCoordinator(inferenceClient: mockClient)
 
-        await pipeline.process(folder: tempDir, ratingConfig: config, exposureEnabled: true, exposureThreshold: 0.10, autoOrganize: false)
+        await pipeline.process(folder: tempDir, ratingConfig: config, exposureEnabled: true, exposureThreshold: 0.10)
 
         let db = try ReportDatabase(folderPath: tempDir)
         let photos = try db.fetchAllPhotos()
@@ -73,7 +73,7 @@ struct MockInferenceClient: InferenceClient {
         let config = RatingEngine.Config(sharpnessThreshold: 380, aestheticsThreshold: 4.8)
         let pipeline = PipelineCoordinator(inferenceClient: mockClient)
 
-        await pipeline.process(folder: tempDir, ratingConfig: config, exposureEnabled: false, exposureThreshold: 0.10, autoOrganize: false)
+        await pipeline.process(folder: tempDir, ratingConfig: config, exposureEnabled: false, exposureThreshold: 0.10)
 
         let db = try ReportDatabase(folderPath: tempDir)
         let photos = try db.fetchAllPhotos()
@@ -93,7 +93,7 @@ struct MockInferenceClient: InferenceClient {
         let config = RatingEngine.Config(sharpnessThreshold: 380, aestheticsThreshold: 4.8)
         let pipeline = PipelineCoordinator(inferenceClient: mockClient)
 
-        await pipeline.process(folder: tempDir, ratingConfig: config, exposureEnabled: false, exposureThreshold: 0.10, autoOrganize: false)
+        await pipeline.process(folder: tempDir, ratingConfig: config, exposureEnabled: false, exposureThreshold: 0.10)
 
         #expect(pipeline.processedCount == 3)
         #expect(pipeline.totalCount == 3)
