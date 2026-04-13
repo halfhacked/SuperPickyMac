@@ -172,6 +172,7 @@ struct MainView: View {
                 folders: $appState.folders,
                 ratingCounts: appState.ratingCounts,
                 speciesEntries: appState.speciesEntries,
+                activeFolder: appState.currentFolder,
                 processingFolder: appState.processingFolder,
                 processingProgress: appState.processingProgress,
                 onAddFolder: { pickAndProcess() },
@@ -272,8 +273,9 @@ struct MainView: View {
                 exposureEnabled: exposureEnabled,
                 exposureThreshold: exposureThreshold,
                 onPhotoProcessed: {
-                    // Dispatch async to avoid reentrant NSTableView updates
-                    Task { @MainActor in
+                    // Small delay to avoid reentrant NSTableView updates
+                    try? await Task.sleep(for: .milliseconds(50))
+                    await MainActor.run {
                         if pipeline.totalCount > 0 {
                             appState.processingProgress = Double(pipeline.processedCount) / Double(pipeline.totalCount)
                         }
