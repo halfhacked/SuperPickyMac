@@ -17,7 +17,7 @@ struct SuperPickyApp: App {
                     processManager.start()
                 }
         }
-        .windowStyle(.hiddenTitleBar)
+        .windowStyle(.titleBar)
         .defaultSize(width: 1200, height: 800)
 
         Settings {

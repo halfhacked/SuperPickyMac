@@ -56,10 +56,7 @@ final class AppState {
             buildSpeciesHierarchy()
 
             photos = allPhotos
-            // Auto-select the highest-rated photo
-            selectedPhotoID = photos
-                .sorted { ($0.starRating, $0.aestheticsScore ?? 0) > ($1.starRating, $1.aestheticsScore ?? 0) }
-                .first?.id
+            selectedPhotoID = photos.first?.id
         } catch {
             allPhotos = []
             photos = []
@@ -175,7 +172,6 @@ struct MainView: View {
                 folders: $appState.folders,
                 ratingCounts: appState.ratingCounts,
                 speciesEntries: appState.speciesEntries,
-                activeFolder: appState.currentFolder,
                 processingFolder: appState.processingFolder,
                 processingProgress: appState.processingProgress,
                 onAddFolder: { pickAndProcess() },
@@ -270,24 +266,29 @@ struct MainView: View {
         appState.processingProgress = 0
 
         processingTask = Task {
-            await pipeline.process(
-                folder: folder,
-                ratingConfig: ratingConfig,
-                exposureEnabled: exposureEnabled,
-                exposureThreshold: exposureThreshold,
-                onPhotoProcessed: {
-                    try? await Task.sleep(for: .milliseconds(150))
+            // Observe pipeline progress
+            let progressTask = Task {
+                while !Task.isCancelled {
                     await MainActor.run {
                         if pipeline.totalCount > 0 {
                             appState.processingProgress = Double(pipeline.processedCount) / Double(pipeline.totalCount)
                         }
                         appState.processingFilename = pipeline.currentFilename
-                        appState.loadPhotos(for: folder)
                     }
+                    try? await Task.sleep(for: .milliseconds(200))
                 }
+            }
+
+            await pipeline.process(
+                folder: folder,
+                ratingConfig: ratingConfig,
+                exposureEnabled: exposureEnabled,
+                exposureThreshold: exposureThreshold,
             )
 
-            // Final reload (includes burst detection results)
+            progressTask.cancel()
+
+            // Processing done — load results on MainActor
             await MainActor.run {
                 appState.processingFolder = nil
                 appState.processingProgress = 0

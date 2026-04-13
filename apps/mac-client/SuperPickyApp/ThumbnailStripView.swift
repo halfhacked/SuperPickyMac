@@ -59,9 +59,8 @@ struct ThumbnailCell: View {
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .overlay(
             RoundedRectangle(cornerRadius: 6)
-                .stroke(isSelected ? Color.accentColor : .clear, lineWidth: 3)
+                .stroke(isSelected ? Color.accentColor : .clear, lineWidth: 2)
         )
-        .shadow(color: isSelected ? Color.accentColor.opacity(0.5) : .clear, radius: 4)
         .accessibilityIdentifier("Thumbnail_\(photo.filename)")
     }
 }

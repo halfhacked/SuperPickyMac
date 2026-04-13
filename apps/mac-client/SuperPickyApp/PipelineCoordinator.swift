@@ -26,7 +26,6 @@ final class PipelineCoordinator {
         ratingConfig: RatingEngine.Config,
         exposureEnabled: Bool,
         exposureThreshold: Float,
-        onPhotoProcessed: (@Sendable () async -> Void)? = nil
     ) async {
         isProcessing = true
         defer { isProcessing = false }
@@ -78,7 +77,6 @@ final class PipelineCoordinator {
                 logger.error("Failed to save photo: \(error)")
             }
             processedCount += 1
-            await onPhotoProcessed?()
         }
 
         // Burst detection — group similar consecutive photos
