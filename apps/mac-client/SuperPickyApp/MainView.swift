@@ -304,17 +304,31 @@ struct ContentView: View {
     let photos: [Photo]
     @Binding var selectedPhotoID: UUID?
     let selectedPhoto: Photo?
+    @State private var showExifPanel = false
 
     var body: some View {
         VSplitView {
-            PreviewView(photo: selectedPhoto)
-                .frame(minHeight: 300)
+            ZStack(alignment: .topTrailing) {
+                PreviewView(photo: selectedPhoto)
+
+                if showExifPanel, let photo = selectedPhoto {
+                    ExifPanelView(photo: photo)
+                        .transition(.move(edge: .trailing))
+                }
+            }
+            .frame(minHeight: 300)
 
             ThumbnailStripView(
                 photos: photos,
                 selectedPhotoID: $selectedPhotoID
             )
             .frame(minHeight: 80, idealHeight: 120, maxHeight: 200)
+        }
+        .onKeyPress("i") {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showExifPanel.toggle()
+            }
+            return .handled
         }
     }
 }
