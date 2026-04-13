@@ -1,4 +1,5 @@
-import sys, os
+import sys
+import os
 from PIL import Image
 from io import BytesIO
 from inference.device import get_best_device

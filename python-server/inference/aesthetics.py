@@ -1,4 +1,5 @@
-import sys, os
+import sys
+import os
 from inference.device import get_best_device
 
 SUPERPICKY_DIR = os.environ.get("SUPERPICKY_ORIGINAL", os.path.expanduser("~/projects/SuperPicky"))
