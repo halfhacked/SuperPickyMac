@@ -346,6 +346,7 @@ struct ContentView: View {
     @State private var showExifPanel = true
     @State private var showFullscreen = false
     @State private var isExporting = false
+    @FocusState private var isContentFocused: Bool
     @State private var exportProgress = 0
     @State private var exportTotal = 0
     @State private var showExportComplete = false
@@ -370,6 +371,10 @@ struct ContentView: View {
             )
             .frame(minHeight: 80, idealHeight: 120, maxHeight: 200)
         }
+        .focusable()
+        .focusEffectDisabled()
+        .focused($isContentFocused)
+        .onAppear { isContentFocused = true }
         .onKeyPress("i") {
             withAnimation(.easeInOut(duration: 0.2)) {
                 showExifPanel.toggle()
@@ -380,6 +385,12 @@ struct ContentView: View {
             showFullscreen = true
             return .handled
         }
+        .onKeyPress("0") { rateSelectedPhoto(0); return .handled }
+        .onKeyPress("1") { rateSelectedPhoto(1); return .handled }
+        .onKeyPress("2") { rateSelectedPhoto(2); return .handled }
+        .onKeyPress("3") { rateSelectedPhoto(3); return .handled }
+        .onKeyPress("4") { rateSelectedPhoto(4); return .handled }
+        .onKeyPress("5") { rateSelectedPhoto(5); return .handled }
         .overlay {
             if showFullscreen {
                 FullscreenViewer(
@@ -437,6 +448,11 @@ struct ContentView: View {
         } message: {
             Text("No photos match the current filter")
         }
+    }
+
+    private func rateSelectedPhoto(_ rating: Int) {
+        guard let id = selectedPhoto?.id else { return }
+        onRatePhoto?(id, rating)
     }
 
     private func exportPhotos() {

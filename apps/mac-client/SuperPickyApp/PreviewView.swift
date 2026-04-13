@@ -88,6 +88,10 @@ struct InfoBarView: View {
         HStack(spacing: 16) {
             HStack(spacing: 4) {
                 StarRatingView(rating: photo.starRating)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityIdentifier("InfoBarRating")
+                    .accessibilityLabel("Star rating")
+                    .accessibilityValue("\(photo.starRating)")
                 if photo.isManualRating {
                     Image(systemName: "pencil")
                         .font(.caption)
