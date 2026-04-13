@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct SuperPickyApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var processManager = ProcessManager()
     @State private var config = CullingConfig()
 
@@ -11,6 +12,10 @@ struct SuperPickyApp: App {
                 .frame(minWidth: 900, minHeight: 600)
                 .environment(processManager)
                 .environment(config)
+                .onAppear {
+                    appDelegate.processManager = processManager
+                    processManager.start()
+                }
         }
         .windowStyle(.titleBar)
         .defaultSize(width: 1200, height: 800)
