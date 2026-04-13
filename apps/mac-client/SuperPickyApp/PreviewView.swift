@@ -5,7 +5,7 @@ struct PreviewView: View {
     @State private var zoomState = ZoomState()
     @State private var previousPhotoID: UUID?
 
-    private static let bgColor = Color(white: 0.18)
+    private static let bgColor = Color(nsColor: .underPageBackgroundColor)
 
     var body: some View {
         VStack(spacing: 0) {
@@ -44,7 +44,7 @@ struct AsyncPreviewImage: View {
 
     var body: some View {
         ZStack {
-            Color(white: 0.18)
+            Color(nsColor: .underPageBackgroundColor)
             if let image {
                 ZoomableImageView(image: image, zoomState: zoomState)
             } else {
