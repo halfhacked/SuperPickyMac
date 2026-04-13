@@ -4,6 +4,7 @@ struct FullscreenViewer: View {
     let photos: [Photo]
     @Binding var selectedPhotoID: UUID?
     @Binding var isPresented: Bool
+    var onRatePhoto: ((UUID, Int) -> Void)?
     @State private var showInfo = false
 
     var body: some View {
@@ -31,10 +32,12 @@ struct FullscreenViewer: View {
         .onKeyPress(.rightArrow) { navigatePhoto(direction: 1); return .handled }
         .onKeyPress(.escape) { isPresented = false; return .handled }
         .onKeyPress("i") { showInfo.toggle(); return .handled }
+        .onKeyPress("0") { rateSelected(0); return .handled }
         .onKeyPress("1") { rateSelected(1); return .handled }
         .onKeyPress("2") { rateSelected(2); return .handled }
         .onKeyPress("3") { rateSelected(3); return .handled }
-        .onKeyPress("0") { rateSelected(0); return .handled }
+        .onKeyPress("4") { rateSelected(4); return .handled }
+        .onKeyPress("5") { rateSelected(5); return .handled }
     }
 
     private var selectedPhoto: Photo? {
@@ -51,6 +54,7 @@ struct FullscreenViewer: View {
     }
 
     private func rateSelected(_ rating: Int) {
-        // Rating update will be wired to database in future task
+        guard let id = selectedPhotoID else { return }
+        onRatePhoto?(id, rating)
     }
 }
