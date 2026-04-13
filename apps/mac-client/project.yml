@@ -3,9 +3,6 @@ options:
   bundleIdPrefix: com.superpicky
   deploymentTarget:
     macOS: "14.0"
-  xcodeVersion: "16.0"
-  minimumXcodeGenVersion: "2.40.0"
-  generateEmptyDirectories: true
 
 packages:
   GRDB:
@@ -17,34 +14,13 @@ targets:
     type: application
     platform: macOS
     sources:
-      - SuperPicky
+      - SuperPickyApp
     dependencies:
       - package: GRDB
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.superpicky.mac
-        MARKETING_VERSION: "0.1.0"
-        CURRENT_PROJECT_VERSION: "1"
         GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: SuperPicky
-        INFOPLIST_KEY_NSHighResolutionCapable: YES
-        INFOPLIST_KEY_NSSupportsAutomaticTermination: NO
         SWIFT_VERSION: "5.10"
-        MACOSX_DEPLOYMENT_TARGET: "14.0"
-        CODE_SIGN_IDENTITY: "-"
-        CODE_SIGNING_REQUIRED: NO
-
-  SuperPickyTests:
-    type: bundle.unit-test
-    platform: macOS
-    sources:
-      - SuperPickyTests
-    dependencies:
-      - target: SuperPicky
-    settings:
-      base:
-        SWIFT_VERSION: "5.10"
-        GENERATE_INFOPLIST_FILE: YES
         CODE_SIGN_IDENTITY: "-"
         CODE_SIGNING_REQUIRED: NO
 
@@ -57,7 +33,7 @@ targets:
       - target: SuperPicky
     settings:
       base:
-        SWIFT_VERSION: "5.10"
         GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.10"
         CODE_SIGN_IDENTITY: "-"
         CODE_SIGNING_REQUIRED: NO
