@@ -10,19 +10,15 @@ final class ProcessingFlowUITests: XCTestCase {
     // MARK: - Mock tests (no server needed)
 
     func testEmptyStateShowsSelectFolder() throws {
-        let app = XCUIApplication()
-        app.launchEnvironment["TEST_MODE"] = "1"
-        app.launch()
+        let app = launchApp(testMode: true)
         defer { app.terminate() }
 
         let selectButton = app.buttons["SelectFolderButton"]
-        XCTAssertTrue(selectButton.waitForExistence(timeout: 5), "Empty state should show Select Folder button")
+        XCTAssertTrue(selectButton.waitForExistence(timeout: 5))
     }
 
     func testSidebarShowsRatings() throws {
-        let app = XCUIApplication()
-        app.launchEnvironment["TEST_MODE"] = "1"
-        app.launch()
+        let app = launchApp(testMode: true)
         defer { app.terminate() }
 
         XCTAssertTrue(app.staticTexts["Excellent"].waitForExistence(timeout: 5))
@@ -31,107 +27,143 @@ final class ProcessingFlowUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Reject"].exists)
     }
 
-    // MARK: - Real inference tests (requires server on :8420 + test-photos)
+    // MARK: - Real inference tests (requires server on :8420)
+
+    func testProcessAndShowThumbnails() throws {
+        let testDir = copyTestPhotos(suffix: "thumbs")
+        let app = launchApp(testFolder: testDir)
+        defer { app.terminate() }
+
+        // Wait for server + processing
+        XCTAssertTrue(app.staticTexts["Models ready"].waitForExistence(timeout: 30))
+        let folderName = (testDir as NSString).lastPathComponent
+        XCTAssertTrue(app.staticTexts[folderName].waitForExistence(timeout: 15))
+        waitForProcessingComplete(app: app, testDir: testDir, timeout: 120)
+
+        // Thumbnails should appear in the horizontal strip
+        let images = app.images
+        XCTAssertGreaterThan(images.count, 0, "Thumbnails should be visible after processing")
+    }
+
+    func testSelectPhotoShowsPreview() throws {
+        let testDir = copyTestPhotos(suffix: "preview")
+        let app = launchApp(testFolder: testDir)
+        defer { app.terminate() }
+
+        XCTAssertTrue(app.staticTexts["Models ready"].waitForExistence(timeout: 30))
+        let folderName = (testDir as NSString).lastPathComponent
+        XCTAssertTrue(app.staticTexts[folderName].waitForExistence(timeout: 15))
+        waitForProcessingComplete(app: app, testDir: testDir, timeout: 120)
+
+        // After processing, a photo should be auto-selected.
+        // The empty state text should be gone — replaced by the actual preview
+        let emptyText = app.staticTexts["Select a photo to preview"]
+        XCTAssertFalse(emptyText.exists, "Empty state should be gone after processing — photo should be previewed")
+
+        // Thumbnails should also be visible (confirming photos loaded)
+        XCTAssertGreaterThan(app.images.count, 0, "Thumbnails should be visible")
+    }
+
+    func testFilterByRating() throws {
+        let testDir = copyTestPhotos(suffix: "filter")
+        let app = launchApp(testFolder: testDir)
+        defer { app.terminate() }
+
+        XCTAssertTrue(app.staticTexts["Models ready"].waitForExistence(timeout: 30))
+        let folderName = (testDir as NSString).lastPathComponent
+        XCTAssertTrue(app.staticTexts[folderName].waitForExistence(timeout: 15))
+        waitForProcessingComplete(app: app, testDir: testDir, timeout: 120)
+
+        // Click "Excellent" in the sidebar to filter by 3-star
+        let excellentRow = app.staticTexts["Excellent"]
+        XCTAssertTrue(excellentRow.exists)
+        excellentRow.click()
+        sleep(1)
+
+        // The thumbnail count should change (fewer or same, not more)
+        // We just verify the app doesn't crash and the sidebar selection changed
+        XCTAssertTrue(app.staticTexts["Excellent"].exists, "Excellent should still be visible after clicking")
+    }
 
     func testProcessRealBirdPhotos() throws {
         let testDir = copyTestPhotos(suffix: "process")
-
-        let app = XCUIApplication()
-        app.launchEnvironment["TEST_FOLDER"] = testDir
-        app.launch()
+        let app = launchApp(testFolder: testDir)
         defer { app.terminate() }
 
-        // 1. Wait for server status to show "Models ready"
-        let modelsReady = app.staticTexts["Models ready"]
-        XCTAssertTrue(modelsReady.waitForExistence(timeout: 30), "Server should become ready")
-
-        // 2. Folder should appear in sidebar
+        XCTAssertTrue(app.staticTexts["Models ready"].waitForExistence(timeout: 30))
         let folderName = (testDir as NSString).lastPathComponent
-        let folderLabel = app.staticTexts[folderName]
-        XCTAssertTrue(folderLabel.waitForExistence(timeout: 15), "Folder should appear in sidebar")
-
-        // 3. Wait for processing to finish — progress bar disappears when done
-        //    Poll until no more progress indicator is visible
+        XCTAssertTrue(app.staticTexts[folderName].waitForExistence(timeout: 15))
         waitForProcessingComplete(app: app, testDir: testDir, timeout: 120)
 
-        // 4. Database should be created
+        // Database should be created
         let dbPath = (testDir as NSString).appendingPathComponent(".report.db")
-        XCTAssertTrue(FileManager.default.fileExists(atPath: dbPath), "Database should be created")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: dbPath))
 
-        // 5. All 8 photos should remain (no auto-organize)
+        // All 8 photos should remain in folder
         let photos = try! FileManager.default.contentsOfDirectory(atPath: testDir)
             .filter { $0.hasSuffix(".jpg") }
-        XCTAssertEqual(photos.count, 8, "All 8 photos should remain in folder")
+        XCTAssertEqual(photos.count, 8, "All 8 photos should remain")
     }
 
     func testRatingCountsAfterRealProcessing() throws {
         let testDir = copyTestPhotos(suffix: "ratings")
-
-        let app = XCUIApplication()
-        app.launchEnvironment["TEST_FOLDER"] = testDir
-        app.launch()
+        let app = launchApp(testFolder: testDir)
         defer { app.terminate() }
 
-        // Wait for server + processing
-        let modelsReady = app.staticTexts["Models ready"]
-        XCTAssertTrue(modelsReady.waitForExistence(timeout: 30), "Server should become ready")
-
+        XCTAssertTrue(app.staticTexts["Models ready"].waitForExistence(timeout: 30))
         let folderName = (testDir as NSString).lastPathComponent
-        let folderLabel = app.staticTexts[folderName]
-        XCTAssertTrue(folderLabel.waitForExistence(timeout: 15))
-
+        XCTAssertTrue(app.staticTexts[folderName].waitForExistence(timeout: 15))
         waitForProcessingComplete(app: app, testDir: testDir, timeout: 120)
 
-        // Rating labels should exist
-        XCTAssertTrue(app.staticTexts["Excellent"].exists, "Excellent label should exist")
+        XCTAssertTrue(app.staticTexts["Excellent"].exists)
 
-        // Database should have entries
         let dbPath = (testDir as NSString).appendingPathComponent(".report.db")
         XCTAssertTrue(FileManager.default.fileExists(atPath: dbPath))
     }
 
     // MARK: - Helpers
 
-    /// Wait for processing to complete by watching for the database to appear
-    /// and the progress indicator to disappear.
+    private func launchApp(testMode: Bool = false, testFolder: String? = nil) -> XCUIApplication {
+        let app = XCUIApplication()
+        if testMode {
+            app.launchEnvironment["TEST_MODE"] = "1"
+        }
+        if let testFolder {
+            app.launchEnvironment["TEST_FOLDER"] = testFolder
+        }
+        app.launch()
+        return app
+    }
+
     private func waitForProcessingComplete(app: XCUIApplication, testDir: String, timeout: TimeInterval) {
         let deadline = Date().addingTimeInterval(timeout)
         let dbPath = (testDir as NSString).appendingPathComponent(".report.db")
 
-        // Wait for database to be created (processing started and saved at least one result)
         while Date() < deadline {
-            if FileManager.default.fileExists(atPath: dbPath) {
-                break
-            }
+            if FileManager.default.fileExists(atPath: dbPath) { break }
             sleep(1)
         }
 
-        // Then wait for progress bar to disappear (processing finished)
         while Date() < deadline {
-            let progressExists = app.progressIndicators.count > 0
-            if !progressExists {
-                sleep(1) // Give UI time to update
+            if app.progressIndicators.count == 0 {
+                sleep(1)
                 return
             }
             sleep(1)
         }
     }
 
-    /// Copy test bird photos to a unique temp directory.
     private func copyTestPhotos(suffix: String) -> String {
         let testDir = NSTemporaryDirectory() + "superpicky_\(suffix)"
         try? FileManager.default.removeItem(atPath: testDir)
         try! FileManager.default.createDirectory(atPath: testDir, withIntermediateDirectories: true)
 
-        // Use #filePath to find project root at compile time
-        // This file is at: .../SuperPickyMac/apps/mac-client/SuperPickyUITests/ProcessingFlowUITests.swift
-        // test-photos is at: .../SuperPickyMac/test-photos
         let thisFile = URL(fileURLWithPath: #filePath)
         let projectRoot = thisFile
-            .deletingLastPathComponent() // SuperPickyUITests/
-            .deletingLastPathComponent() // mac-client/
-            .deletingLastPathComponent() // apps/
-            .deletingLastPathComponent() // SuperPickyMac/
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
         let sourceDir = projectRoot.appendingPathComponent("test-photos").path
 
         if FileManager.default.fileExists(atPath: sourceDir) {

@@ -37,13 +37,9 @@ struct ThumbnailCell: View {
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            Rectangle()
-                .fill(.quaternary)
+            AsyncThumbnailImage(filePath: photo.filePath)
                 .frame(width: 80, height: 80)
-                .overlay {
-                    Image(systemName: "photo")
-                        .foregroundStyle(.tertiary)
-                }
+                .clipped()
 
             if photo.starRating >= 0 {
                 StarRatingView(rating: photo.starRating)
@@ -65,5 +61,59 @@ struct ThumbnailCell: View {
             RoundedRectangle(cornerRadius: 6)
                 .stroke(isSelected ? Color.accentColor : .clear, lineWidth: 2)
         )
+        .accessibilityIdentifier("Thumbnail_\(photo.filename)")
+    }
+}
+
+/// Loads a thumbnail from a file path asynchronously.
+struct AsyncThumbnailImage: View {
+    let filePath: String
+    @State private var image: NSImage?
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } else {
+                Rectangle()
+                    .fill(.quaternary)
+                    .overlay {
+                        Image(systemName: "photo")
+                            .foregroundStyle(.tertiary)
+                    }
+            }
+        }
+        .task {
+            image = await loadThumbnail()
+        }
+    }
+
+    private func loadThumbnail() async -> NSImage? {
+        let url = URL(fileURLWithPath: filePath)
+        guard FileManager.default.fileExists(atPath: filePath) else { return nil }
+
+        // Load and resize on background thread
+        return await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                // Request a thumbnail at max 160px (2x for retina)
+                let options: [CFString: Any] = [
+                    kCGImageSourceThumbnailMaxPixelSize: 160,
+                    kCGImageSourceCreateThumbnailFromImageAlways: true,
+                    kCGImageSourceCreateThumbnailWithTransform: true,
+                ]
+                guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+                continuation.resume(returning: nsImage)
+            }
+        }
     }
 }

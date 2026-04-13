@@ -5,14 +5,19 @@ final class AppState {
     var sidebarSelection: SidebarSelection?
     var selectedPhotoID: UUID?
     var folders: [URL] = []
-    var photos: [Photo] = []
     var ratingCounts: [Int: Int] = [:]
     var speciesList: [(name: String, count: Int)] = []
 
+    // All photos from the current folder (unfiltered)
+    private var allPhotos: [Photo] = []
+    // Filtered photos shown in the UI
+    var photos: [Photo] = []
+
     // Per-folder processing state
     var processingFolder: URL?
-    var processingProgress: Double = 0 // 0-1
+    var processingProgress: Double = 0
     var processingFilename: String = ""
+    var currentFolder: URL?
 
     var isProcessing: Bool { processingFolder != nil }
 
@@ -22,19 +27,19 @@ final class AppState {
     }
 
     var isEmpty: Bool {
-        folders.isEmpty || photos.isEmpty
+        folders.isEmpty || allPhotos.isEmpty
     }
 
     /// Load photos from the database for the selected folder.
     func loadPhotos(for folder: URL) {
+        currentFolder = folder
         do {
             let db = try ReportDatabase(folderPath: folder)
-            photos = try db.fetchAllPhotos()
+            allPhotos = try db.fetchAllPhotos()
             ratingCounts = try db.ratingCounts()
 
-            // Build species list
             var speciesMap: [String: Int] = [:]
-            for photo in photos {
+            for photo in allPhotos {
                 if let name = photo.speciesCommonName ?? photo.speciesScientificName {
                     speciesMap[name, default: 0] += 1
                 }
@@ -42,14 +47,38 @@ final class AppState {
             speciesList = speciesMap.map { (name: $0.key, count: $0.value) }
                 .sorted { $0.count > $1.count }
 
-            // Auto-select first photo
-            if selectedPhotoID == nil, let first = photos.first {
-                selectedPhotoID = first.id
-            }
+            // Show all photos initially
+            photos = allPhotos
+            selectedPhotoID = photos.first?.id
         } catch {
+            allPhotos = []
             photos = []
             ratingCounts = [:]
             speciesList = []
+        }
+    }
+
+    /// Filter photos by sidebar selection.
+    func applyFilter() {
+        switch sidebarSelection {
+        case .folder:
+            photos = allPhotos
+        case .rating(let rating):
+            photos = allPhotos.filter { $0.starRating == rating }
+        case .flying:
+            photos = allPhotos.filter { $0.isFlying }
+        case .picks:
+            photos = allPhotos.filter { $0.isPick }
+        case .species(let name):
+            photos = allPhotos.filter {
+                $0.speciesCommonName == name || $0.speciesScientificName == name
+            }
+        case nil:
+            photos = allPhotos
+        }
+        // Update selection
+        if let id = selectedPhotoID, !photos.contains(where: { $0.id == id }) {
+            selectedPhotoID = photos.first?.id
         }
     }
 }
@@ -89,8 +118,13 @@ struct MainView: View {
         }
         .navigationTitle("")
         .onChange(of: appState.sidebarSelection) { _, newValue in
-            if case .folder(let url) = newValue {
+            switch newValue {
+            case .folder(let url):
                 appState.loadPhotos(for: url)
+            case .rating, .flying, .picks, .species:
+                appState.applyFilter()
+            case nil:
+                break
             }
         }
         .onAppear {
