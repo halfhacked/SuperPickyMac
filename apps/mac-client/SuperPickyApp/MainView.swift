@@ -122,6 +122,33 @@ final class AppState {
         currentFolder = nil
     }
 
+    /// Update a photo's star rating manually and persist to the database.
+    func ratePhoto(id: UUID, rating: Int) {
+        guard let folder = currentFolder else { return }
+        do {
+            let db = try ReportDatabase(folderPath: folder)
+            guard var photo = try db.fetchPhoto(id: id) else { return }
+            photo.starRating = rating
+            photo.isManualRating = true
+            try db.save(&photo)
+
+            // Update in-memory arrays
+            if let idx = allPhotos.firstIndex(where: { $0.id == id }) {
+                allPhotos[idx].starRating = rating
+                allPhotos[idx].isManualRating = true
+            }
+            if let idx = photos.firstIndex(where: { $0.id == id }) {
+                photos[idx].starRating = rating
+                photos[idx].isManualRating = true
+            }
+
+            // Refresh rating counts
+            ratingCounts = (try? db.ratingCounts()) ?? ratingCounts
+        } catch {
+            // Silently fail — rating not persisted
+        }
+    }
+
     /// Filter photos by sidebar selection.
     func applyFilter() {
         switch sidebarSelection {
@@ -190,7 +217,10 @@ struct MainView: View {
                 ContentView(
                     photos: appState.photos,
                     selectedPhotoID: $appState.selectedPhotoID,
-                    selectedPhoto: appState.selectedPhoto
+                    selectedPhoto: appState.selectedPhoto,
+                    onRatePhoto: { id, rating in
+                        appState.ratePhoto(id: id, rating: rating)
+                    }
                 )
             }
         }
@@ -308,7 +338,9 @@ struct ContentView: View {
     let photos: [Photo]
     @Binding var selectedPhotoID: UUID?
     let selectedPhoto: Photo?
+    var onRatePhoto: ((UUID, Int) -> Void)?
     @State private var showExifPanel = true
+    @State private var showFullscreen = false
 
     var body: some View {
         VSplitView {
@@ -333,6 +365,20 @@ struct ContentView: View {
                 showExifPanel.toggle()
             }
             return .handled
+        }
+        .onKeyPress("f") {
+            showFullscreen = true
+            return .handled
+        }
+        .overlay {
+            if showFullscreen {
+                FullscreenViewer(
+                    photos: photos,
+                    selectedPhotoID: $selectedPhotoID,
+                    isPresented: $showFullscreen,
+                    onRatePhoto: onRatePhoto
+                )
+            }
         }
         .toolbar {
             ToolbarItem(placement: .automatic) {

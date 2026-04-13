@@ -80,7 +80,15 @@ struct InfoBarView: View {
 
     var body: some View {
         HStack(spacing: 16) {
-            StarRatingView(rating: photo.starRating)
+            HStack(spacing: 4) {
+                StarRatingView(rating: photo.starRating)
+                if photo.isManualRating {
+                    Image(systemName: "pencil")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("ManualRatingIndicator")
+                }
+            }
 
             if let sharpness = photo.sharpnessScore {
                 Label("Sharp: \(Int(sharpness))", systemImage: "scope")
