@@ -37,7 +37,7 @@ final class ReportDatabase: Sendable {
                 t.column("sharpnessScore", .double)
                 t.column("exposureStatus", .text)
                 t.column("focusPointStatus", .text)
-                t.column("starRating", .integer).notNull().defaults(to: -1)
+                t.column("starRating", .integer).notNull().defaults(to: 0)
                 t.column("isPick", .boolean).notNull().defaults(to: false)
                 t.column("speciesScientificName", .text)
                 t.column("speciesCommonName", .text)
