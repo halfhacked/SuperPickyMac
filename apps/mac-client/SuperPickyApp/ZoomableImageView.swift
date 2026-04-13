@@ -53,6 +53,7 @@ struct ZoomableImageView: View {
                 .scaleEffect(zoomState.scale)
                 .offset(zoomState.offset)
                 .frame(width: geo.size.width, height: geo.size.height)
+                .background(Color(white: 0.18))
                 .clipped()
                 .contentShape(Rectangle())
                 .gesture(dragGesture)
