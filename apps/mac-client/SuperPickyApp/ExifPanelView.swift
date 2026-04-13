@@ -8,7 +8,7 @@ struct ExifPanelView: View {
 
     var body: some View {
         ScrollView {
-            if loaded, let data = exifData {
+            if loaded, let data = exifData, !data.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Info")
                         .font(.headline)
