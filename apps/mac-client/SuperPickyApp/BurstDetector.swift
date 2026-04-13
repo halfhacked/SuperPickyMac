@@ -12,7 +12,7 @@ struct BurstDetector: Sendable {
     /// Vision feature print distance threshold — below this, images are considered similar.
     let similarityThreshold: Float
 
-    init(timeThresholdMs: Double = 250, minBurstCount: Int = 2, similarityThreshold: Float = 15.0) {
+    init(timeThresholdMs: Double = 100, minBurstCount: Int = 2, similarityThreshold: Float = 15.0) {
         self.timeThresholdMs = timeThresholdMs
         self.minBurstCount = minBurstCount
         self.similarityThreshold = similarityThreshold
