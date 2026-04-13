@@ -61,6 +61,17 @@ struct ExifPanelView: View {
                         exifRow(label: "Date", value: date)
                     }
 
+                    // Location
+                    if let location = formatLocation(data) {
+                        exifRow(label: "Location", value: location)
+                    }
+                    if let coords = formatCoordinates(data) {
+                        exifRow(label: "GPS", value: coords)
+                    }
+                    if let alt = data.altitude {
+                        exifRow(label: "Altitude", value: "\(Int(alt)) m")
+                    }
+
                     // Keywords
                     if !data.keywords.isEmpty {
                         exifRow(label: "Keywords", value: data.keywords.joined(separator: ", "))
@@ -108,5 +119,18 @@ struct ExifPanelView: View {
             return "\(Int(value))"
         }
         return String(format: "%.1f", value)
+    }
+
+    private func formatLocation(_ data: EXIFData) -> String? {
+        let parts = [data.city, data.state, data.country].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: ", ")
+    }
+
+    private func formatCoordinates(_ data: EXIFData) -> String? {
+        guard let lat = data.latitude, let lon = data.longitude else { return nil }
+        let latDir = lat >= 0 ? "N" : "S"
+        let lonDir = lon >= 0 ? "E" : "W"
+        return String(format: "%.4f\u{00B0} %@, %.4f\u{00B0} %@",
+                      abs(lat), latDir, abs(lon), lonDir)
     }
 }

@@ -17,13 +17,17 @@ import ImageIO
         return dir
     }
 
-    /// Creates a JPEG with full EXIF metadata and IPTC keywords injected.
+    /// Creates a JPEG with full EXIF metadata, IPTC keywords, GPS, and location injected.
     func createJPEGWithEXIF(at url: URL, make: String = "Nikon", model: String = "Z9",
                              lens: String = "NIKKOR Z 800mm f/6.3",
                              focalLength: Double = 800, aperture: Double = 6.3,
                              exposureTime: Double = 0.0005, iso: Int = 1600,
                              dateTime: String = "2025:03:15 07:30:22",
-                             keywords: [String] = ["bird", "kingfisher", "wildlife"]) {
+                             keywords: [String] = ["bird", "kingfisher", "wildlife"],
+                             latitude: Double? = nil, longitude: Double? = nil,
+                             altitude: Double? = nil,
+                             city: String? = nil, state: String? = nil,
+                             country: String? = nil) {
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         let context = CGContext(
             data: nil, width: 200, height: 150,
@@ -49,15 +53,35 @@ import ImageIO
             kCGImagePropertyTIFFModel as String: model,
         ]
 
-        let iptcDict: [String: Any] = [
+        var iptcDict: [String: Any] = [
             kCGImagePropertyIPTCKeywords as String: keywords,
         ]
+        if let city { iptcDict[kCGImagePropertyIPTCCity as String] = city }
+        if let state { iptcDict[kCGImagePropertyIPTCProvinceState as String] = state }
+        if let country { iptcDict[kCGImagePropertyIPTCCountryPrimaryLocationName as String] = country }
 
-        let properties: [String: Any] = [
+        var properties: [String: Any] = [
             kCGImagePropertyExifDictionary as String: exifDict,
             kCGImagePropertyTIFFDictionary as String: tiffDict,
             kCGImagePropertyIPTCDictionary as String: iptcDict,
         ]
+
+        // GPS
+        if latitude != nil || longitude != nil || altitude != nil {
+            var gpsDict: [String: Any] = [:]
+            if let lat = latitude {
+                gpsDict[kCGImagePropertyGPSLatitude as String] = abs(lat)
+                gpsDict[kCGImagePropertyGPSLatitudeRef as String] = lat >= 0 ? "N" : "S"
+            }
+            if let lon = longitude {
+                gpsDict[kCGImagePropertyGPSLongitude as String] = abs(lon)
+                gpsDict[kCGImagePropertyGPSLongitudeRef as String] = lon >= 0 ? "E" : "W"
+            }
+            if let alt = altitude {
+                gpsDict[kCGImagePropertyGPSAltitude as String] = alt
+            }
+            properties[kCGImagePropertyGPSDictionary as String] = gpsDict
+        }
 
         CGImageDestinationAddImage(dest, image, properties as CFDictionary)
         CGImageDestinationFinalize(dest)
@@ -218,6 +242,71 @@ import ImageIO
         #expect(slow.shutterSpeed == "1s")
     }
 
+    // MARK: - Scenario: EXIF panel shows GPS coordinates
+
+    @Test func exifPanelShowsGPSCoordinates() throws {
+        let dir = try makeTempDir()
+        let photoURL = dir.appendingPathComponent("gps_test.jpg")
+        createJPEGWithEXIF(at: photoURL,
+                           latitude: 35.6762, longitude: 139.6503, altitude: 40)
+
+        let data = try #require(EXIFReader.read(from: photoURL.path))
+        #expect(data.latitude == 35.6762)
+        #expect(data.longitude == 139.6503)
+        #expect(data.altitude == 40)
+    }
+
+    // MARK: - Scenario: GPS handles southern/western hemisphere
+
+    @Test func exifPanelHandlesSouthWestGPS() throws {
+        let dir = try makeTempDir()
+        let photoURL = dir.appendingPathComponent("sw_gps.jpg")
+        createJPEGWithEXIF(at: photoURL,
+                           latitude: -33.8688, longitude: -151.2093)
+
+        let data = try #require(EXIFReader.read(from: photoURL.path))
+        // Negative values for S/W
+        #expect(data.latitude! < 0)
+        #expect(data.longitude! < 0)
+        let latRounded = (data.latitude! * 10000).rounded() / 10000
+        let lonRounded = (data.longitude! * 10000).rounded() / 10000
+        #expect(latRounded == -33.8688)
+        #expect(lonRounded == -151.2093)
+    }
+
+    // MARK: - Scenario: EXIF panel shows IPTC location (city, state, country)
+
+    @Test func exifPanelShowsIPTCLocation() throws {
+        let dir = try makeTempDir()
+        let photoURL = dir.appendingPathComponent("location_test.jpg")
+        createJPEGWithEXIF(at: photoURL,
+                           latitude: 51.5074, longitude: -0.1278,
+                           city: "London", state: "England", country: "United Kingdom")
+
+        let data = try #require(EXIFReader.read(from: photoURL.path))
+        #expect(data.city == "London")
+        #expect(data.state == "England")
+        #expect(data.country == "United Kingdom")
+        #expect(data.latitude != nil)
+        #expect(data.longitude != nil)
+    }
+
+    // MARK: - Scenario: Photo without GPS has nil coordinates
+
+    @Test func exifPanelShowsNilGPSWhenNone() throws {
+        let dir = try makeTempDir()
+        let photoURL = dir.appendingPathComponent("no_gps.jpg")
+        createJPEGWithEXIF(at: photoURL) // No GPS params
+
+        let data = try #require(EXIFReader.read(from: photoURL.path))
+        #expect(data.latitude == nil)
+        #expect(data.longitude == nil)
+        #expect(data.altitude == nil)
+        #expect(data.city == nil)
+        #expect(data.state == nil)
+        #expect(data.country == nil)
+    }
+
     // MARK: - Scenario: Read EXIF from real test-photos directory
 
     @Test func realTestPhotosHaveEXIFAndKeywords() throws {
@@ -241,6 +330,9 @@ import ImageIO
         #expect(!data.keywords.isEmpty)
         #expect(data.keywords.contains("kingfisher"))
         #expect(data.keywords.contains("bird"))
+        #expect(data.latitude != nil)
+        #expect(data.longitude != nil)
+        #expect(data.city != nil)
         #expect(!data.isEmpty)
     }
 }

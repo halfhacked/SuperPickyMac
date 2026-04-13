@@ -19,13 +19,25 @@ struct EXIFData: Sendable {
     var whiteBalance: String?
     var keywords: [String] = []    // IPTC keywords, empty if none
 
+    // GPS
+    var latitude: Double?
+    var longitude: Double?
+    var altitude: Double?          // meters
+
+    // IPTC location
+    var city: String?
+    var state: String?
+    var country: String?
+
     /// True when no meaningful EXIF metadata is present.
     /// Excludes imageWidth/imageHeight since those are always available from the image container.
     var isEmpty: Bool {
         cameraMake == nil && cameraModel == nil && lensModel == nil &&
         focalLength == nil && aperture == nil && shutterSpeed == nil &&
         iso == nil && dateTimeOriginal == nil && exposureBias == nil &&
-        meteringMode == nil && whiteBalance == nil && keywords.isEmpty
+        meteringMode == nil && whiteBalance == nil && keywords.isEmpty &&
+        latitude == nil && longitude == nil && altitude == nil &&
+        city == nil && state == nil && country == nil
     }
 }
 
@@ -91,6 +103,23 @@ enum EXIFReader {
         if let kw = iptc?[kCGImagePropertyIPTCKeywords as String] as? [String] {
             data.keywords = kw
         }
+
+        // GPS
+        let gps = properties[kCGImagePropertyGPSDictionary as String] as? [String: Any]
+        if let lat = doubleValue(gps, key: kCGImagePropertyGPSLatitude as String) {
+            let ref = gps?[kCGImagePropertyGPSLatitudeRef as String] as? String
+            data.latitude = ref == "S" ? -lat : lat
+        }
+        if let lon = doubleValue(gps, key: kCGImagePropertyGPSLongitude as String) {
+            let ref = gps?[kCGImagePropertyGPSLongitudeRef as String] as? String
+            data.longitude = ref == "W" ? -lon : lon
+        }
+        data.altitude = doubleValue(gps, key: kCGImagePropertyGPSAltitude as String)
+
+        // IPTC location
+        data.city = iptc?[kCGImagePropertyIPTCCity as String] as? String
+        data.state = iptc?[kCGImagePropertyIPTCProvinceState as String] as? String
+        data.country = iptc?[kCGImagePropertyIPTCCountryPrimaryLocationName as String] as? String
 
         return data
     }
