@@ -7,7 +7,7 @@ struct ThumbnailStripView: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: true) {
-                LazyHStack(spacing: 6) {
+                LazyHStack(spacing: 4) {
                     ForEach(photos) { photo in
                         ThumbnailCell(photo: photo, isSelected: photo.id == selectedPhotoID)
                             .id(photo.id)
@@ -16,8 +16,8 @@ struct ThumbnailStripView: View {
                             }
                     }
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 2)
             }
             .background(.bar)
             .onChange(of: selectedPhotoID) { _, newValue in
@@ -38,27 +38,24 @@ struct ThumbnailCell: View {
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             AsyncThumbnailImage(filePath: photo.filePath)
-                .frame(width: 80, height: 80)
+                .aspectRatio(3/2, contentMode: .fit)
                 .clipped()
 
-            if photo.starRating >= 0 {
+            HStack(spacing: 2) {
                 StarRatingView(rating: photo.starRating)
-                    .padding(3)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 3))
-                    .padding(3)
+                if photo.isPick {
+                    Image(systemName: "flag.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.purple)
+                }
             }
-
-            if photo.isPick {
-                Image(systemName: "flag.fill")
-                    .font(.caption2)
-                    .foregroundStyle(.purple)
-                    .frame(maxWidth: .infinity, alignment: .topTrailing)
-                    .padding(3)
-            }
+            .padding(2)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 3))
+            .padding(2)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .clipShape(RoundedRectangle(cornerRadius: 4))
         .overlay(
-            RoundedRectangle(cornerRadius: 6)
+            RoundedRectangle(cornerRadius: 4)
                 .stroke(isSelected ? Color.accentColor : .clear, lineWidth: 2)
         )
         .accessibilityIdentifier("Thumbnail_\(photo.filename)")
@@ -104,7 +101,7 @@ struct AsyncThumbnailImage: View {
                 // Request a thumbnail at max 160px (2x for retina)
                 let options: [CFString: Any] = [
                     kCGImageSourceThumbnailMaxPixelSize: 160,
-                    kCGImageSourceCreateThumbnailFromImageAlways: true,
+                    kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
                     kCGImageSourceCreateThumbnailWithTransform: true,
                 ]
                 guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
