@@ -14,18 +14,20 @@ BASE_URL = os.environ.get("INFERENCE_URL", "http://localhost:8420")
 
 # Use real bird photo from test-photos folder
 TEST_PHOTOS_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "test-photos")
-BIRD_IMAGE = os.path.join(TEST_PHOTOS_DIR, "kingfisher_darwin.jpg")
-# Fallback to fixtures dir
 FIXTURE_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
-FIXTURE_IMAGE = os.path.join(FIXTURE_DIR, "test_bird.jpg")
 
 
 def get_test_image():
     """Return path to a real bird photo for testing."""
-    if os.path.exists(BIRD_IMAGE):
-        return BIRD_IMAGE
-    if os.path.exists(FIXTURE_IMAGE):
-        return FIXTURE_IMAGE
+    # Look for any JPEG in test-photos
+    if os.path.isdir(TEST_PHOTOS_DIR):
+        for f in sorted(os.listdir(TEST_PHOTOS_DIR)):
+            if f.lower().endswith((".jpg", ".jpeg")):
+                return os.path.join(TEST_PHOTOS_DIR, f)
+    # Fallback to fixtures
+    fixture = os.path.join(FIXTURE_DIR, "test_bird.jpg")
+    if os.path.exists(fixture):
+        return fixture
     pytest.skip("No test bird image available")
 
 
