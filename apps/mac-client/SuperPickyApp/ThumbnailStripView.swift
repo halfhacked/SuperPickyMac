@@ -19,6 +19,7 @@ struct ThumbnailStripView: View {
                 .padding(.horizontal, 4)
                 .padding(.vertical, 2)
             }
+            .verticalScrollToHorizontal()
             .background(.bar)
             .onChange(of: selectedPhotoID) { _, newValue in
                 if let id = newValue {
@@ -121,7 +122,43 @@ struct AsyncThumbnailImage: View {
     }
 }
 
-// No custom scroll wheel adapter needed — removed complex NSView approaches.
-// Vertical scroll on the thumbnail strip is handled by the system when
-// shift is held, or users can use left/right arrow keys to navigate.
+// MARK: - Vertical scroll wheel → horizontal scroll
+
+/// NSView that intercepts vertical scroll wheel and redirects to the parent NSScrollView horizontally.
+struct ScrollWheelRedirector: NSViewRepresentable {
+    func makeNSView(context: Context) -> ScrollWheelRedirectorView {
+        ScrollWheelRedirectorView()
+    }
+    func updateNSView(_ nsView: ScrollWheelRedirectorView, context: Context) {}
+}
+
+class ScrollWheelRedirectorView: NSView {
+    override func scrollWheel(with event: NSEvent) {
+        if abs(event.scrollingDeltaY) > abs(event.scrollingDeltaX) {
+            // Walk up the responder chain to find the NSScrollView
+            var responder: NSResponder? = self.nextResponder
+            while let r = responder {
+                if let scrollView = r as? NSScrollView {
+                    let clip = scrollView.contentView
+                    var origin = clip.bounds.origin
+                    let multiplier: CGFloat = event.hasPreciseScrollingDeltas ? 1.0 : 10.0
+                    origin.x -= event.scrollingDeltaY * multiplier
+                    let maxX = max(0, (scrollView.documentView?.bounds.width ?? 0) - scrollView.bounds.width)
+                    origin.x = min(max(0, origin.x), maxX)
+                    clip.scroll(to: origin)
+                    scrollView.reflectScrolledClipView(clip)
+                    return
+                }
+                responder = r.nextResponder
+            }
+        }
+        super.scrollWheel(with: event)
+    }
+}
+
+extension View {
+    func verticalScrollToHorizontal() -> some View {
+        self.background(ScrollWheelRedirector())
+    }
+}
 
