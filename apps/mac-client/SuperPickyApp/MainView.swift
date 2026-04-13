@@ -341,6 +341,12 @@ struct ContentView: View {
     var onRatePhoto: ((UUID, Int) -> Void)?
     @State private var showExifPanel = true
     @State private var showFullscreen = false
+    @State private var isExporting = false
+    @State private var exportProgress = 0
+    @State private var exportTotal = 0
+    @State private var showExportComplete = false
+    @State private var exportResultMessage = ""
+    @State private var showNoPhotosAlert = false
 
     var body: some View {
         VSplitView {
@@ -383,6 +389,16 @@ struct ContentView: View {
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 Button {
+                    exportPhotos()
+                } label: {
+                    Label("Export", systemImage: "square.and.arrow.up")
+                }
+                .accessibilityIdentifier("ExportButton")
+                .help("Export filtered photos with XMP sidecars")
+                .disabled(isExporting)
+            }
+            ToolbarItem(placement: .automatic) {
+                Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         showExifPanel.toggle()
                     }
@@ -391,6 +407,78 @@ struct ContentView: View {
                 }
                 .accessibilityIdentifier("ExifToggle")
                 .help("Toggle EXIF Info (I)")
+            }
+        }
+        .sheet(isPresented: $isExporting) {
+            VStack(spacing: 16) {
+                Text("Exporting Photos...")
+                    .font(.headline)
+                ProgressView(value: Double(exportProgress), total: Double(max(exportTotal, 1)))
+                    .progressViewStyle(.linear)
+                    .frame(width: 300)
+                Text("\(exportProgress) of \(exportTotal)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(40)
+            .interactiveDismissDisabled()
+        }
+        .alert("Export Complete", isPresented: $showExportComplete) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(exportResultMessage)
+        }
+        .alert("No Photos", isPresented: $showNoPhotosAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("No photos match the current filter")
+        }
+    }
+
+    private func exportPhotos() {
+        guard !photos.isEmpty else {
+            showNoPhotosAlert = true
+            return
+        }
+
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        panel.message = "Choose a destination folder for exported photos"
+        panel.prompt = "Export"
+
+        guard panel.runModal() == .OK, let destination = panel.url else { return }
+
+        let photosToExport = photos
+        exportProgress = 0
+        exportTotal = photosToExport.count
+        isExporting = true
+
+        Task {
+            do {
+                let result = try await ExportService.export(
+                    photos: photosToExport,
+                    to: destination,
+                    onProgress: { current, total in
+                        exportProgress = current
+                        exportTotal = total
+                    }
+                )
+                isExporting = false
+                exportResultMessage = "Exported \(result.exportedCount) photos to \(destination.path)"
+                if result.skippedCount > 0 {
+                    exportResultMessage += "\n\(result.skippedCount) skipped (already exist)"
+                }
+                if result.failedCount > 0 {
+                    exportResultMessage += "\n\(result.failedCount) failed"
+                }
+                showExportComplete = true
+            } catch {
+                isExporting = false
+                exportResultMessage = "Export failed: \(error.localizedDescription)"
+                showExportComplete = true
             }
         }
     }
