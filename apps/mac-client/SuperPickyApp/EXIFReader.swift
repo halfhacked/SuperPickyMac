@@ -19,13 +19,13 @@ struct EXIFData: Sendable {
     var whiteBalance: String?
     var keywords: [String] = []    // IPTC keywords, empty if none
 
-    /// True when every optional field is nil and keywords is empty.
+    /// True when no meaningful EXIF metadata is present.
+    /// Excludes imageWidth/imageHeight since those are always available from the image container.
     var isEmpty: Bool {
         cameraMake == nil && cameraModel == nil && lensModel == nil &&
         focalLength == nil && aperture == nil && shutterSpeed == nil &&
-        iso == nil && dateTimeOriginal == nil && imageWidth == nil &&
-        imageHeight == nil && exposureBias == nil && meteringMode == nil &&
-        whiteBalance == nil && keywords.isEmpty
+        iso == nil && dateTimeOriginal == nil && exposureBias == nil &&
+        meteringMode == nil && whiteBalance == nil && keywords.isEmpty
     }
 }
 
