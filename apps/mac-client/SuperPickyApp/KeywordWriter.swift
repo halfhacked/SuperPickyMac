@@ -19,20 +19,13 @@ enum KeywordWriter {
         }
         let exiftool = try findExiftool()
 
-        // Read existing keywords and merge
-        let existing = EXIFReader.read(from: filePath)?.keywords ?? []
-        var seen = Set<String>()
-        var merged: [String] = []
-        for kw in existing + keywords {
-            if seen.insert(kw).inserted {
-                merged.append(kw)
-            }
-        }
-
-        // Build args: clear then add each keyword
-        var args = ["-overwrite_original", "-charset", "iptc=UTF8", "-IPTC:Keywords="]
-        for kw in merged {
+        // Write to both IPTC and XMP. Overwrite (don't merge) to avoid
+        // accumulating garbled keywords from encoding round-trips.
+        var args = ["-overwrite_original", "-charset", "iptc=UTF8",
+                    "-IPTC:Keywords=", "-XMP:Subject="]
+        for kw in keywords {
             args.append("-IPTC:Keywords=\(kw)")
+            args.append("-XMP:Subject=\(kw)")
         }
         args.append(filePath)
 
