@@ -383,7 +383,7 @@ struct ContentView: View {
             )
             .frame(minHeight: 80, idealHeight: 120, maxHeight: 200)
         }
-        .background(Color(white: 0.18))
+        .background(Color(nsColor: .underPageBackgroundColor))
         .focusable()
         .focusEffectDisabled()
         .focused($isContentFocused)
