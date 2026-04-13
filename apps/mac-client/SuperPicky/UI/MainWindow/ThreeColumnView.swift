@@ -59,5 +59,11 @@ struct ThreeColumnView: View {
                 appState.sidebarSelection = .folder(completedFolder)
             }
         }
+        .onAppear {
+            // Auto-open processing sheet with pre-filled folder in test mode
+            if let testFolder = ProcessInfo.processInfo.environment["TEST_FOLDER"] {
+                showProcessingSheet = true
+            }
+        }
     }
 }
