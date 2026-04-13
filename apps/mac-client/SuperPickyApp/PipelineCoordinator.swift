@@ -95,10 +95,20 @@ final class PipelineCoordinator {
                 logger.error("Failed to save photo: \(error)")
             }
             processedCount += 1
+
+            // Run burst detection every 10 photos for incremental updates
+            if processedCount % 10 == 0 {
+                runBurstDetection(db: db)
+            }
+
             await onPhotoProcessed?()
         }
 
-        // Burst detection — group similar consecutive photos
+        // Final burst detection (catches remaining photos)
+        runBurstDetection(db: db)
+    }
+
+    private func runBurstDetection(db: ReportDatabase) {
         do {
             let allPhotos = try db.fetchAllPhotos()
             let burstGroups = burstDetector.detect(photos: allPhotos)
@@ -109,9 +119,6 @@ final class PipelineCoordinator {
                     updated.isBurstBest = (photo.id == group.bestPhotoID)
                     try db.save(&updated)
                 }
-            }
-            if !burstGroups.isEmpty {
-                logger.info("Detected \(burstGroups.count) burst groups")
             }
         } catch {
             logger.error("Burst detection failed: \(error)")
@@ -127,15 +134,36 @@ final class PipelineCoordinator {
         writeKeywords: Bool,
         keywordFormat: String
     ) async throws {
-        // Load 1280px thumbnail for detect/aesthetics/keypoints/flight
-        let image = try rawConverter.convert(fileURL: fileURL)
+        // Single call to preen: YOLO detect + species identify (handles image loading, GPS, everything)
+        let identifyResult = try await inferenceClient.identify(filePath: fileURL.path, topK: 1)
 
-        let detection = try await inferenceClient.detect(image: image)
-        guard let bird = detection.birds.first else {
+        guard let bird = identifyResult.birds?.first else {
             photo.starRating = 0
             return
         }
         photo.birdConfidence = bird.confidence
+
+        // Save species
+        if let top = identifyResult.species.first {
+            photo.speciesScientificName = top.scientificName
+            photo.speciesCommonName = top.commonName
+            photo.speciesConfidence = top.confidence
+
+            let aboveThreshold = top.thresholdUsed != "below_threshold"
+            if writeKeywords && aboveThreshold {
+                let keywords = KeywordWriter.formatKeywords(
+                    template: keywordFormat,
+                    en: top.commonName, cn: top.cnName,
+                    latin: top.scientificName, pinyin: top.pinyin
+                )
+                if !keywords.isEmpty {
+                    try? KeywordWriter.write(keywords: ["bird"] + keywords, to: fileURL.path)
+                }
+            }
+        }
+
+        // Load 1280px thumbnail for aesthetics/keypoints/flight (fast, small payload)
+        let image = try rawConverter.convert(fileURL: fileURL)
 
         let cropRect = CGRect(
             x: bird.bbox.origin.x * CGFloat(image.width),
@@ -167,7 +195,6 @@ final class PipelineCoordinator {
         photo.isFlying = flight.isFlying
         photo.flightConfidence = flight.confidence
 
-        // Sharpness proxy (temporary)
         photo.sharpnessScore = keypoints.bestEyeVisibility * 600
 
         if exposureEnabled {
@@ -195,37 +222,5 @@ final class PipelineCoordinator {
         )
         photo.starRating = ratingResult.rating
         photo.isPick = ratingResult.isPick
-
-        // Bird ID — preen handles everything: load image, extract GPS, YOLO, crop, classify
-        do {
-            let species = try await inferenceClient.identify(filePath: fileURL.path, topK: 1)
-            if let top = species.first {
-                // Always save species (even below threshold) for display
-                photo.speciesScientificName = top.scientificName
-                photo.speciesCommonName = top.commonName
-                photo.speciesConfidence = top.confidence
-
-                // Only write keywords when species met the confidence threshold
-                let aboveThreshold = top.thresholdUsed != "below_threshold"
-                if writeKeywords && aboveThreshold {
-                    let keywords = KeywordWriter.formatKeywords(
-                        template: keywordFormat,
-                        en: top.commonName,
-                        cn: top.cnName,
-                        latin: top.scientificName,
-                        pinyin: top.pinyin
-                    )
-                    if !keywords.isEmpty {
-                        do {
-                            try KeywordWriter.write(keywords: ["bird"] + keywords, to: fileURL.path)
-                        } catch {
-                            logger.warning("Keyword writing failed for \(fileURL.lastPathComponent): \(error)")
-                        }
-                    }
-                }
-            }
-        } catch {
-            logger.warning("Species identification failed: \(error)")
-        }
     }
 }

@@ -13,12 +13,16 @@ struct MockInferenceClient: InferenceClient {
         beak: Keypoint(x: 0.5, y: 0.5, visibility: 0.95)
     )
     var flightResult: FlightResult = FlightResult(isFlying: false, confidence: 0.1)
+    // Default: no birds detected (identify drives detection now)
+    var identifyBirds: [BirdDetection] = []
 
     func detect(image: CGImage) async throws -> DetectionResult { detectResult }
     func aesthetics(image: CGImage) async throws -> AestheticsResponse { aestheticsResult }
     func keypoints(image: CGImage) async throws -> KeypointResult { keypointResult }
     func flight(image: CGImage) async throws -> FlightResult { flightResult }
-    func identify(filePath: String, topK: Int) async throws -> [SpeciesMatch] { [] }
+    func identify(filePath: String, topK: Int) async throws -> IdentifyResponse {
+        IdentifyResponse(species: [], birds: identifyBirds, totalDetected: identifyBirds.count)
+    }
     func healthCheck() async throws -> ServerHealth {
         ServerHealth(status: "ready", modelsLoaded: [], device: "cpu", version: "1.0.0")
     }
@@ -65,9 +69,9 @@ struct MockInferenceClient: InferenceClient {
         createTestJPEG(at: jpegURL)
 
         var mockClient = MockInferenceClient()
-        mockClient.detectResult = DetectionResult(birds: [
+        mockClient.identifyBirds = [
             BirdDetection(bbox: CGRect(x: 0.1, y: 0.1, width: 0.5, height: 0.5), confidence: 0.95, mask: Data())
-        ])
+        ]
         mockClient.aestheticsResult = AestheticsResponse(score: 6.0, distribution: [])
 
         let config = RatingEngine.Config(sharpnessThreshold: 380, aestheticsThreshold: 4.8)

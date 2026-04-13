@@ -39,7 +39,7 @@ final class HTTPInferenceClient: InferenceClient {
         return try decode(FlightResult.self, from: responseData)
     }
 
-    func identify(filePath: String, topK: Int = 5) async throws -> [SpeciesMatch] {
+    func identify(filePath: String, topK: Int = 5) async throws -> IdentifyResponse {
         // Send file path — preen handles image loading, GPS extraction, everything
         var components = URLComponents(url: baseURL.appendingPathComponent("identify"), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "top_k", value: "\(topK)")]
@@ -63,8 +63,7 @@ final class HTTPInferenceClient: InferenceClient {
             let code = (response as? HTTPURLResponse)?.statusCode ?? -1
             throw InferenceError.requestFailed(statusCode: code)
         }
-        let resp = try decode(IdentifyResponse.self, from: data)
-        return resp.species
+        return try decode(IdentifyResponse.self, from: data)
     }
 
     func healthCheck() async throws -> ServerHealth {
