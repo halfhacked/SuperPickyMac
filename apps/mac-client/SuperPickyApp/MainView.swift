@@ -22,6 +22,8 @@ final class AppState {
     var selectedPhotoID: UUID?
     var folders: [URL] = []
     var ratingCounts: [Int: Int] = [:]
+    var flyingCount: Int = 0
+    var picksCount: Int = 0
     var speciesEntries: [SpeciesEntry] = []
 
     // All photos from the current folder (unfiltered)
@@ -55,6 +57,8 @@ final class AppState {
             let db = try ReportDatabase(folderPath: folder)
             allPhotos = try db.fetchAllPhotos()
             ratingCounts = try db.ratingCounts()
+            flyingCount = allPhotos.filter { $0.isFlying }.count
+            picksCount = allPhotos.filter { $0.isPick }.count
             buildSpeciesHierarchy()
 
             // Re-apply current filter instead of resetting to all
@@ -208,6 +212,8 @@ struct MainView: View {
                 selection: $appState.sidebarSelection,
                 folders: $appState.folders,
                 ratingCounts: appState.ratingCounts,
+                flyingCount: appState.flyingCount,
+                picksCount: appState.picksCount,
                 speciesEntries: appState.speciesEntries,
                 processingFolder: appState.processingFolder,
                 processingProgress: appState.processingProgress,

@@ -13,6 +13,8 @@ struct SourceListView: View {
     @Binding var selection: SidebarSelection?
     @Binding var folders: [URL]
     let ratingCounts: [Int: Int]
+    let flyingCount: Int
+    let picksCount: Int
     let speciesEntries: [SpeciesEntry]
     let processingFolder: URL?
     let processingProgress: Double
@@ -76,10 +78,31 @@ struct SourceListView: View {
             }
 
             Section("Tags") {
-                Label("In Flight", systemImage: "bird")
-                    .tag(SidebarSelection.flying)
-                Label("Picks", systemImage: "flag.fill")
-                    .tag(SidebarSelection.picks)
+                Label {
+                    HStack {
+                        Text("In Flight")
+                        Spacer()
+                        Text("\(flyingCount)")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                    }
+                } icon: {
+                    Image(systemName: "bird")
+                }
+                .tag(SidebarSelection.flying)
+
+                Label {
+                    HStack {
+                        Text("Picks")
+                        Spacer()
+                        Text("\(picksCount)")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                    }
+                } icon: {
+                    Image(systemName: "flag.fill")
+                }
+                .tag(SidebarSelection.picks)
             }
 
             if !speciesEntries.isEmpty {
