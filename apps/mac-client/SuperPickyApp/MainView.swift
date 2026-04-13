@@ -298,7 +298,7 @@ struct ContentView: View {
     let photos: [Photo]
     @Binding var selectedPhotoID: UUID?
     let selectedPhoto: Photo?
-    @State private var showExifPanel = false
+    @State private var showExifPanel = true
 
     var body: some View {
         VSplitView {
@@ -309,26 +309,6 @@ struct ContentView: View {
                     ExifPanelView(photo: photo)
                         .transition(.move(edge: .trailing))
                 }
-
-                // Toggle button overlaid on preview area
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        showExifPanel.toggle()
-                    }
-                } label: {
-                    Image(systemName: showExifPanel ? "info.circle.fill" : "info.circle")
-                        .font(.system(size: 16))
-                        .foregroundStyle(showExifPanel ? .white : .secondary)
-                        .frame(width: 28, height: 28)
-                        .background(showExifPanel ? Color.accentColor : Color.clear)
-                        .clipShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("ExifToggle")
-                .help("Toggle EXIF Info (I)")
-                .padding(showExifPanel ? .leading : .trailing, 8)
-                .padding(.top, 8)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: showExifPanel ? .topLeading : .topTrailing)
             }
             .frame(minHeight: 300)
 
@@ -343,6 +323,19 @@ struct ContentView: View {
                 showExifPanel.toggle()
             }
             return .handled
+        }
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showExifPanel.toggle()
+                    }
+                } label: {
+                    Image(systemName: showExifPanel ? "info.circle.fill" : "info.circle")
+                }
+                .accessibilityIdentifier("ExifToggle")
+                .help("Toggle EXIF Info (I)")
+            }
         }
     }
 }
