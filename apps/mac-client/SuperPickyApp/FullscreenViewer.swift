@@ -8,11 +8,13 @@ struct FullscreenViewer: View {
     @State private var showInfo = false
     @State private var zoomState = ZoomState()
     @State private var image: NSImage?
+    @FocusState private var isFocused: Bool
 
     var body: some View {
         GeometryReader { geo in
             ZStack {
                 Color.black.ignoresSafeArea()
+                    .accessibilityIdentifier("FullscreenViewer")
 
                 if let photo = selectedPhoto {
                     if let image {
@@ -44,6 +46,10 @@ struct FullscreenViewer: View {
                 return .handled
             }
         }
+        .focusable()
+        .focusEffectDisabled()
+        .focused($isFocused)
+        .onAppear { isFocused = true }
         .onKeyPress(.leftArrow) { navigatePhoto(direction: -1); return .handled }
         .onKeyPress(.rightArrow) { navigatePhoto(direction: 1); return .handled }
         .onKeyPress(.escape) { isPresented = false; return .handled }
