@@ -18,25 +18,41 @@ final class ProcessingFlowUITests: XCTestCase {
         app.terminate()
     }
 
-    // MARK: - Scenario: Open processing sheet via toolbar button
+    // MARK: - Scenario: Open processing sheet via Select Folder button
 
-    func testClickPlusOpensProcessingSheet() throws {
-        let toolbar = app.toolbars
-        let plusButton = toolbar.buttons["ProcessNewFolder"]
-        XCTAssertTrue(plusButton.waitForExistence(timeout: 5), "Toolbar + button should exist")
-        plusButton.click()
+    func testSelectFolderButtonOpensSheet() throws {
+        // Close auto-opened sheet first (TEST_FOLDER triggers it)
+        let autoSheet = app.sheets.firstMatch
+        if autoSheet.waitForExistence(timeout: 3) {
+            app.typeKey(.escape, modifierFlags: [])
+            sleep(1)
+        }
+
+        // Empty state shows "Select Folder" button
+        let selectButton = app.buttons["SelectFolderButton"]
+        XCTAssertTrue(selectButton.waitForExistence(timeout: 5), "Select Folder button should exist in empty state")
+        selectButton.click()
 
         let sheet = app.sheets.firstMatch
         XCTAssertTrue(sheet.waitForExistence(timeout: 5), "Processing sheet should appear")
     }
 
-    // MARK: - Scenario: Open processing sheet via Cmd+O
+    // MARK: - Scenario: Open processing sheet via sidebar + button
 
-    func testCmdOOpensProcessingSheet() throws {
-        app.typeKey("o", modifierFlags: .command)
+    func testSidebarAddFolderOpensSheet() throws {
+        // Close auto-opened sheet first (TEST_FOLDER triggers it)
+        let autoSheet = app.sheets.firstMatch
+        if autoSheet.waitForExistence(timeout: 3) {
+            app.typeKey(.escape, modifierFlags: [])
+            sleep(1)
+        }
+
+        let addButton = app.buttons["AddFolderButton"]
+        XCTAssertTrue(addButton.waitForExistence(timeout: 5), "Sidebar + button should exist")
+        addButton.click()
 
         let sheet = app.sheets.firstMatch
-        XCTAssertTrue(sheet.waitForExistence(timeout: 5), "Cmd+O should open processing sheet")
+        XCTAssertTrue(sheet.waitForExistence(timeout: 5), "Processing sheet should appear")
     }
 
     // MARK: - Scenario: Sheet shows pre-filled folder from TEST_FOLDER

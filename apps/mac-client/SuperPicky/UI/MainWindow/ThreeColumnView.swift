@@ -14,43 +14,38 @@ final class AppState {
         guard let id = selectedPhotoID else { return nil }
         return photos.first { $0.id == id }
     }
+
+    var isEmpty: Bool {
+        folders.isEmpty || photos.isEmpty
+    }
 }
 
-struct ThreeColumnView: View {
+struct MainView: View {
     @State private var appState = AppState()
     @State private var showProcessingSheet = false
-    @State private var columnVisibility = NavigationSplitViewVisibility.all
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
+        NavigationSplitView {
             SourceListView(
                 selection: $appState.sidebarSelection,
-                folders: appState.folders,
+                folders: $appState.folders,
                 ratingCounts: appState.ratingCounts,
-                speciesList: appState.speciesList
+                speciesList: appState.speciesList,
+                onAddFolder: { showProcessingSheet = true }
             )
             .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 300)
-        } content: {
-            ThumbnailStripView(
-                photos: appState.photos,
-                selectedPhotoID: $appState.selectedPhotoID
-            )
-            .navigationSplitViewColumnWidth(min: 100, ideal: 140, max: 200)
         } detail: {
-            PreviewView(photo: appState.selectedPhoto)
-        }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showProcessingSheet = true
-                } label: {
-                    Image(systemName: "plus")
-                }
-                .help("Process new folder")
-                .keyboardShortcut("o", modifiers: .command)
-                .accessibilityIdentifier("ProcessNewFolder")
+            if appState.isEmpty {
+                EmptyStateView { showProcessingSheet = true }
+            } else {
+                ContentView(
+                    photos: appState.photos,
+                    selectedPhotoID: $appState.selectedPhotoID,
+                    selectedPhoto: appState.selectedPhoto
+                )
             }
         }
+        .navigationTitle("")
         .sheet(isPresented: $showProcessingSheet) {
             ProcessingSheet(prefilledFolder: nil) { completedFolder in
                 if !appState.folders.contains(completedFolder) {
@@ -60,10 +55,64 @@ struct ThreeColumnView: View {
             }
         }
         .onAppear {
-            // Auto-open processing sheet with pre-filled folder in test mode
-            if let testFolder = ProcessInfo.processInfo.environment["TEST_FOLDER"] {
+            if ProcessInfo.processInfo.environment["TEST_FOLDER"] != nil {
                 showProcessingSheet = true
             }
         }
+    }
+}
+
+/// Main content area: preview on top, thumbnail strip at bottom.
+struct ContentView: View {
+    let photos: [Photo]
+    @Binding var selectedPhotoID: UUID?
+    let selectedPhoto: Photo?
+
+    var body: some View {
+        VSplitView {
+            // Preview area (top, takes most space)
+            PreviewView(photo: selectedPhoto)
+                .frame(minHeight: 300)
+
+            // Horizontal thumbnail strip (bottom)
+            ThumbnailStripView(
+                photos: photos,
+                selectedPhotoID: $selectedPhotoID
+            )
+            .frame(minHeight: 80, idealHeight: 120, maxHeight: 200)
+        }
+    }
+}
+
+struct EmptyStateView: View {
+    let onSelectFolder: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "folder.badge.plus")
+                .font(.system(size: 56, weight: .ultraLight))
+                .foregroundStyle(.secondary)
+
+            Text("Add a folder to get started")
+                .font(.title3)
+                .foregroundStyle(.secondary)
+
+            Text("Process bird photos with AI to rate and organize them")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+
+            Button {
+                onSelectFolder()
+            } label: {
+                Label("Select Folder", systemImage: "folder")
+                    .padding(.horizontal, 8)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .keyboardShortcut("o", modifiers: .command)
+            .accessibilityIdentifier("SelectFolderButton")
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

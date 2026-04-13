@@ -6,12 +6,20 @@ struct ThumbnailStripView: View {
 
     var body: some View {
         ScrollViewReader { proxy in
-            List(photos, selection: $selectedPhotoID) { photo in
-                ThumbnailCell(photo: photo)
-                    .tag(photo.id)
-                    .id(photo.id)
+            ScrollView(.horizontal, showsIndicators: true) {
+                LazyHStack(spacing: 6) {
+                    ForEach(photos) { photo in
+                        ThumbnailCell(photo: photo, isSelected: photo.id == selectedPhotoID)
+                            .id(photo.id)
+                            .onTapGesture {
+                                selectedPhotoID = photo.id
+                            }
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
             }
-            .listStyle(.plain)
+            .background(.bar)
             .onChange(of: selectedPhotoID) { _, newValue in
                 if let id = newValue {
                     withAnimation {
@@ -25,12 +33,13 @@ struct ThumbnailStripView: View {
 
 struct ThumbnailCell: View {
     let photo: Photo
+    let isSelected: Bool
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             Rectangle()
                 .fill(.quaternary)
-                .aspectRatio(1, contentMode: .fit)
+                .frame(width: 80, height: 80)
                 .overlay {
                     Image(systemName: "photo")
                         .foregroundStyle(.tertiary)
@@ -38,9 +47,9 @@ struct ThumbnailCell: View {
 
             if photo.starRating >= 0 {
                 StarRatingView(rating: photo.starRating)
-                    .padding(4)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 4))
-                    .padding(4)
+                    .padding(3)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 3))
+                    .padding(3)
             }
 
             if photo.isPick {
@@ -48,9 +57,13 @@ struct ThumbnailCell: View {
                     .font(.caption2)
                     .foregroundStyle(.purple)
                     .frame(maxWidth: .infinity, alignment: .topTrailing)
-                    .padding(4)
+                    .padding(3)
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(isSelected ? Color.accentColor : .clear, lineWidth: 2)
+        )
     }
 }
