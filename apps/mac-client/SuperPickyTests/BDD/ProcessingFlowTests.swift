@@ -170,7 +170,7 @@ private struct StubInferenceClient: InferenceClient {
     func aesthetics(image: CGImage) async throws -> AestheticsResponse { aestheticsResult }
     func keypoints(image: CGImage) async throws -> KeypointResult { keypointResult }
     func flight(image: CGImage) async throws -> FlightResult { FlightResult(isFlying: false, confidence: 0.1) }
-    func identify(image: CGImage, topK: Int, temperature: Float, latitude: Double?, longitude: Double?) async throws -> [SpeciesMatch] { [] }
+    func identify(filePath: String, topK: Int) async throws -> [SpeciesMatch] { [] }
     func healthCheck() async throws -> ServerHealth { ServerHealth(status: "ready", modelsLoaded: [], device: "cpu", version: "1.0.0") }
 }
 
@@ -186,6 +186,6 @@ private struct SlowInferenceClient: InferenceClient {
                        beak: Keypoint(x: 0.5, y: 0.5, visibility: 0.9))
     }
     func flight(image: CGImage) async throws -> FlightResult { FlightResult(isFlying: false, confidence: 0.1) }
-    func identify(image: CGImage, topK: Int, temperature: Float, latitude: Double?, longitude: Double?) async throws -> [SpeciesMatch] { [] }
+    func identify(filePath: String, topK: Int) async throws -> [SpeciesMatch] { [] }
     func healthCheck() async throws -> ServerHealth { ServerHealth(status: "ready", modelsLoaded: [], device: "cpu", version: "1.0.0") }
 }

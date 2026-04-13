@@ -127,30 +127,10 @@ final class PipelineCoordinator {
         writeKeywords: Bool,
         keywordFormat: String
     ) async throws {
+        // Load 1280px thumbnail for detect/aesthetics/keypoints/flight
         let image = try rawConverter.convert(fileURL: fileURL)
 
-        // Downsample for detect/aesthetics/keypoints/flight (1280px is sufficient)
-        let smallImage: CGImage = {
-            let maxDim = 1280
-            if image.width <= maxDim && image.height <= maxDim { return image }
-            guard let source = CGImageSourceCreateWithData(
-                NSMutableData() as CFMutableData, nil
-            ) else { return image }
-            // Use thumbnail API for fast downscale
-            let data = NSMutableData()
-            guard let dest = CGImageDestinationCreateWithData(data, "public.jpeg" as CFString, 1, nil) else { return image }
-            CGImageDestinationAddImage(dest, image, [kCGImageDestinationLossyCompressionQuality: 0.8] as CFDictionary)
-            CGImageDestinationFinalize(dest)
-            guard let src = CGImageSourceCreateWithData(data, nil) else { return image }
-            let opts: [CFString: Any] = [
-                kCGImageSourceThumbnailMaxPixelSize: maxDim,
-                kCGImageSourceCreateThumbnailFromImageAlways: true,
-                kCGImageSourceCreateThumbnailWithTransform: true,
-            ]
-            return CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary) ?? image
-        }()
-
-        let detection = try await inferenceClient.detect(image: smallImage)
+        let detection = try await inferenceClient.detect(image: image)
         guard let bird = detection.birds.first else {
             photo.starRating = 0
             return
@@ -158,17 +138,17 @@ final class PipelineCoordinator {
         photo.birdConfidence = bird.confidence
 
         let cropRect = CGRect(
-            x: bird.bbox.origin.x * CGFloat(smallImage.width),
-            y: bird.bbox.origin.y * CGFloat(smallImage.height),
-            width: bird.bbox.size.width * CGFloat(smallImage.width),
-            height: bird.bbox.size.height * CGFloat(smallImage.height)
+            x: bird.bbox.origin.x * CGFloat(image.width),
+            y: bird.bbox.origin.y * CGFloat(image.height),
+            width: bird.bbox.size.width * CGFloat(image.width),
+            height: bird.bbox.size.height * CGFloat(image.height)
         )
-        guard let birdCrop = smallImage.cropping(to: cropRect) else {
+        guard let birdCrop = image.cropping(to: cropRect) else {
             photo.starRating = 0
             return
         }
 
-        async let aestheticsResponse = inferenceClient.aesthetics(image: smallImage)
+        async let aestheticsResponse = inferenceClient.aesthetics(image: image)
         async let keypointResult = inferenceClient.keypoints(image: birdCrop)
         async let flightResult = inferenceClient.flight(image: birdCrop)
 
@@ -216,14 +196,9 @@ final class PipelineCoordinator {
         photo.starRating = ratingResult.rating
         photo.isPick = ratingResult.isPick
 
-        // Bird ID — identify species from cropped region (GPS-boosted when available)
+        // Bird ID — preen handles everything: load image, extract GPS, YOLO, crop, classify
         do {
-            let exif = EXIFReader.read(from: fileURL.path)
-            // Send full image — preen handles YOLO detection + smart crop internally
-            let species = try await inferenceClient.identify(
-                image: image, topK: 1, temperature: 0.9,
-                latitude: exif?.latitude, longitude: exif?.longitude
-            )
+            let species = try await inferenceClient.identify(filePath: fileURL.path, topK: 1)
             if let top = species.first {
                 // Always save species (even below threshold) for display
                 photo.speciesScientificName = top.scientificName

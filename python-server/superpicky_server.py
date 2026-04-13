@@ -87,10 +87,17 @@ def flight():
 
 @app.route("/identify", methods=["POST"])
 def identify():
+    top_k = request.args.get("top_k", 5, type=int)
+
+    # Prefer file_path (preen handles loading, GPS, everything)
+    file_path = request.form.get("file_path") or request.args.get("file_path")
+    if file_path:
+        return jsonify(get_species().predict_file(file_path, top_k=top_k))
+
+    # Fallback: image bytes (for tests / backward compat)
     f = request.files.get("image")
     if not f:
-        return jsonify({"error": "No image provided"}), 400
-    top_k = request.args.get("top_k", 5, type=int)
+        return jsonify({"error": "No image or file_path provided"}), 400
     temperature = request.args.get("temperature", 0.9, type=float)
     lat = request.args.get("lat", None, type=float)
     lon = request.args.get("lon", None, type=float)
