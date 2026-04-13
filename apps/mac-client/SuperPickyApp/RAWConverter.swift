@@ -29,7 +29,7 @@ struct RAWConverter: Sendable {
         }
         let options: [CFString: Any] = [
             kCGImageSourceThumbnailMaxPixelSize: Self.maxInferenceSize,
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
         ]
         guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
