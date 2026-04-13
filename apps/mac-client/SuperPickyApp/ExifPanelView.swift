@@ -84,6 +84,7 @@ struct ExifPanelView: View {
                     Text("No EXIF data available")
                         .foregroundStyle(.secondary)
                         .font(.callout)
+                        .accessibilityIdentifier("ExifNoData")
                     Spacer()
                 }
                 .padding()
@@ -95,6 +96,7 @@ struct ExifPanelView: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .shadow(radius: 4)
         .padding(8)
+        .accessibilityIdentifier("ExifPanel")
         .task(id: photo.id) {
             loaded = false
             exifData = await Task.detached {
@@ -111,6 +113,7 @@ struct ExifPanelView: View {
                 .foregroundStyle(.secondary)
             Text(value)
                 .font(.callout)
+                .accessibilityIdentifier("Exif_\(label)")
         }
     }
 
