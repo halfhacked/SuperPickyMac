@@ -49,8 +49,9 @@ struct AsyncPreviewImage: View {
             }
         }
         .task(id: filePath) {
-            image = nil
-            image = await loadImage()
+            // Keep old image visible until new one loads (no white flash)
+            let newImage = await loadImage()
+            image = newImage
         }
     }
 
@@ -64,10 +65,10 @@ struct AsyncPreviewImage: View {
                     continuation.resume(returning: nil)
                     return
                 }
-                // For preview, use a larger size (max 2000px)
+                // Extract embedded preview (fast for RAW — no full decode)
                 let options: [CFString: Any] = [
                     kCGImageSourceThumbnailMaxPixelSize: 2000,
-                    kCGImageSourceCreateThumbnailFromImageAlways: true,
+                    kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
                     kCGImageSourceCreateThumbnailWithTransform: true,
                 ]
                 guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
