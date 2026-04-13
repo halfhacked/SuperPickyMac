@@ -16,7 +16,8 @@ struct SuperPickyApp: App {
         .defaultSize(width: 1200, height: 800)
 
         Settings {
-            Text("Settings — coming soon")
+            SettingsView()
+                .environment(config)
         }
     }
 }
