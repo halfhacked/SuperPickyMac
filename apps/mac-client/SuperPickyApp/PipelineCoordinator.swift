@@ -187,7 +187,7 @@ final class PipelineCoordinator {
 
         // Bird ID — identify species from cropped region
         do {
-            let species = try await inferenceClient.identify(image: birdCrop, topK: 1, temperature: 1.0)
+            let species = try await inferenceClient.identify(image: birdCrop, topK: 1, temperature: 1.0, latitude: nil, longitude: nil)
             if let top = species.first {
                 photo.speciesScientificName = top.scientificName
                 photo.speciesCommonName = top.commonName

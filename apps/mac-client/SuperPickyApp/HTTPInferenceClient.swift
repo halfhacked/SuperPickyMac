@@ -39,14 +39,22 @@ final class HTTPInferenceClient: InferenceClient {
         return try decode(FlightResult.self, from: responseData)
     }
 
-    func identify(image: CGImage, topK: Int = 5, temperature: Float = 1.0) async throws -> [SpeciesMatch] {
+    func identify(image: CGImage, topK: Int = 5, temperature: Float = 0.9,
+                  latitude: Double? = nil, longitude: Double? = nil) async throws -> [SpeciesMatch] {
         let data = try jpegData(from: image)
+        var queryItems = [
+            URLQueryItem(name: "top_k", value: "\(topK)"),
+            URLQueryItem(name: "temperature", value: "\(temperature)"),
+        ]
+        if let lat = latitude {
+            queryItems.append(URLQueryItem(name: "lat", value: "\(lat)"))
+        }
+        if let lon = longitude {
+            queryItems.append(URLQueryItem(name: "lon", value: "\(lon)"))
+        }
         let responseData = try await postMultipart(
             endpoint: "identify",
-            queryItems: [
-                URLQueryItem(name: "top_k", value: "\(topK)"),
-                URLQueryItem(name: "temperature", value: "\(temperature)"),
-            ],
+            queryItems: queryItems,
             imageData: data
         )
         let response = try decode(IdentifyResponse.self, from: responseData)
