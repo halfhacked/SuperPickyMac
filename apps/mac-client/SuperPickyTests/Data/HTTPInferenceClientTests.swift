@@ -17,7 +17,7 @@ import Foundation
         let result = try JSONDecoder().decode(DetectionResult.self, from: json)
         #expect(result.birds.count == 1)
         #expect(result.birds[0].confidence == 0.94)
-        #expect(result.birds[0].bbox.origin.x == 0.1)
+        #expect(abs(result.birds[0].bbox.origin.x - 0.1) < 0.001)
         #expect(abs(result.birds[0].bbox.size.width - 0.5) < 0.001)
     }
 
