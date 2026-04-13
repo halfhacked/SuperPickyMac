@@ -91,8 +91,10 @@ def identify():
     if not f:
         return jsonify({"error": "No image provided"}), 400
     top_k = request.args.get("top_k", 5, type=int)
-    temperature = request.args.get("temperature", 1.0, type=float)
-    return jsonify(get_species().predict(f.read(), top_k=top_k, temperature=temperature))
+    temperature = request.args.get("temperature", 0.9, type=float)
+    lat = request.args.get("lat", None, type=float)
+    lon = request.args.get("lon", None, type=float)
+    return jsonify(get_species().predict(f.read(), top_k=top_k, temperature=temperature, lat=lat, lon=lon))
 
 
 if __name__ == "__main__":

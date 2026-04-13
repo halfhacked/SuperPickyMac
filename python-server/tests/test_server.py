@@ -34,7 +34,14 @@ def client():
 
         mock_sp.return_value = MagicMock()
         mock_sp.return_value.predict.return_value = {
-            "species": [{"name": "Alcedo atthis", "common_name": "Common Kingfisher", "confidence": 0.94}]
+            "species": [{
+                "name": "Alcedo atthis",
+                "common_name": "Common Kingfisher",
+                "confidence": 0.94,
+                "cn_name": "\u666e\u901a\u7fe0\u9e1f",
+                "pinyin": "p\u01d4 t\u014dng cu\xec ni\u01ceo",
+                "threshold_used": "gps",
+            }]
         }
 
         from superpicky_server import app
@@ -84,7 +91,34 @@ def test_flight(client):
 def test_identify(client):
     resp = _post_image(client, "/identify?top_k=3")
     assert resp.status_code == 200
-    assert len(resp.get_json()["species"]) == 1
+    data = resp.get_json()
+    assert len(data["species"]) == 1
+    sp = data["species"][0]
+    assert "cn_name" in sp
+    assert "pinyin" in sp
+    assert "threshold_used" in sp
+
+
+def test_identify_with_gps(client):
+    resp = _post_image(client, "/identify?top_k=3&lat=39.9&lon=116.4")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert len(data["species"]) == 1
+    sp = data["species"][0]
+    assert sp["cn_name"] == "\u666e\u901a\u7fe0\u9e1f"
+    assert sp["pinyin"] == "p\u01d4 t\u014dng cu\xec ni\u01ceo"
+    assert sp["threshold_used"] == "gps"
+
+
+def test_identify_without_gps(client):
+    resp = _post_image(client, "/identify?top_k=5")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert len(data["species"]) == 1
+    sp = data["species"][0]
+    assert "cn_name" in sp
+    assert "pinyin" in sp
+    assert "threshold_used" in sp
 
 
 def test_no_image(client):
