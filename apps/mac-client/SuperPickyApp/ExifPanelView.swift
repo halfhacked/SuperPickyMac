@@ -64,8 +64,22 @@ struct ExifPanelView: View {
                         if let location = formatLocation(data) {
                             exifRow(label: "Place", value: location)
                         }
-                        if let coords = formatCoordinates(data) {
-                            exifRow(label: "GPS", value: coords)
+                        if let lat = data.latitude, let lon = data.longitude {
+                            Button {
+                                let url = URL(string: "maps://?ll=\(lat),\(lon)&z=14")!
+                                NSWorkspace.shared.open(url)
+                            } label: {
+                                exifRow(label: "GPS", value: formatCoordinates(data) ?? "")
+                                    .foregroundStyle(.blue)
+                            }
+                            .buttonStyle(.plain)
+                            .onHover { hovering in
+                                if hovering {
+                                    NSCursor.pointingHand.push()
+                                } else {
+                                    NSCursor.pop()
+                                }
+                            }
                         }
                         if let alt = data.altitude {
                             exifRow(label: "Altitude", value: "\(Int(alt)) m")
