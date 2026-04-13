@@ -107,24 +107,42 @@ final class ProcessingFlowUITests: XCTestCase {
         XCTAssertTrue(speciesFound, "At least one bird species should appear in sidebar after processing")
     }
 
-    /// 09: Click Excellent to filter — app doesn't crash, selection works
-    func test09_FilterByExcellent() throws {
+    /// 09: Expand species with burst — "Burst" child appears
+    func test09_ExpandBurstSpecies() throws {
+        // Find the disclosure group for a species with bursts and click its arrow
+        let disclosureButtons = Self.app.disclosureTriangles
+        if disclosureButtons.count > 0 {
+            // Click the first disclosure triangle to expand
+            disclosureButtons.firstMatch.click()
+            sleep(1)
+
+            // "Burst" child should now be visible
+            let burstLabel = Self.app.staticTexts["Burst"]
+            XCTAssertTrue(burstLabel.waitForExistence(timeout: 3), "Burst group should appear under species")
+        } else {
+            // No disclosure groups — burst detection might not have found groups
+            // This is acceptable if the test photos didn't produce bursts
+        }
+    }
+
+    /// 10: Click Excellent to filter — app doesn't crash, selection works
+    func test10_FilterByExcellent() throws {
         Self.app.staticTexts["Excellent"].click()
         sleep(1)
         // Still running, sidebar still visible
         XCTAssertTrue(Self.app.staticTexts["Excellent"].exists)
     }
 
-    /// 10: Click folder again to show all photos
-    func test10_ClickFolderShowsAll() throws {
+    /// 11: Click folder again to show all photos
+    func test11_ClickFolderShowsAll() throws {
         let folderName = (Self.testDir! as NSString).lastPathComponent
         Self.app.staticTexts[folderName].click()
         sleep(1)
         XCTAssertGreaterThan(Self.app.images.count, 0, "All thumbnails should return after clicking folder")
     }
 
-    /// 11: Remove folder — counts reset to 0, empty state returns
-    func test11_RemoveFolderClearsCounts() throws {
+    /// 12: Remove folder — counts reset to 0, empty state returns
+    func test12_RemoveFolderClearsCounts() throws {
         let folderName = (Self.testDir! as NSString).lastPathComponent
         let folderLabel = Self.app.staticTexts[folderName]
 

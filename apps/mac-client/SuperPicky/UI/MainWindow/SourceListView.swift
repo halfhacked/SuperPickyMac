@@ -85,31 +85,8 @@ struct SourceListView: View {
             if !speciesEntries.isEmpty {
                 Section("Species") {
                     ForEach(speciesEntries) { species in
-                        DisclosureGroup {
-                            // Burst groups as children
-                            ForEach(species.burstGroups) { burst in
-                                HStack {
-                                    Image(systemName: "rectangle.stack")
-                                        .foregroundStyle(.orange)
-                                    Text("Burst")
-                                    Spacer()
-                                    Text("\(burst.count)")
-                                        .foregroundStyle(.secondary)
-                                }
-                                .tag(SidebarSelection.burstGroup(burst.id))
-                            }
-                            // Single (non-burst) photos count
-                            if species.singlePhotos > 0 {
-                                HStack {
-                                    Image(systemName: "photo")
-                                        .foregroundStyle(.secondary)
-                                    Text("Singles")
-                                    Spacer()
-                                    Text("\(species.singlePhotos)")
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        } label: {
+                        if species.burstGroups.isEmpty {
+                            // No bursts — flat row, no disclosure arrow
                             HStack {
                                 Text(species.name)
                                 Spacer()
@@ -117,6 +94,39 @@ struct SourceListView: View {
                                     .foregroundStyle(.secondary)
                             }
                             .tag(SidebarSelection.species(species.name))
+                        } else {
+                            // Has bursts — expandable
+                            DisclosureGroup {
+                                ForEach(species.burstGroups) { burst in
+                                    HStack {
+                                        Image(systemName: "rectangle.stack")
+                                            .foregroundStyle(.orange)
+                                        Text("Burst")
+                                        Spacer()
+                                        Text("\(burst.count)")
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .tag(SidebarSelection.burstGroup(burst.id))
+                                }
+                                if species.singlePhotos > 0 {
+                                    HStack {
+                                        Image(systemName: "photo")
+                                            .foregroundStyle(.secondary)
+                                        Text("Singles")
+                                        Spacer()
+                                        Text("\(species.singlePhotos)")
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            } label: {
+                                HStack {
+                                    Text(species.name)
+                                    Spacer()
+                                    Text("\(species.count)")
+                                        .foregroundStyle(.secondary)
+                                }
+                                .tag(SidebarSelection.species(species.name))
+                            }
                         }
                     }
                 }

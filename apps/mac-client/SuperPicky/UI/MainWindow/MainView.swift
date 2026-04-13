@@ -5,7 +5,8 @@ struct SpeciesEntry: Identifiable {
     let name: String
     let count: Int
     let burstGroups: [BurstGroupEntry]
-    let singlePhotos: Int // photos not in any burst
+    let singlePhotos: Int
+    let isUnidentified: Bool // true if no species was detected
     var id: String { name }
 }
 
@@ -67,17 +68,20 @@ final class AppState {
     /// Build species → burst group hierarchy from loaded photos.
     private func buildSpeciesHierarchy() {
         // Group photos by species
-        var bySpecies: [String: [Photo]] = [:]
+        // Key: (displayName, isUnidentified)
+        var bySpecies: [String: (photos: [Photo], isUnidentified: Bool)] = [:]
         for photo in allPhotos {
-            let name = photo.speciesCommonName ?? photo.speciesScientificName ?? "Unknown"
-            bySpecies[name, default: []].append(photo)
+            let hasSpecies = photo.speciesScientificName != nil
+            let name = photo.speciesCommonName ?? photo.speciesScientificName ?? NSLocalizedString("Unidentified", comment: "Photos with no species detected")
+            var entry = bySpecies[name] ?? (photos: [], isUnidentified: !hasSpecies)
+            entry.photos.append(photo)
+            bySpecies[name] = entry
         }
 
-        speciesEntries = bySpecies.map { name, photos in
-            // Find burst groups within this species
+        speciesEntries = bySpecies.map { name, entry in
             var burstMap: [UUID: [Photo]] = [:]
             var singleCount = 0
-            for photo in photos {
+            for photo in entry.photos {
                 if let groupID = photo.burstGroupID {
                     burstMap[groupID, default: []].append(photo)
                 } else {
@@ -96,11 +100,16 @@ final class AppState {
 
             return SpeciesEntry(
                 name: name,
-                count: photos.count,
+                count: entry.photos.count,
                 burstGroups: burstGroups,
-                singlePhotos: singleCount
+                singlePhotos: singleCount,
+                isUnidentified: entry.isUnidentified
             )
-        }.sorted { $0.count > $1.count }
+        }.sorted {
+            // Unidentified always first, then by count
+            if $0.isUnidentified != $1.isUnidentified { return $0.isUnidentified }
+            return $0.count > $1.count
+        }
     }
 
     /// Clear all photo data (when folder is removed).
