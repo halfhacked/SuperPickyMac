@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import GRDB
 @testable import SuperPicky
 
 @Suite struct ReportDatabaseTests {
@@ -48,6 +49,72 @@ import Foundation
         let counts = try db.ratingCounts()
         #expect(counts[3] == 3)
         #expect(counts[1] == 3)
+    }
+
+    @Test func v2MigrationAddsIsManualRatingAndRemapsMinus1() throws {
+        let tempDir = try makeTempDir()
+        let dbPath = tempDir.appendingPathComponent(".report.db").path
+
+        // Create a v1-only database with a -1 rating row
+        let queue = try DatabaseQueue(path: dbPath)
+        try queue.write { db in
+            try db.execute(sql: """
+                CREATE TABLE photos (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    filename TEXT NOT NULL,
+                    filePath TEXT NOT NULL,
+                    folderPath TEXT NOT NULL,
+                    dateCreated DATETIME NOT NULL,
+                    birdConfidence DOUBLE,
+                    birdBbox BLOB,
+                    birdMask BLOB,
+                    aestheticsScore DOUBLE,
+                    leftEyeX DOUBLE, leftEyeY DOUBLE, leftEyeVis DOUBLE,
+                    rightEyeX DOUBLE, rightEyeY DOUBLE, rightEyeVis DOUBLE,
+                    beakX DOUBLE, beakY DOUBLE, beakVis DOUBLE,
+                    isFlying BOOLEAN NOT NULL DEFAULT 0,
+                    flightConfidence DOUBLE,
+                    sharpnessScore DOUBLE,
+                    exposureStatus TEXT,
+                    focusPointStatus TEXT,
+                    starRating INTEGER NOT NULL DEFAULT 0,
+                    isPick BOOLEAN NOT NULL DEFAULT 0,
+                    speciesScientificName TEXT,
+                    speciesCommonName TEXT,
+                    speciesConfidence DOUBLE,
+                    burstGroupID TEXT,
+                    isBurstBest BOOLEAN NOT NULL DEFAULT 0
+                )
+            """)
+            // Insert grdb_migrations so v1 is already "applied"
+            try db.execute(sql: "CREATE TABLE grdb_migrations (identifier TEXT NOT NULL PRIMARY KEY)")
+            try db.execute(sql: "INSERT INTO grdb_migrations (identifier) VALUES ('v1')")
+            // Insert a photo with starRating = -1 (legacy)
+            let id = UUID().uuidString
+            try db.execute(sql: """
+                INSERT INTO photos (id, filename, filePath, folderPath, dateCreated, isFlying, starRating, isPick, isBurstBest)
+                VALUES (?, 'legacy.CR3', '/tmp/legacy.CR3', ?, datetime('now'), 0, -1, 0, 0)
+            """, arguments: [id, tempDir.path])
+        }
+
+        // Now open via ReportDatabase which should run v2 migration
+        let reportDb = try ReportDatabase(folderPath: tempDir)
+        let allPhotos = try reportDb.fetchAllPhotos()
+        #expect(allPhotos.count == 1)
+        // -1 should be remapped to 0
+        #expect(allPhotos[0].starRating == 0)
+        // isManualRating column should exist and default to false
+        #expect(allPhotos[0].isManualRating == false)
+    }
+
+    @Test func isManualRatingDefaultsFalseForNewPhotos() throws {
+        let tempDir = try makeTempDir()
+        let db = try ReportDatabase(folderPath: tempDir)
+        var photo = Photo(filename: "IMG_NEW.CR3", filePath: "/tmp/IMG_NEW.CR3", folderPath: tempDir.path)
+        try db.save(&photo)
+        let fetched = try db.fetchPhoto(id: photo.id)
+        #expect(fetched != nil)
+        #expect(fetched?.isManualRating == false)
     }
 
     @Test func deletePhoto() throws {
