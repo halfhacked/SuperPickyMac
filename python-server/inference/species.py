@@ -14,7 +14,7 @@ GLOBAL_THRESHOLD = 0.90
 def _to_pinyin(cn_name: str) -> str:
     if not cn_name:
         return ""
-    return " ".join(p[0] for p in pinyin(cn_name, style=Style.TONE, errors="ignore"))
+    return "".join(p[0] for p in pinyin(cn_name, style=Style.NORMAL, errors="ignore"))
 
 
 def _build_filter_chain(avonet: AvonetFilter, lat, lon):
@@ -74,10 +74,7 @@ class SpeciesClassifier:
                 break
 
         if best_result is None:
-            best_result = self.classifier.predict_from_logits(
-                logits, top_k=top_k, temperature=temperature, species_set=None
-            )
-            threshold_used = "global"
+            return {"species": []}
 
         species = []
         for r in best_result:
