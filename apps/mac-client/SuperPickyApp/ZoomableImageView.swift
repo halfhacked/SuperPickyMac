@@ -57,6 +57,7 @@ struct ZoomableImageView: View {
                 .contentShape(Rectangle())
                 .gesture(dragGesture)
                 .onTapGesture(count: 2) {
+                    dragStart = .zero
                     zoomState.toggleFitActualPixels(
                         imagePixelWidth: image.size.width,
                         viewWidth: geo.size.width
@@ -68,6 +69,9 @@ struct ZoomableImageView: View {
                         zoomState.zoom(by: factor)
                     }
                 )
+                .onChange(of: zoomState.scale) { _, newScale in
+                    if newScale <= 1.0 { dragStart = .zero }
+                }
         }
     }
 
