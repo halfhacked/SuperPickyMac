@@ -18,7 +18,7 @@ struct MockInferenceClient: InferenceClient {
     func aesthetics(image: CGImage) async throws -> AestheticsResponse { aestheticsResult }
     func keypoints(image: CGImage) async throws -> KeypointResult { keypointResult }
     func flight(image: CGImage) async throws -> FlightResult { flightResult }
-    func identify(image: CGImage, topK: Int, temperature: Float) async throws -> [SpeciesMatch] { [] }
+    func identify(image: CGImage, topK: Int, temperature: Float, latitude: Double?, longitude: Double?) async throws -> [SpeciesMatch] { [] }
     func healthCheck() async throws -> ServerHealth {
         ServerHealth(status: "ready", modelsLoaded: [], device: "cpu", version: "1.0.0")
     }
