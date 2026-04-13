@@ -78,16 +78,24 @@ struct AsyncPreviewImage: View {
 struct InfoBarView: View {
     let photo: Photo
 
+    private var hasBird: Bool { photo.starRating >= 0 && photo.birdConfidence != nil }
+
     var body: some View {
         HStack(spacing: 16) {
             StarRatingView(rating: photo.starRating)
 
-            if let sharpness = photo.sharpnessScore {
+            if !hasBird {
+                Text("No bird detected")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if hasBird, let sharpness = photo.sharpnessScore, sharpness > 0 {
                 Label("Sharp: \(Int(sharpness))", systemImage: "scope")
                     .font(.caption)
             }
 
-            if let aesthetics = photo.aestheticsScore {
+            if hasBird, let aesthetics = photo.aestheticsScore {
                 Label("Aesth: \(String(format: "%.1f", aesthetics))", systemImage: "sparkles")
                     .font(.caption)
             }
