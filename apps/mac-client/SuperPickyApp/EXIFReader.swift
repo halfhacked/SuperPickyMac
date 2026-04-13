@@ -18,6 +18,15 @@ struct EXIFData: Sendable {
     var meteringMode: String?
     var whiteBalance: String?
     var keywords: [String] = []    // IPTC keywords, empty if none
+
+    /// True when every optional field is nil and keywords is empty.
+    var isEmpty: Bool {
+        cameraMake == nil && cameraModel == nil && lensModel == nil &&
+        focalLength == nil && aperture == nil && shutterSpeed == nil &&
+        iso == nil && dateTimeOriginal == nil && imageWidth == nil &&
+        imageHeight == nil && exposureBias == nil && meteringMode == nil &&
+        whiteBalance == nil && keywords.isEmpty
+    }
 }
 
 /// Reads EXIF metadata from image files using ImageIO.
