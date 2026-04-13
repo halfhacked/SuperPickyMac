@@ -14,13 +14,6 @@ struct StarRatingView: View {
     }
 
     private var color: Color {
-        switch rating {
-        case 5: .green
-        case 4: .blue
-        case 3: .yellow
-        case 2: .orange
-        case 1: .secondary
-        default: .secondary
-        }
+        rating > 0 ? .primary : .secondary
     }
 }

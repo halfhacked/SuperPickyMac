@@ -381,7 +381,7 @@ struct ContentView: View {
                 photos: photos,
                 selectedPhotoID: $selectedPhotoID
             )
-            .frame(minHeight: 80, idealHeight: 120, maxHeight: 200)
+            .frame(minHeight: 60, idealHeight: 80, maxHeight: 120)
         }
         .background(Color(nsColor: .controlBackgroundColor))
         .focusable()
