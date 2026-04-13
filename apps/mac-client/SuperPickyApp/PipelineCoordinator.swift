@@ -153,5 +153,17 @@ final class PipelineCoordinator {
         )
         photo.starRating = ratingResult.rating
         photo.isPick = ratingResult.isPick
+
+        // Bird ID — identify species from cropped region
+        do {
+            let species = try await inferenceClient.identify(image: birdCrop, topK: 1, temperature: 1.0)
+            if let top = species.first {
+                photo.speciesScientificName = top.scientificName
+                photo.speciesCommonName = top.commonName
+                photo.speciesConfidence = top.confidence
+            }
+        } catch {
+            logger.warning("Species identification failed: \(error)")
+        }
     }
 }
