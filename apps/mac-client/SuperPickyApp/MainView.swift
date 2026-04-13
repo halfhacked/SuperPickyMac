@@ -160,6 +160,7 @@ struct MainView: View {
     @Environment(ProcessManager.self) private var processManager
     @State private var appState = AppState()
     @State private var processingTask: Task<Void, Never>?
+    @AppStorage("lastFolderPath") private var lastFolderPath: String = ""
 
     private var isTestMode: Bool {
         ProcessInfo.processInfo.environment["TEST_MODE"] == "1"
@@ -207,7 +208,6 @@ struct MainView: View {
         .onAppear {
             if let testFolder = ProcessInfo.processInfo.environment["TEST_FOLDER"] {
                 let folder = URL(fileURLWithPath: testFolder)
-                // Wait for server to be ready before auto-processing
                 Task {
                     if !isTestMode {
                         for _ in 0..<30 {
@@ -218,6 +218,15 @@ struct MainView: View {
                     await MainActor.run {
                         startProcessing(folder: folder)
                     }
+                }
+            } else if !lastFolderPath.isEmpty {
+                let folder = URL(fileURLWithPath: lastFolderPath)
+                // Only restore if .report.db exists (folder was previously processed)
+                let dbPath = folder.appendingPathComponent(".report.db").path
+                if FileManager.default.fileExists(atPath: dbPath) {
+                    appState.folders.append(folder)
+                    appState.sidebarSelection = .folder(folder)
+                    appState.loadPhotos(for: folder)
                 }
             }
         }
@@ -257,10 +266,11 @@ struct MainView: View {
         let exposureEnabled = config.exposureDetectionEnabled
         let exposureThreshold = config.exposureThreshold
 
-        // Add folder to sidebar immediately
+        // Add folder to sidebar immediately and remember it
         if !appState.folders.contains(folder) {
             appState.folders.append(folder)
         }
+        lastFolderPath = folder.path
         appState.sidebarSelection = .folder(folder)
         appState.processingFolder = folder
         appState.processingProgress = 0
