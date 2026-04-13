@@ -272,7 +272,8 @@ struct MainView: View {
                 exposureEnabled: exposureEnabled,
                 exposureThreshold: exposureThreshold,
                 onPhotoProcessed: {
-                    await MainActor.run {
+                    // Dispatch async to avoid reentrant NSTableView updates
+                    Task { @MainActor in
                         if pipeline.totalCount > 0 {
                             appState.processingProgress = Double(pipeline.processedCount) / Double(pipeline.totalCount)
                         }
