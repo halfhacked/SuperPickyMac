@@ -5,9 +5,9 @@ struct PreviewView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ZStack {
-                Color.black
-                if let photo {
+            if let photo {
+                ZStack {
+                    Color(nsColor: .controlBackgroundColor)
                     VStack {
                         Image(systemName: "photo.fill")
                             .font(.system(size: 64))
@@ -15,14 +15,21 @@ struct PreviewView: View {
                         Text(photo.filename)
                             .foregroundStyle(.secondary)
                     }
-                } else {
-                    Text("No photo selected")
-                        .foregroundStyle(.tertiary)
                 }
-            }
-
-            if let photo {
                 InfoBarView(photo: photo)
+            } else {
+                VStack(spacing: 12) {
+                    Image(systemName: "bird")
+                        .font(.system(size: 48, weight: .ultraLight))
+                        .foregroundStyle(.quaternary)
+                    Text("Select a photo to preview")
+                        .font(.title3)
+                        .foregroundStyle(.tertiary)
+                    Text("Process a folder with + to get started")
+                        .font(.caption)
+                        .foregroundStyle(.quaternary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
