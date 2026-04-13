@@ -73,6 +73,7 @@ struct ProcessingSheet: View {
                 if folderURL != nil {
                     Button("Start Processing") { startProcessing() }
                         .buttonStyle(.borderedProminent)
+                        .keyboardShortcut(.defaultAction)
                         .accessibilityIdentifier("StartProcessingButton")
                 }
             }
