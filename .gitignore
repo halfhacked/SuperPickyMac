@@ -34,3 +34,4 @@ python-server/models/*.pth
 
 # Superpowers
 .superpowers/
+real-photos/
