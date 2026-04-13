@@ -38,12 +38,14 @@ struct SourceListView: View {
                     Button {
                         onAddFolder()
                     } label: {
-                        Image(systemName: "plus.circle")
-                            .font(.caption)
+                        Image(systemName: "plus.circle.fill")
+                            .font(.body)
+                            .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
                     .help("Process new folder")
                     .accessibilityIdentifier("AddFolderButton")
+                    .padding(.trailing, 4)
                 }
             }
 
