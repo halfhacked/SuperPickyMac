@@ -19,6 +19,7 @@ struct ThumbnailStripView: View {
                 .padding(.horizontal, 4)
                 .padding(.vertical, 2)
             }
+            .onScrollWheelVerticalToHorizontal()
             .background(.bar)
             .onChange(of: selectedPhotoID) { _, newValue in
                 if let id = newValue {
@@ -112,5 +113,50 @@ struct AsyncThumbnailImage: View {
                 continuation.resume(returning: nsImage)
             }
         }
+    }
+}
+
+// MARK: - Vertical-to-horizontal scroll wheel adapter
+
+private struct VerticalToHorizontalScrollModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content.background(
+            VerticalScrollInterceptor()
+        )
+    }
+}
+
+private struct VerticalScrollInterceptor: NSViewRepresentable {
+    func makeNSView(context: Context) -> ScrollInterceptorView {
+        ScrollInterceptorView()
+    }
+    func updateNSView(_ nsView: ScrollInterceptorView, context: Context) {}
+}
+
+private class ScrollInterceptorView: NSView {
+    override func scrollWheel(with event: NSEvent) {
+        if abs(event.deltaY) > abs(event.deltaX) {
+            guard let cg = event.cgEvent else {
+                super.scrollWheel(with: event)
+                return
+            }
+            // Swap: vertical scroll becomes horizontal
+            let dy = cg.getDoubleValueField(.scrollWheelEventDeltaAxis1)
+            cg.setDoubleValueField(.scrollWheelEventDeltaAxis1, value: 0)
+            cg.setDoubleValueField(.scrollWheelEventDeltaAxis2, value: dy)
+            if let converted = NSEvent(cgEvent: cg) {
+                super.scrollWheel(with: converted)
+            } else {
+                super.scrollWheel(with: event)
+            }
+        } else {
+            super.scrollWheel(with: event)
+        }
+    }
+}
+
+extension View {
+    func onScrollWheelVerticalToHorizontal() -> some View {
+        modifier(VerticalToHorizontalScrollModifier())
     }
 }
