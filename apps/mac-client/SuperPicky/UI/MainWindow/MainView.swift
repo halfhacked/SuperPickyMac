@@ -56,7 +56,10 @@ final class AppState {
             buildSpeciesHierarchy()
 
             photos = allPhotos
-            selectedPhotoID = photos.first?.id
+            // Auto-select the highest-rated photo
+            selectedPhotoID = photos
+                .sorted { ($0.starRating, $0.aestheticsScore ?? 0) > ($1.starRating, $1.aestheticsScore ?? 0) }
+                .first?.id
         } catch {
             allPhotos = []
             photos = []
@@ -273,8 +276,7 @@ struct MainView: View {
                 exposureEnabled: exposureEnabled,
                 exposureThreshold: exposureThreshold,
                 onPhotoProcessed: {
-                    // Small delay to avoid reentrant NSTableView updates
-                    try? await Task.sleep(for: .milliseconds(50))
+                    try? await Task.sleep(for: .milliseconds(150))
                     await MainActor.run {
                         if pipeline.totalCount > 0 {
                             appState.processingProgress = Double(pipeline.processedCount) / Double(pipeline.totalCount)
