@@ -32,6 +32,7 @@ struct Photo: Identifiable, Codable, Sendable, FetchableRecord, PersistableRecor
     var speciesConfidence: Float?
     var burstGroupID: UUID?
     var isBurstBest: Bool
+    var isManualRating: Bool
 
     static let databaseTableName = "photos"
 
@@ -45,5 +46,6 @@ struct Photo: Identifiable, Codable, Sendable, FetchableRecord, PersistableRecor
         self.starRating = 0
         self.isPick = false
         self.isBurstBest = false
+        self.isManualRating = false
     }
 }
