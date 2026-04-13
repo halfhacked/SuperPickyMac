@@ -5,6 +5,8 @@ struct PreviewView: View {
     @State private var zoomState = ZoomState()
     @State private var previousPhotoID: UUID?
 
+    private static let bgColor = Color(white: 0.18)
+
     var body: some View {
         VStack(spacing: 0) {
             if let photo {
@@ -24,6 +26,7 @@ struct PreviewView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .background(Self.bgColor)
         .onChange(of: photo?.id) { _, newID in
             if newID != previousPhotoID {
                 previousPhotoID = newID

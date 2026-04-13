@@ -330,7 +330,10 @@ struct MainView: View {
                             appState.processingProgress = Double(pipeline.processedCount) / Double(pipeline.totalCount)
                         }
                         appState.processingFilename = pipeline.currentFilename
-                        appState.loadPhotos(for: folder)
+                        // Reload UI every 5 photos to avoid jarring per-photo re-renders
+                        if pipeline.processedCount % 5 == 0 {
+                            appState.loadPhotos(for: folder)
+                        }
                     }
                 }
             )
@@ -380,6 +383,7 @@ struct ContentView: View {
             )
             .frame(minHeight: 80, idealHeight: 120, maxHeight: 200)
         }
+        .background(Color(white: 0.18))
         .focusable()
         .focusEffectDisabled()
         .focused($isContentFocused)
