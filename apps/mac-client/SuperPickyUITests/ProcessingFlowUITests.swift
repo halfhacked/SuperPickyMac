@@ -3,114 +3,86 @@ import XCTest
 /// BDD: Processing flow — user picks a folder and processes bird photos.
 final class ProcessingFlowUITests: XCTestCase {
 
-    var app: XCUIApplication!
-
     override func setUpWithError() throws {
         continueAfterFailure = false
-        app = XCUIApplication()
-        // Test mode: bypass Python server, use mock inference
+    }
+
+    // MARK: - Scenario: Empty state shows Select Folder button
+
+    func testEmptyStateShowsSelectFolder() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["TEST_MODE"] = "1"
+        app.launch()
+        defer { app.terminate() }
+
+        let selectButton = app.buttons["SelectFolderButton"]
+        XCTAssertTrue(selectButton.waitForExistence(timeout: 5), "Empty state should show Select Folder button")
+    }
+
+    // MARK: - Scenario: Sidebar shows ratings
+
+    func testSidebarShowsRatings() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["TEST_MODE"] = "1"
+        app.launch()
+        defer { app.terminate() }
+
+        XCTAssertTrue(app.staticTexts["Excellent"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Good"].exists)
+        XCTAssertTrue(app.staticTexts["Average"].exists)
+        XCTAssertTrue(app.staticTexts["Reject"].exists)
+    }
+
+    // MARK: - Scenario: Processing folder appears in sidebar
+
+    func testProcessFolderAppearsInSidebar() throws {
+        let app = XCUIApplication()
         app.launchEnvironment["TEST_MODE"] = "1"
         app.launchEnvironment["TEST_FOLDER"] = createTestFolder()
         app.launch()
-    }
+        defer { app.terminate() }
 
-    override func tearDownWithError() throws {
-        app.terminate()
-    }
-
-    // MARK: - Scenario: Open processing sheet via Select Folder button
-
-    func testSelectFolderButtonOpensSheet() throws {
-        // Close auto-opened sheet first (TEST_FOLDER triggers it)
-        let autoSheet = app.sheets.firstMatch
-        if autoSheet.waitForExistence(timeout: 3) {
-            app.typeKey(.escape, modifierFlags: [])
-            sleep(1)
-        }
-
-        // Empty state shows "Select Folder" button
-        let selectButton = app.buttons["SelectFolderButton"]
-        XCTAssertTrue(selectButton.waitForExistence(timeout: 5), "Select Folder button should exist in empty state")
-        selectButton.click()
-
-        let sheet = app.sheets.firstMatch
-        XCTAssertTrue(sheet.waitForExistence(timeout: 5), "Processing sheet should appear")
-    }
-
-    // MARK: - Scenario: Open processing sheet via sidebar + button
-
-    func testSidebarAddFolderOpensSheet() throws {
-        // Close auto-opened sheet first (TEST_FOLDER triggers it)
-        let autoSheet = app.sheets.firstMatch
-        if autoSheet.waitForExistence(timeout: 3) {
-            app.typeKey(.escape, modifierFlags: [])
-            sleep(1)
-        }
-
-        let addButton = app.buttons["AddFolderButton"]
-        XCTAssertTrue(addButton.waitForExistence(timeout: 5), "Sidebar + button should exist")
-        addButton.click()
-
-        let sheet = app.sheets.firstMatch
-        XCTAssertTrue(sheet.waitForExistence(timeout: 5), "Processing sheet should appear")
-    }
-
-    // MARK: - Scenario: Sheet shows pre-filled folder from TEST_FOLDER
-
-    func testSheetShowsPrefilledFolder() throws {
-        // Sheet auto-opens because TEST_FOLDER is set
-        let sheet = app.sheets.firstMatch
-        XCTAssertTrue(sheet.waitForExistence(timeout: 5))
-
-        // Folder name should be visible
         let folderLabel = app.staticTexts["superpicky_uitest"]
-        XCTAssertTrue(folderLabel.waitForExistence(timeout: 3), "Pre-filled folder name should be displayed")
-
-        // Start Processing button should be visible (folder is selected)
-        let startButton = sheet.buttons["Start Processing"]
-        XCTAssertTrue(startButton.waitForExistence(timeout: 3), "Start Processing button should appear when folder is set")
+        XCTAssertTrue(folderLabel.waitForExistence(timeout: 10), "Folder should appear in sidebar")
     }
 
-    // MARK: - Scenario: Process folder and see completion
+    // MARK: - Scenario: Photos not moved (auto-organize off)
 
-    func testProcessFolderToCompletion() throws {
-        // Sheet auto-opens with TEST_FOLDER
-        let sheet = app.sheets.firstMatch
-        XCTAssertTrue(sheet.waitForExistence(timeout: 5))
+    func testPhotosNotMovedAfterProcessing() throws {
+        let testDir = createTestFolder()
+        let app = XCUIApplication()
+        app.launchEnvironment["TEST_MODE"] = "1"
+        app.launchEnvironment["TEST_FOLDER"] = testDir
+        app.launch()
+        defer { app.terminate() }
 
-        // Click Start Processing
-        let startButton = sheet.buttons["Start Processing"]
-        XCTAssertTrue(startButton.waitForExistence(timeout: 3))
-        startButton.click()
+        let folderLabel = app.staticTexts["superpicky_uitest"]
+        XCTAssertTrue(folderLabel.waitForExistence(timeout: 10))
+        sleep(5)
 
-        // Wait for "Processing complete!" text
-        let completeText = app.staticTexts["Processing complete!"]
-        XCTAssertTrue(completeText.waitForExistence(timeout: 30), "Processing should complete")
-
-        // Click Done
-        let doneButton = sheet.buttons["Done"]
-        XCTAssertTrue(doneButton.waitForExistence(timeout: 5))
-        doneButton.click()
-
-        // Sheet should dismiss — verify sidebar shows the folder
-        let folderInSidebar = app.staticTexts["superpicky_uitest"]
-        XCTAssertTrue(folderInSidebar.waitForExistence(timeout: 5), "Processed folder should appear in sidebar")
+        for i in 1...3 {
+            let path = (testDir as NSString).appendingPathComponent("bird\(i).jpg")
+            XCTAssertTrue(FileManager.default.fileExists(atPath: path),
+                "bird\(i).jpg should stay in root")
+        }
     }
 
-    // MARK: - Scenario: Settings opens with Cmd+,
+    // MARK: - Scenario: Database created after processing
 
-    func testSettingsOpens() throws {
-        // Close auto-opened sheet first
-        app.typeKey(.escape, modifierFlags: [])
-        sleep(1)
+    func testDatabaseCreatedAfterProcessing() throws {
+        let testDir = createTestFolder()
+        let app = XCUIApplication()
+        app.launchEnvironment["TEST_MODE"] = "1"
+        app.launchEnvironment["TEST_FOLDER"] = testDir
+        app.launch()
+        defer { app.terminate() }
 
-        app.typeKey(",", modifierFlags: .command)
-        sleep(1)
+        let folderLabel = app.staticTexts["superpicky_uitest"]
+        XCTAssertTrue(folderLabel.waitForExistence(timeout: 10))
+        sleep(5)
 
-        // SwiftUI Settings scene may use different window titles
-        // Check that a new window appeared (app should have 2+ windows)
-        let windowCount = app.windows.count
-        XCTAssertGreaterThanOrEqual(windowCount, 2, "Settings should open a new window")
+        let dbPath = (testDir as NSString).appendingPathComponent(".report.db")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: dbPath), "Database should be created")
     }
 
     // MARK: - Helpers
@@ -120,7 +92,6 @@ final class ProcessingFlowUITests: XCTestCase {
         try? FileManager.default.removeItem(atPath: dir)
         try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
 
-        // Create minimal JPEG test files
         for i in 1...3 {
             let path = (dir as NSString).appendingPathComponent("bird\(i).jpg")
             createMinimalJPEG(at: path)

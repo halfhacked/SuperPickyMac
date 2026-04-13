@@ -25,9 +25,6 @@ struct PreviewView: View {
                     Text("Select a photo to preview")
                         .font(.title3)
                         .foregroundStyle(.tertiary)
-                    Text("Process a folder with + to get started")
-                        .font(.caption)
-                        .foregroundStyle(.quaternary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
