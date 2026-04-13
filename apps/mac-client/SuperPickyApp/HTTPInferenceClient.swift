@@ -39,26 +39,32 @@ final class HTTPInferenceClient: InferenceClient {
         return try decode(FlightResult.self, from: responseData)
     }
 
-    func identify(image: CGImage, topK: Int = 5, temperature: Float = 0.9,
-                  latitude: Double? = nil, longitude: Double? = nil) async throws -> [SpeciesMatch] {
-        let data = try jpegData(from: image)
-        var queryItems = [
-            URLQueryItem(name: "top_k", value: "\(topK)"),
-            URLQueryItem(name: "temperature", value: "\(temperature)"),
-        ]
-        if let lat = latitude {
-            queryItems.append(URLQueryItem(name: "lat", value: "\(lat)"))
+    func identify(filePath: String, topK: Int = 5) async throws -> [SpeciesMatch] {
+        // Send file path — preen handles image loading, GPS extraction, everything
+        var components = URLComponents(url: baseURL.appendingPathComponent("identify"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "top_k", value: "\(topK)")]
+        let url = components.url!
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+
+        let boundary = UUID().uuidString
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file_path\"\r\n\r\n".data(using: .utf8)!)
+        body.append(filePath.data(using: .utf8)!)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        request.httpBody = body
+
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+            throw InferenceError.requestFailed(statusCode: code)
         }
-        if let lon = longitude {
-            queryItems.append(URLQueryItem(name: "lon", value: "\(lon)"))
-        }
-        let responseData = try await postMultipart(
-            endpoint: "identify",
-            queryItems: queryItems,
-            imageData: data
-        )
-        let response = try decode(IdentifyResponse.self, from: responseData)
-        return response.species
+        let resp = try decode(IdentifyResponse.self, from: data)
+        return resp.species
     }
 
     func healthCheck() async throws -> ServerHealth {
