@@ -53,6 +53,15 @@ final class PipelineCoordinator {
             if Task.isCancelled { break }
 
             currentFilename = fileURL.lastPathComponent
+
+            // Skip already-processed photos
+            if let existing = try? db.fetchByFilePath(fileURL.path) {
+                _ = existing
+                processedCount += 1
+                await onPhotoProcessed?()
+                continue
+            }
+
             var photo = Photo(
                 filename: fileURL.lastPathComponent,
                 filePath: fileURL.path,
