@@ -58,6 +58,16 @@ final class AppState {
         }
     }
 
+    /// Clear all photo data (when folder is removed).
+    func clearPhotos() {
+        allPhotos = []
+        photos = []
+        ratingCounts = [:]
+        speciesList = []
+        selectedPhotoID = nil
+        currentFolder = nil
+    }
+
     /// Filter photos by sidebar selection.
     func applyFilter() {
         switch sidebarSelection {
@@ -102,7 +112,12 @@ struct MainView: View {
                 speciesList: appState.speciesList,
                 processingFolder: appState.processingFolder,
                 processingProgress: appState.processingProgress,
-                onAddFolder: { pickAndProcess() }
+                onAddFolder: { pickAndProcess() },
+                onRemoveFolder: { folder in
+                    if appState.currentFolder == folder {
+                        appState.clearPhotos()
+                    }
+                }
             )
             .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 300)
         } detail: {
