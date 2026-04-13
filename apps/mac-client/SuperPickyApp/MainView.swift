@@ -265,6 +265,8 @@ struct MainView: View {
         )
         let exposureEnabled = config.exposureDetectionEnabled
         let exposureThreshold = config.exposureThreshold
+        let writeKeywords = config.writeKeywords
+        let keywordFormat = config.keywordFormat
 
         // Add folder to sidebar immediately and remember it
         if !appState.folders.contains(folder) {
@@ -281,6 +283,8 @@ struct MainView: View {
                 ratingConfig: ratingConfig,
                 exposureEnabled: exposureEnabled,
                 exposureThreshold: exposureThreshold,
+                writeKeywords: writeKeywords,
+                keywordFormat: keywordFormat,
                 onPhotoProcessed: {
                     await MainActor.run {
                         if pipeline.totalCount > 0 {

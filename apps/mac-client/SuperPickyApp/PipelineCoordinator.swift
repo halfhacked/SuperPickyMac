@@ -26,6 +26,8 @@ final class PipelineCoordinator {
         ratingConfig: RatingEngine.Config,
         exposureEnabled: Bool,
         exposureThreshold: Float,
+        writeKeywords: Bool = false,
+        keywordFormat: String = "{cn} {en} {pinyin}",
         onPhotoProcessed: (@Sendable () async -> Void)? = nil
     ) async {
         isProcessing = true
@@ -74,7 +76,9 @@ final class PipelineCoordinator {
                     fileURL: fileURL,
                     ratingConfig: ratingConfig,
                     exposureEnabled: exposureEnabled,
-                    exposureThreshold: exposureThreshold
+                    exposureThreshold: exposureThreshold,
+                    writeKeywords: writeKeywords,
+                    keywordFormat: keywordFormat
                 )
             } catch {
                 logger.error("Failed to process \(fileURL.lastPathComponent): \(error)")
@@ -115,7 +119,9 @@ final class PipelineCoordinator {
         fileURL: URL,
         ratingConfig: RatingEngine.Config,
         exposureEnabled: Bool,
-        exposureThreshold: Float
+        exposureThreshold: Float,
+        writeKeywords: Bool,
+        keywordFormat: String
     ) async throws {
         let image = try rawConverter.convert(fileURL: fileURL)
 
@@ -196,6 +202,24 @@ final class PipelineCoordinator {
                 photo.speciesScientificName = top.scientificName
                 photo.speciesCommonName = top.commonName
                 photo.speciesConfidence = top.confidence
+
+                // Write IPTC keywords
+                if writeKeywords {
+                    let keywords = KeywordWriter.formatKeywords(
+                        template: keywordFormat,
+                        en: top.commonName,
+                        cn: top.cnName,
+                        latin: top.scientificName,
+                        pinyin: top.pinyin
+                    )
+                    if !keywords.isEmpty {
+                        do {
+                            try KeywordWriter.write(keywords: ["bird"] + keywords, to: fileURL.path)
+                        } catch {
+                            logger.warning("Keyword writing failed for \(fileURL.lastPathComponent): \(error)")
+                        }
+                    }
+                }
             }
         } catch {
             logger.warning("Species identification failed: \(error)")

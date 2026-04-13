@@ -55,6 +55,8 @@ final class CullingConfig {
     var burstDetectionEnabled: Bool { didSet { save() } }
     var namingStandard: NamingStandard { didSet { save() } }
     var backendPort: Int { didSet { save() } }
+    var writeKeywords: Bool { didSet { save() } }
+    var keywordFormat: String { didSet { save() } }
 
     init() {
         let defaults = UserDefaults.standard
@@ -67,6 +69,8 @@ final class CullingConfig {
         self.burstDetectionEnabled = defaults.object(forKey: "burstDetectionEnabled") as? Bool ?? true
         self.namingStandard = NamingStandard(rawValue: defaults.string(forKey: "namingStandard") ?? "") ?? .osea
         self.backendPort = defaults.object(forKey: "backendPort") as? Int ?? 8420
+        self.writeKeywords = defaults.object(forKey: "writeKeywords") as? Bool ?? true
+        self.keywordFormat = defaults.string(forKey: "keywordFormat") ?? "{cn} {en} {pinyin}"
     }
 
     private func save() {
@@ -79,5 +83,7 @@ final class CullingConfig {
         defaults.set(burstDetectionEnabled, forKey: "burstDetectionEnabled")
         defaults.set(namingStandard.rawValue, forKey: "namingStandard")
         defaults.set(backendPort, forKey: "backendPort")
+        defaults.set(writeKeywords, forKey: "writeKeywords")
+        defaults.set(keywordFormat, forKey: "keywordFormat")
     }
 }

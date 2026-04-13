@@ -13,6 +13,18 @@ struct BirdIDTab: View {
                 Text("BirdLife International v9").tag(NamingStandard.birdlife)
                 Text("Scientific Names Only").tag(NamingStandard.scientific)
             }
+
+            Section("Keywords") {
+                Toggle("Write keywords to photos", isOn: $config.writeKeywords)
+
+                if config.writeKeywords {
+                    TextField("Keyword format", text: $config.keywordFormat)
+                        .textFieldStyle(.roundedBorder)
+                    Text("Tokens: {en} {cn} {latin} {pinyin}")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
         .formStyle(.grouped)
     }
