@@ -14,7 +14,7 @@ struct ExifPanelView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     // Camera section
                     if data.cameraMake != nil || data.cameraModel != nil || data.lensModel != nil {
-                        sectionHeader("Camera")
+                        sectionHeader("Camera", showDivider: false)
                         if let make = data.cameraMake, let model = data.cameraModel {
                             exifRow(label: "Camera", value: "\(make) \(model)")
                         } else if let model = data.cameraModel {
@@ -90,10 +90,9 @@ struct ExifPanelView: View {
                         .padding(.vertical, 6)
                     }
                 }
-                .padding(.vertical, 4)
+                .padding(.vertical, 8)
             } else if loaded {
                 VStack(spacing: 8) {
-                    Spacer()
                     Image(systemName: "camera.metering.unknown")
                         .font(.system(size: 24))
                         .foregroundStyle(.tertiary)
@@ -101,16 +100,12 @@ struct ExifPanelView: View {
                         .foregroundStyle(.secondary)
                         .font(.callout)
                         .accessibilityIdentifier("ExifNoData")
-                    Spacer()
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding()
+                .padding(20)
             }
         }
-        .scrollBounceBehavior(.basedOnSize)
-        .frame(width: 270)
+        .frame(width: 270, alignment: .top)
         .fixedSize(horizontal: false, vertical: true)
-        .frame(maxHeight: 600)
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .shadow(color: .black.opacity(0.2), radius: 8, x: -2, y: 2)
@@ -127,17 +122,19 @@ struct ExifPanelView: View {
 
     // MARK: - Components
 
-    private func sectionHeader(_ title: String) -> some View {
+    private func sectionHeader(_ title: String, showDivider: Bool = true) -> some View {
         VStack(spacing: 0) {
-            Divider()
-                .padding(.horizontal, 12)
+            if showDivider {
+                Divider()
+                    .padding(.horizontal, 12)
+            }
             Text(title.uppercased())
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(.tertiary)
                 .tracking(0.8)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 12)
-                .padding(.top, 8)
+                .padding(.top, showDivider ? 8 : 2)
                 .padding(.bottom, 4)
         }
     }

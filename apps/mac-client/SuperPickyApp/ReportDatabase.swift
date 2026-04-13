@@ -71,6 +71,12 @@ final class ReportDatabase: Sendable {
         }
     }
 
+    func fetchByFilePath(_ filePath: String) throws -> Photo? {
+        try dbQueue.read { db in
+            try Photo.filter(Column("filePath") == filePath).fetchOne(db)
+        }
+    }
+
     func fetchAllPhotos() throws -> [Photo] {
         try dbQueue.read { db in
             try Photo.fetchAll(db)
