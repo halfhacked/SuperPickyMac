@@ -1,4 +1,6 @@
 import Foundation
+import CoreGraphics
+import ImageIO
 
 /// Metadata extracted from an image file's EXIF, TIFF, and IPTC dictionaries.
 struct EXIFData: Sendable {
@@ -22,7 +24,105 @@ struct EXIFData: Sendable {
 enum EXIFReader {
     /// Returns nil if the file does not exist or cannot be read as an image.
     static func read(from filePath: String) -> EXIFData? {
-        // Stub — returns nil for now
+        let url = URL(fileURLWithPath: filePath)
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any] else {
+            return nil
+        }
+
+        let exif = properties[kCGImagePropertyExifDictionary as String] as? [String: Any]
+        let tiff = properties[kCGImagePropertyTIFFDictionary as String] as? [String: Any]
+        let exifAux = properties[kCGImagePropertyExifAuxDictionary as String] as? [String: Any]
+        let iptc = properties[kCGImagePropertyIPTCDictionary as String] as? [String: Any]
+
+        var data = EXIFData()
+
+        // TIFF
+        data.cameraMake = tiff?[kCGImagePropertyTIFFMake as String] as? String
+        data.cameraModel = tiff?[kCGImagePropertyTIFFModel as String] as? String
+
+        // Lens: prefer ExifAux, fallback to Exif
+        data.lensModel = (exifAux?[kCGImagePropertyExifAuxLensModel as String] as? String)
+            ?? (exif?[kCGImagePropertyExifLensModel as String] as? String)
+
+        // Exif numerics
+        data.focalLength = doubleValue(exif, key: kCGImagePropertyExifFocalLength as String)
+        data.aperture = doubleValue(exif, key: kCGImagePropertyExifFNumber as String)
+        data.exposureBias = doubleValue(exif, key: kCGImagePropertyExifExposureBiasValue as String)
+
+        // ISO
+        if let isoArray = exif?[kCGImagePropertyExifISOSpeedRatings as String] as? [Any],
+           let first = isoArray.first {
+            data.iso = intValue(first)
+        }
+
+        // Shutter speed (ExposureTime)
+        if let exposure = doubleValue(exif, key: kCGImagePropertyExifExposureTime as String) {
+            data.shutterSpeed = formatShutterSpeed(exposure)
+        }
+
+        // Date
+        data.dateTimeOriginal = exif?[kCGImagePropertyExifDateTimeOriginal as String] as? String
+
+        // Metering mode
+        if let mode = exif?[kCGImagePropertyExifMeteringMode as String] {
+            data.meteringMode = describeMeteringMode(intValue(mode))
+        }
+
+        // White balance
+        if let wb = exif?[kCGImagePropertyExifWhiteBalance as String] {
+            data.whiteBalance = intValue(wb) == 0 ? "Auto" : "Manual"
+        }
+
+        // Dimensions (top-level)
+        data.imageWidth = properties[kCGImagePropertyPixelWidth as String] as? Int
+        data.imageHeight = properties[kCGImagePropertyPixelHeight as String] as? Int
+
+        // IPTC keywords
+        if let kw = iptc?[kCGImagePropertyIPTCKeywords as String] as? [String] {
+            data.keywords = kw
+        }
+
+        return data
+    }
+
+    // MARK: - Private helpers
+
+    private static func doubleValue(_ dict: [String: Any]?, key: String) -> Double? {
+        guard let val = dict?[key] else { return nil }
+        if let d = val as? Double { return d }
+        if let n = val as? NSNumber { return n.doubleValue }
+        if let s = val as? String { return Double(s) }
         return nil
+    }
+
+    private static func intValue(_ val: Any) -> Int? {
+        if let i = val as? Int { return i }
+        if let n = val as? NSNumber { return n.intValue }
+        return nil
+    }
+
+    private static func formatShutterSpeed(_ exposure: Double) -> String {
+        if exposure >= 1.0 {
+            // Format as "Ns" — remove trailing zero for whole numbers
+            if exposure == exposure.rounded() {
+                return "\(Int(exposure))s"
+            }
+            return "\(exposure)s"
+        }
+        let denominator = 1.0 / exposure
+        return "1/\(Int(denominator.rounded()))"
+    }
+
+    private static func describeMeteringMode(_ mode: Int?) -> String? {
+        switch mode {
+        case 1: return "Average"
+        case 2: return "Center-weighted"
+        case 3: return "Spot"
+        case 4: return "Multi-spot"
+        case 5: return "Multi-segment"
+        case 6: return "Partial"
+        default: return mode.map { "Unknown (\($0))" }
+        }
     }
 }
