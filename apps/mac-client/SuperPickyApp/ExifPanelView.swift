@@ -65,21 +65,32 @@ struct ExifPanelView: View {
                             exifRow(label: "Place", value: location)
                         }
                         if let lat = data.latitude, let lon = data.longitude {
-                            Button {
-                                let url = URL(string: "maps://?ll=\(lat),\(lon)&z=14")!
-                                NSWorkspace.shared.open(url)
-                            } label: {
-                                exifRow(label: "GPS", value: formatCoordinates(data) ?? "")
-                                    .foregroundStyle(.blue)
-                            }
-                            .buttonStyle(.plain)
-                            .onHover { hovering in
-                                if hovering {
-                                    NSCursor.pointingHand.push()
-                                } else {
-                                    NSCursor.pop()
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                Text("GPS")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: labelWidth, alignment: .trailing)
+                                    .lineLimit(1)
+                                Text(formatCoordinates(data) ?? "")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.primary)
+                                    .accessibilityIdentifier("Exif_GPS")
+                                Button {
+                                    let url = URL(string: "maps://?ll=\(lat),\(lon)&z=14")!
+                                    NSWorkspace.shared.open(url)
+                                } label: {
+                                    Image(systemName: "map")
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                                .help("Open in Maps")
+                                .onHover { hovering in
+                                    if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
                                 }
                             }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 3)
                         }
                         if let alt = data.altitude {
                             exifRow(label: "Altitude", value: "\(Int(alt)) m")
