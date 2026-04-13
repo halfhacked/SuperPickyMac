@@ -8,7 +8,7 @@ struct SuperPickyApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ThreeColumnView()
+            MainView()
                 .frame(minWidth: 900, minHeight: 600)
                 .environment(processManager)
                 .environment(config)
@@ -17,7 +17,7 @@ struct SuperPickyApp: App {
                     processManager.start()
                 }
         }
-        .windowStyle(.titleBar)
+        .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1200, height: 800)
 
         Settings {
