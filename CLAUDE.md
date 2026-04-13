@@ -50,4 +50,4 @@ cd python-server && pytest tests/ -v
 - Python server is inference-only — no business logic
 - All business logic (rating, burst, exposure, sharpness) in Swift
 - CullingConfig is @MainActor @Observable (UI state)
-- Fixed minimums (sharpness 100, aesthetics 3.5) separate from configurable thresholds
+- Fixed minimums (sharpness 100, aesthetics 2.0) separate from configurable thresholds

@@ -15,10 +15,10 @@
 | # | Commit | Description | Status |
 |---|--------|-------------|--------|
 | 1 | `docs: add culling enhancement plan` | This plan | done |
-| 2 | `test: add 0-5 rating engine tests (TDD)` | Tests for new rating scale | pending |
-| 3 | `feat: implement 0-5 rating engine (TDD)` | New rating logic | pending |
-| 4 | `feat: update UI for 0-5 star scale` | StarRatingView, SourceListView, InfoBarView | pending |
-| 5 | `feat: add isManualRating column + migration` | Database migration | pending |
+| 2 | `test: update tests for 0-5 rating scale (TDD)` | Rating + pipeline + BDD tests | pending |
+| 3 | `feat: implement 0-5 rating engine (TDD)` | New rating logic + Photo default + Pipeline -1→0 | pending |
+| 4 | `feat: add isManualRating column + migration` | Database migration | pending |
+| 5 | `feat: update UI for 0-5 star scale` | StarRatingView, SourceListView, InfoBarView | pending |
 | 6 | `feat: wire manual rating in fullscreen viewer` | Keyboard 0-5 rating | pending |
 | 7 | `feat: skip manual ratings during reprocessing` | Pipeline respects overrides | pending |
 | 8 | `test: add ZoomableImageView tests (TDD)` | Zoom state logic tests | pending |
@@ -67,11 +67,13 @@ cd apps/mac-client && swift test
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
 | Rating scale | 0–5 Int (no -1) | Matches Lightroom; -1 becomes 0 (reject) for undetected birds |
+| minimumAesthetics | 2.0 (per code) | Code uses 2.0 in RatingEngine.swift; CLAUDE.md said 3.5 which was stale — update CLAUDE.md |
 | Zoom implementation | Custom SwiftUI view with GeometryReader + magnification gesture | No AppKit dependency needed; works in both preview and fullscreen |
 | XMP generation | Pure Swift string template | No external dependencies; XMP schema is simple and stable |
-| Export mechanism | FileManager.copyItem | Simple, reliable; no need for NSFileCoordinator for one-shot copy |
+| Export mechanism | FileManager.copyItem with async/await | Supports Task.checkCancellation() for user cancellation |
 | Manual rating flag | `isManualRating` Bool column | Lightweight; pipeline checks before overwriting |
 | Zoom state | Shared `ZoomState` ObservableObject | Reused between preview and fullscreen without duplication |
+| Source folder XMP write | Uses NSOpenPanel-granted URL access | App already has access to processed folders via NSOpenPanel; no extra bookmarks needed |
 
 ---
 
@@ -106,16 +108,26 @@ moderateAesthetics = (minimumAesthetics + config.aestheticsThreshold) / 2
 adjSharpness = sharpness * focusSharpnessWeight * (isFlying ? 1.2 : 1.0)
 adjAesthetics = (aesthetics ?? 0) * focusAestheticsWeight * (isFlying ? 1.1 : 1.0)
 
+// Early returns (rating 0)
 if !detected → 0
 if confidence < 0.5 → 0
 if sharpness < minimumSharpness → 0
-if aesthetics < minimumAesthetics → 0
+if aesthetics != nil AND aesthetics < minimumAesthetics → 0
+
+// Special case
 if allKeypointsHidden → 1
-if adjSharpness < moderateSharpness AND adjAesthetics < moderateAesthetics → 1
-if adjSharpness < moderateSharpness OR adjAesthetics < moderateAesthetics → 2
-if adjSharpness < threshold AND adjAesthetics < threshold → 3
-if adjSharpness >= threshold AND adjAesthetics >= threshold → 5
-else → 4
+
+// Decision tree (mutually exclusive, evaluated in order):
+sharpAboveThreshold = adjSharpness >= config.sharpnessThreshold
+aestheticsAboveThreshold = adjAesthetics >= config.aestheticsThreshold
+sharpAboveModerate = adjSharpness >= moderateSharpness
+aestheticsAboveModerate = adjAesthetics >= moderateAesthetics
+
+if sharpAboveThreshold AND aestheticsAboveThreshold → 5
+if (sharpAboveThreshold OR aestheticsAboveThreshold) AND (sharpAboveModerate AND aestheticsAboveModerate) → 4
+if sharpAboveModerate AND aestheticsAboveModerate → 3
+if sharpAboveModerate OR aestheticsAboveModerate → 2
+else → 1  (both below moderate)
 
 Exposure penalty: rating = max(0, rating - 1) if overexposed or underexposed
 
@@ -168,15 +180,17 @@ Reset: when photo changes, reset to fit-to-view
 ### ExportService
 
 ```
-func export(photos: [Photo], to destination: URL, onProgress: (Int, Int) -> Void) throws -> ExportResult
+func export(photos: [Photo], to destination: URL, onProgress: @Sendable (Int, Int) -> Void) async throws -> ExportResult
 
 For each photo:
-1. Write XMP sidecar next to original (source folder) — XMPWriter.write(photo:)
-2. Copy original file to destination
-3. Copy .xmp file to destination
-4. Report progress
+1. Check Task.isCancelled — if true, return partial result
+2. Write XMP sidecar next to original (source folder) — XMPWriter.write(photo:)
+3. Copy original file to destination
+4. Copy .xmp file to destination
+5. Report progress
 
 ExportResult: exported count, skipped count (already exists), failed count, errors
+Note: async enables structured concurrency cancellation via Task.cancel()
 ```
 
 ---
@@ -217,8 +231,9 @@ ExportResult: exported count, skipped count (already exists), failed count, erro
 | 9 | `apps/mac-client/SuperPickyApp/FullscreenViewer.swift` | modify | Wire 0–5 key handlers, add database write |
 | 10 | `apps/mac-client/SuperPickyApp/MainView.swift` | modify | Pass database to fullscreen, add Export button, update AppState |
 | 11 | `apps/mac-client/SuperPickyApp/ThumbnailStripView.swift` | modify | StarRatingView already uses `rating` param — just works with 0–5 |
-| 12 | `apps/mac-client/SuperPickyApp/PipelineCoordinator.swift` | modify | Skip rating for isManualRating photos |
-| 13 | `apps/mac-client/SuperPickyApp/CullingConfig.swift` | modify | No changes needed — thresholds drive 4/5 boundary naturally |
+| 12 | `apps/mac-client/SuperPickyApp/PipelineCoordinator.swift` | modify | Change -1 → 0, skip rating for isManualRating photos |
+| 13 | `apps/mac-client/SuperPickyTests/Core/PipelineCoordinatorTests.swift` | modify | Update -1 assertions to 0 |
+| 14 | `apps/mac-client/SuperPickyTests/BDD/ProcessingFlowTests.swift` | modify | Update -1 assertions to 0 (if any) |
 | 14 | `apps/mac-client/SuperPickyApp/ZoomableImageView.swift` | create | Zoomable/pannable image component |
 | 15 | `apps/mac-client/SuperPickyApp/XMPWriter.swift` | create | XMP sidecar file generation |
 | 16 | `apps/mac-client/SuperPickyApp/ExportService.swift` | create | Export photos + sidecars to folder |
@@ -234,6 +249,8 @@ ExportResult: exported count, skipped count (already exists), failed count, erro
 | `apps/mac-client/SuperPickyApp/BurstDetector.swift` | Burst logic unchanged |
 | `apps/mac-client/SuperPickyApp/ExposureDetector.swift` | Exposure detection unchanged |
 | `apps/mac-client/SuperPickyApp/CullingConfig.swift` | Thresholds drive the 4/5 boundary naturally — no changes needed |
+
+**Note:** The v1 database migration in ReportDatabase.swift remains as-is (defaults to -1). It's already applied to existing databases. The v2 migration remaps -1 → 0, and the Photo model initializer changes default from -1 to 0 for new records.
 
 ---
 
@@ -274,20 +291,29 @@ ExportResult: exported count, skipped count (already exists), failed count, erro
 
 ### Task 1: 0–5 Star Rating Engine
 
-Rewrite RatingEngine to produce 0–5 ratings using moderate thresholds. Update all existing tests to match new scale.
+Rewrite RatingEngine to produce 0–5 ratings using moderate thresholds. Update Photo model default from -1 to 0. Change PipelineCoordinator's -1 assignments to 0. Update all existing tests that assert -1 to assert 0.
+
+**Important context:**
+- `PipelineCoordinator.swift` sets `photo.starRating = -1` at lines 81 and 124 — these must become 0
+- `Photo.swift` init sets `starRating = -1` — must become 0
+- `PipelineCoordinatorTests.swift` line 59 asserts `starRating == -1` — must become 0
+- `ProcessingFlowTests.swift` may also assert -1 — check and update
+- `RatingEngineTests.swift` existing test `noBirdDetected` expects -1 — must expect 0
 
 **Acceptance criteria:**
-- [ ] `RatingEngine.calculate()` returns ratings 0–5 per the new logic
+- [ ] `RatingEngine.calculate()` returns ratings 0–5 per the new logic (no -1 anywhere)
 - [ ] `isPick` is true only when final rating is 5
 - [ ] No bird detected returns 0 (not -1)
-- [ ] All 13 rating tests pass
-- [ ] `swift test` passes with no regressions
+- [ ] Photo model initializer defaults starRating to 0
+- [ ] PipelineCoordinator uses 0 instead of -1 for error/undetected cases
+- [ ] All rating tests pass with updated expectations
+- [ ] `swift test` passes with no regressions (including PipelineCoordinatorTests, ProcessingFlowTests)
 
 **Commits:**
 | # | Type | Message | Files |
 |---|------|---------|-------|
-| 2 | test | `test: add 0-5 rating engine tests (TDD)` | `SuperPickyTests/Core/RatingEngineTests.swift` |
-| 3 | feat | `feat: implement 0-5 rating engine (TDD)` | `SuperPickyApp/RatingEngine.swift` |
+| 2 | test | `test: update tests for 0-5 rating scale (TDD)` | `SuperPickyTests/Core/RatingEngineTests.swift`, `SuperPickyTests/Core/PipelineCoordinatorTests.swift`, `SuperPickyTests/BDD/ProcessingFlowTests.swift` |
+| 3 | feat | `feat: implement 0-5 rating engine (TDD)` | `SuperPickyApp/RatingEngine.swift`, `SuperPickyApp/Photo.swift`, `SuperPickyApp/PipelineCoordinator.swift` |
 
 ### Task 2: UI Updates for 0–5 Stars + Database Migration
 
@@ -310,6 +336,10 @@ Update StarRatingView to show 5 stars. Update SourceListView sidebar to list rat
 ### Task 3: Manual Rating Override
 
 Wire keyboard shortcuts 0–5 in FullscreenViewer to persist rating to database. Show manual indicator in InfoBarView. Pipeline skips photos with isManualRating=true during reprocessing.
+
+**Important context:**
+- `FullscreenViewer.swift` already has `.onKeyPress("0")` through `.onKeyPress("3")` with a stub `rateSelected()` method. Extend to add "4" and "5" handlers, and implement the stub to write to the database.
+- The FullscreenViewer needs access to a `ReportDatabase` instance — pass it via the MainView/AppState.
 
 **Acceptance criteria:**
 - [ ] Pressing 0–5 in fullscreen sets rating and persists to database
@@ -392,7 +422,7 @@ Create ExportService that copies filtered photos + XMP sidecars to a destination
 | # | Task | Type | Message | Depends On |
 |---|------|------|---------|------------|
 | 1 | — | docs | `docs: add culling enhancement plan` | — |
-| 2 | 1 | test | `test: add 0-5 rating engine tests (TDD)` | 1 |
+| 2 | 1 | test | `test: update tests for 0-5 rating scale (TDD)` | 1 |
 | 3 | 1 | feat | `feat: implement 0-5 rating engine (TDD)` | 2 |
 | 4 | 2 | feat | `feat: add isManualRating column + database migration` | 3 |
 | 5 | 2 | feat | `feat: update UI for 0-5 star scale` | 4 |
@@ -437,6 +467,7 @@ Create ExportService that copies filtered photos + XMP sidecars to a destination
 | XMP not recognized by Lightroom | medium | Use exact Adobe namespace URIs; test with real Lightroom import |
 | Large folder export (1000+ RAW files) slow | low | Progress indicator keeps user informed; sequential copy is fine |
 | Database migration on large .report.db | low | ALTER TABLE + UPDATE is fast for <100k rows |
+| Source folder write permission for XMP | medium | App accesses folders via NSOpenPanel which grants URL access; if access is lost, XMP write fails gracefully — export still copies originals |
 
 ---
 
