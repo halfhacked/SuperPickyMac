@@ -48,6 +48,7 @@ struct ThreeColumnView: View {
                 }
                 .help("Process new folder")
                 .keyboardShortcut("o", modifiers: .command)
+                .accessibilityIdentifier("ProcessNewFolder")
             }
         }
         .sheet(isPresented: $showProcessingSheet) {
