@@ -54,23 +54,21 @@ import ImageIO
         #expect(data!.keywords.count == 3)
     }
 
-    @Test func writeMergesWithExistingKeywords() throws {
-        let path = tempPath("merge_kw.jpg")
+    @Test func writeOverwritesExistingKeywords() throws {
+        let path = tempPath("overwrite_kw.jpg")
         defer { try? FileManager.default.removeItem(atPath: path) }
 
-        // Create JPEG then write initial keywords via exiftool
         createTestJPEG(at: path)
         try KeywordWriter.write(keywords: ["bird", "Eagle"], to: path)
 
-        // Write more keywords — should merge and deduplicate
+        // Second write overwrites (does not merge)
         try KeywordWriter.write(keywords: ["Eagle", "Wildlife"], to: path)
 
         let data = EXIFReader.read(from: path)
         #expect(data != nil)
-        #expect(data!.keywords.contains("bird"))
         #expect(data!.keywords.contains("Eagle"))
         #expect(data!.keywords.contains("Wildlife"))
-        #expect(data!.keywords.count == 3)
+        #expect(data!.keywords.count == 2)
     }
 
     @Test func writeToNonexistentFileThrows() throws {

@@ -74,7 +74,12 @@ class SpeciesClassifier:
                 break
 
         if best_result is None:
-            return {"species": []}
+            # Nothing met threshold — return best global guess anyway so caller
+            # can decide whether to show it (with low confidence indicator)
+            best_result = self.classifier.predict_from_logits(
+                logits, top_k=top_k, temperature=temperature, species_set=None
+            )
+            threshold_used = "below_threshold"
 
         species = []
         for r in best_result:

@@ -201,12 +201,14 @@ final class PipelineCoordinator {
                 latitude: exif?.latitude, longitude: exif?.longitude
             )
             if let top = species.first {
+                // Always save species (even below threshold) for display
                 photo.speciesScientificName = top.scientificName
                 photo.speciesCommonName = top.commonName
                 photo.speciesConfidence = top.confidence
 
-                // Write IPTC keywords
-                if writeKeywords {
+                // Only write keywords when species met the confidence threshold
+                let aboveThreshold = top.thresholdUsed != "below_threshold"
+                if writeKeywords && aboveThreshold {
                     let keywords = KeywordWriter.formatKeywords(
                         template: keywordFormat,
                         en: top.commonName,
