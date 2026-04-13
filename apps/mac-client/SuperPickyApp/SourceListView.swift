@@ -18,6 +18,7 @@ struct SourceListView: View {
     @Environment(ProcessManager.self) private var processManager
 
     let onAddFolder: () -> Void
+    let onRemoveFolder: (URL) -> Void
 
     var body: some View {
         List(selection: $selection) {
@@ -107,6 +108,7 @@ struct SourceListView: View {
         if case .folder(let selected) = selection, selected == folder {
             selection = nil
         }
+        onRemoveFolder(folder)
     }
 
     private func ratingLabel(_ rating: Int) -> String {
