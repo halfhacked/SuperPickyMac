@@ -45,7 +45,7 @@ struct SourceListView: View {
                     .buttonStyle(.plain)
                     .help("Process new folder")
                     .accessibilityIdentifier("AddFolderButton")
-                    .padding(.trailing, 4)
+                    .padding(.trailing, 12)
                 }
             }
 
