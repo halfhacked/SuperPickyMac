@@ -95,4 +95,11 @@ struct AestheticsResponse: Codable, Sendable {
 
 struct IdentifyResponse: Codable, Sendable {
     let species: [SpeciesMatch]
+    let birds: [BirdDetection]?
+    let totalDetected: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case species, birds
+        case totalDetected = "total_detected"
+    }
 }

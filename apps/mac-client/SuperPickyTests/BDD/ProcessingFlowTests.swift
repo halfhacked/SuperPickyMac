@@ -78,13 +78,13 @@ import ImageIO
 
         // Mock returns a bird with good scores
         var mockClient = StubInferenceClient()
-        mockClient.detectResult = DetectionResult(birds: [
+        mockClient.identifyBirds = [
             BirdDetection(
                 bbox: CGRect(x: 0.1, y: 0.1, width: 0.5, height: 0.5),
                 confidence: 0.95,
                 mask: Data()
             )
-        ])
+        ]
         mockClient.aestheticsResult = AestheticsResponse(score: 6.0, distribution: [])
 
         let pipeline = PipelineCoordinator(inferenceClient: mockClient)
@@ -165,12 +165,15 @@ private struct StubInferenceClient: InferenceClient {
         rightEye: Keypoint(x: 0.6, y: 0.3, visibility: 0.9),
         beak: Keypoint(x: 0.5, y: 0.5, visibility: 0.95)
     )
+    var identifyBirds: [BirdDetection] = []
 
     func detect(image: CGImage) async throws -> DetectionResult { detectResult }
     func aesthetics(image: CGImage) async throws -> AestheticsResponse { aestheticsResult }
     func keypoints(image: CGImage) async throws -> KeypointResult { keypointResult }
     func flight(image: CGImage) async throws -> FlightResult { FlightResult(isFlying: false, confidence: 0.1) }
-    func identify(filePath: String, topK: Int) async throws -> [SpeciesMatch] { [] }
+    func identify(filePath: String, topK: Int) async throws -> IdentifyResponse {
+        IdentifyResponse(species: [], birds: identifyBirds, totalDetected: identifyBirds.count)
+    }
     func healthCheck() async throws -> ServerHealth { ServerHealth(status: "ready", modelsLoaded: [], device: "cpu", version: "1.0.0") }
 }
 
@@ -186,6 +189,9 @@ private struct SlowInferenceClient: InferenceClient {
                        beak: Keypoint(x: 0.5, y: 0.5, visibility: 0.9))
     }
     func flight(image: CGImage) async throws -> FlightResult { FlightResult(isFlying: false, confidence: 0.1) }
-    func identify(filePath: String, topK: Int) async throws -> [SpeciesMatch] { [] }
+    func identify(filePath: String, topK: Int) async throws -> IdentifyResponse {
+        try await Task.sleep(for: .milliseconds(100))
+        return IdentifyResponse(species: [], birds: [], totalDetected: 0)
+    }
     func healthCheck() async throws -> ServerHealth { ServerHealth(status: "ready", modelsLoaded: [], device: "cpu", version: "1.0.0") }
 }

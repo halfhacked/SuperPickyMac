@@ -47,16 +47,25 @@ final class AppState {
     }
 
     /// Load photos from the database for the selected folder.
+    /// Preserves current filter and selection when possible.
     func loadPhotos(for folder: URL) {
         currentFolder = folder
+        let previousSelection = selectedPhotoID
         do {
             let db = try ReportDatabase(folderPath: folder)
             allPhotos = try db.fetchAllPhotos()
             ratingCounts = try db.ratingCounts()
             buildSpeciesHierarchy()
 
-            photos = allPhotos
-            selectedPhotoID = photos.first?.id
+            // Re-apply current filter instead of resetting to all
+            applyFilter()
+
+            // Preserve selection if the photo still exists in filtered list
+            if let prev = previousSelection, photos.contains(where: { $0.id == prev }) {
+                selectedPhotoID = prev
+            } else if selectedPhotoID == nil {
+                selectedPhotoID = photos.first?.id
+            }
         } catch {
             allPhotos = []
             photos = []

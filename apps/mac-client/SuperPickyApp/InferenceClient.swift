@@ -13,6 +13,6 @@ protocol InferenceClient: Sendable {
     func aesthetics(image: CGImage) async throws -> AestheticsResponse
     func keypoints(image: CGImage) async throws -> KeypointResult
     func flight(image: CGImage) async throws -> FlightResult
-    func identify(filePath: String, topK: Int) async throws -> [SpeciesMatch]
+    func identify(filePath: String, topK: Int) async throws -> IdentifyResponse
     func healthCheck() async throws -> ServerHealth
 }

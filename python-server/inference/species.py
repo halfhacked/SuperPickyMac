@@ -1,4 +1,4 @@
-"""Species identification — delegates entirely to preen."""
+"""Species + detection — delegates entirely to preen."""
 from pypinyin import pinyin, Style
 
 from preen.detector import BirdDetector
@@ -15,7 +15,7 @@ def _to_pinyin(cn_name: str) -> str:
 
 
 class SpeciesClassifier:
-    """Thin wrapper around preen's BirdDetector."""
+    """Wraps preen's BirdDetector for the HTTP API."""
 
     def __init__(self, model_path: str = None):
         self._detector = None
@@ -26,18 +26,20 @@ class SpeciesClassifier:
         return self._detector
 
     def predict_file(self, file_path: str, top_k: int = 5) -> dict:
-        """Identify birds in a file. Preen handles image loading, GPS extraction,
-        YOLO detection, smart cropping, and OSEA classification."""
+        """Full pipeline: load image, extract GPS, detect birds, identify species.
+        Returns species + bird bounding boxes (normalized 0-1). Single YOLO pass."""
         image = load_folder_image(file_path)
         lat, lon = extract_gps(file_path)
+        w, h = image.size
 
         detector = self._get_detector()
-        results, total_detected = detector.detect_and_identify(
+        results, total_detected, bird_boxes = detector.detect_and_identify(
             image,
             threshold=REGIONAL_THRESHOLD,
             global_threshold=GLOBAL_THRESHOLD,
             lat=lat,
             lon=lon,
+            return_boxes=True,
         )
 
         species = []
@@ -51,26 +53,33 @@ class SpeciesClassifier:
                 "threshold_used": "gps" if lat is not None else "global",
             })
 
+        # Normalize bboxes to 0-1 (x1, y1, x2, y2 format — matches /detect endpoint)
+        birds = []
+        for x1, y1, x2, y2, conf in bird_boxes:
+            birds.append({
+                "bbox": [x1 / w, y1 / h, x2 / w, y2 / h],
+                "confidence": float(conf),
+                "mask": "",
+            })
+
         return {
             "species": species,
+            "birds": birds,
             "total_detected": total_detected,
         }
 
     def predict(self, image_bytes: bytes, top_k: int = 5,
                 temperature: float = 0.9,
                 lat: float = None, lon: float = None) -> dict:
-        """Legacy: identify from image bytes. Used by tests."""
+        """Legacy: identify from image bytes (used by tests)."""
         from PIL import Image
         from io import BytesIO
         image = Image.open(BytesIO(image_bytes)).convert("RGB")
 
         detector = self._get_detector()
         results, total_detected = detector.detect_and_identify(
-            image,
-            threshold=REGIONAL_THRESHOLD,
-            global_threshold=GLOBAL_THRESHOLD,
-            lat=lat,
-            lon=lon,
+            image, threshold=REGIONAL_THRESHOLD,
+            global_threshold=GLOBAL_THRESHOLD, lat=lat, lon=lon,
         )
 
         species = []
@@ -84,7 +93,4 @@ class SpeciesClassifier:
                 "threshold_used": "gps" if lat is not None else "global",
             })
 
-        return {
-            "species": species,
-            "total_detected": total_detected,
-        }
+        return {"species": species, "total_detected": total_detected}
