@@ -35,6 +35,20 @@ enum FocusPointStatus: String, Codable, Sendable {
     case onBird, offBird, notAvailable
 }
 
+enum AppTheme: String, CaseIterable, Codable, Sendable {
+    case system
+    case dark
+    case light
+
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: nil
+        case .dark: .dark
+        case .light: .light
+        }
+    }
+}
+
 enum RawFormat: String, CaseIterable, Sendable {
     case cr2, cr3, nef, arw, raf, orf, rw2, pef, dng, iiq, hif, heif, heic
 }
@@ -57,6 +71,7 @@ final class CullingConfig {
     var backendPort: Int { didSet { save() } }
     var writeKeywords: Bool { didSet { save() } }
     var keywordFormat: String { didSet { save() } }
+    var appTheme: AppTheme { didSet { save() } }
 
     init() {
         let defaults = UserDefaults.standard
@@ -71,6 +86,7 @@ final class CullingConfig {
         self.backendPort = defaults.object(forKey: "backendPort") as? Int ?? 8420
         self.writeKeywords = defaults.object(forKey: "writeKeywords") as? Bool ?? true
         self.keywordFormat = defaults.string(forKey: "keywordFormat") ?? "{cn} {en} {pinyin}"
+        self.appTheme = AppTheme(rawValue: defaults.string(forKey: "appTheme") ?? "") ?? .dark
     }
 
     private func save() {
@@ -85,5 +101,6 @@ final class CullingConfig {
         defaults.set(backendPort, forKey: "backendPort")
         defaults.set(writeKeywords, forKey: "writeKeywords")
         defaults.set(keywordFormat, forKey: "keywordFormat")
+        defaults.set(appTheme.rawValue, forKey: "appTheme")
     }
 }

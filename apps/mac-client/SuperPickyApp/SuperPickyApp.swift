@@ -12,7 +12,7 @@ struct SuperPickyApp: App {
                 .frame(minWidth: 900, minHeight: 600)
                 .environment(processManager)
                 .environment(config)
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(config.appTheme.colorScheme)
                 .onAppear {
                     appDelegate.processManager = processManager
                     processManager.start()

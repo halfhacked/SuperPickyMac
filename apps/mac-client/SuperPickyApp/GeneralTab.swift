@@ -16,6 +16,13 @@ struct GeneralTab: View {
             Text("Skill level sets default thresholds for sharpness and aesthetics scoring.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+            Picker("Appearance", selection: $config.appTheme) {
+                Text("System").tag(AppTheme.system)
+                Text("Dark").tag(AppTheme.dark)
+                Text("Light").tag(AppTheme.light)
+            }
+            .pickerStyle(.segmented)
         }
         .formStyle(.grouped)
     }
