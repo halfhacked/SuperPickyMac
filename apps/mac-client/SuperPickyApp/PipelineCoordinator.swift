@@ -56,9 +56,11 @@ final class PipelineCoordinator {
 
             currentFilename = fileURL.lastPathComponent
 
-            // Skip already-processed photos
+            // Skip already-processed photos (preserve manual ratings)
             if let existing = try? db.fetchByFilePath(fileURL.path) {
-                _ = existing
+                if existing.isManualRating {
+                    logger.info("Skipping \(fileURL.lastPathComponent): manual rating preserved")
+                }
                 processedCount += 1
                 await onPhotoProcessed?()
                 continue
@@ -82,7 +84,7 @@ final class PipelineCoordinator {
                 )
             } catch {
                 logger.error("Failed to process \(fileURL.lastPathComponent): \(error)")
-                photo.starRating = -1
+                photo.starRating = 0
             }
 
             do {
@@ -127,7 +129,7 @@ final class PipelineCoordinator {
 
         let detection = try await inferenceClient.detect(image: image)
         guard let bird = detection.birds.first else {
-            photo.starRating = -1
+            photo.starRating = 0
             return
         }
         photo.birdConfidence = bird.confidence

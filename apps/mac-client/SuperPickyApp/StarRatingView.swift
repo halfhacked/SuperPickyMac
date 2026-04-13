@@ -5,7 +5,7 @@ struct StarRatingView: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            ForEach(1...3, id: \.self) { star in
+            ForEach(1...5, id: \.self) { star in
                 Image(systemName: star <= rating ? "star.fill" : "star")
                     .font(.caption2)
                     .foregroundStyle(color)
@@ -15,9 +15,11 @@ struct StarRatingView: View {
 
     private var color: Color {
         switch rating {
-        case 3: .green
-        case 2: .blue
-        case 1: .yellow
+        case 5: .green
+        case 4: .blue
+        case 3: .yellow
+        case 2: .orange
+        case 1: .secondary
         default: .secondary
         }
     }

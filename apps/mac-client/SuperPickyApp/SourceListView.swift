@@ -58,7 +58,7 @@ struct SourceListView: View {
             }
 
             Section("Ratings") {
-                ForEach([3, 2, 1, 0], id: \.self) { rating in
+                ForEach([5, 4, 3, 2, 1, 0], id: \.self) { rating in
                     let count = ratingCounts[rating] ?? 0
                     Label {
                         HStack {
@@ -166,9 +166,11 @@ struct SourceListView: View {
 
     private func ratingLabel(_ rating: Int) -> String {
         switch rating {
-        case 3: "Excellent"
-        case 2: "Good"
-        case 1: "Average"
+        case 5: "Excellent"
+        case 4: "Good"
+        case 3: "Average"
+        case 2: "Below Average"
+        case 1: "Poor"
         case 0: "Reject"
         default: "Unknown"
         }
@@ -176,8 +178,10 @@ struct SourceListView: View {
 
     private func ratingIcon(_ rating: Int) -> String {
         switch rating {
-        case 3: "star.fill"
-        case 2: "star.leadinghalf.filled"
+        case 5: "star.fill"
+        case 4: "star.fill"
+        case 3: "star.leadinghalf.filled"
+        case 2: "star"
         case 1: "star"
         case 0: "xmark"
         default: "questionmark"
@@ -186,10 +190,12 @@ struct SourceListView: View {
 
     private func ratingColor(_ rating: Int) -> Color {
         switch rating {
-        case 3: .green
-        case 2: .blue
-        case 1: .yellow
-        case 0: .secondary
+        case 5: .green
+        case 4: .blue
+        case 3: .yellow
+        case 2: .orange
+        case 1: .secondary
+        case 0: .red
         default: .secondary
         }
     }

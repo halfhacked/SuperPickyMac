@@ -2,12 +2,14 @@ import SwiftUI
 
 struct PreviewView: View {
     let photo: Photo?
+    @State private var zoomState = ZoomState()
+    @State private var previousPhotoID: UUID?
 
     var body: some View {
         VStack(spacing: 0) {
             if let photo {
                 // Photo preview
-                AsyncPreviewImage(filePath: photo.filePath)
+                AsyncPreviewImage(filePath: photo.filePath, zoomState: zoomState)
                     .accessibilityIdentifier("PhotoPreview")
                 InfoBarView(photo: photo)
             } else {
@@ -22,22 +24,26 @@ struct PreviewView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .onChange(of: photo?.id) { _, newID in
+            if newID != previousPhotoID {
+                previousPhotoID = newID
+                zoomState.reset()
+            }
+        }
     }
 }
 
 /// Loads a full-size preview image asynchronously.
 struct AsyncPreviewImage: View {
     let filePath: String
+    @Bindable var zoomState: ZoomState
     @State private var image: NSImage?
 
     var body: some View {
         ZStack {
             Color(nsColor: .controlBackgroundColor)
             if let image {
-                Image(nsImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .padding(8)
+                ZoomableImageView(image: image, zoomState: zoomState)
             } else {
                 ProgressView()
             }
@@ -80,7 +86,15 @@ struct InfoBarView: View {
 
     var body: some View {
         HStack(spacing: 16) {
-            StarRatingView(rating: photo.starRating)
+            HStack(spacing: 4) {
+                StarRatingView(rating: photo.starRating)
+                if photo.isManualRating {
+                    Image(systemName: "pencil")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("ManualRatingIndicator")
+                }
+            }
 
             if let sharpness = photo.sharpnessScore {
                 Label("Sharp: \(Int(sharpness))", systemImage: "scope")

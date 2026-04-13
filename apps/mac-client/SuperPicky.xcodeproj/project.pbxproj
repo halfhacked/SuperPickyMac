@@ -43,6 +43,10 @@
 		EB526AFC3879286A8B692A21 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978BD285BA4245F2711720E0 /* MainView.swift */; };
 		EEE71D9CDEA197DC1AB1542F /* InferenceClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 383C2AE26F03BE2BA8C8AF84 /* InferenceClient.swift */; };
 		F0E93BA6594B7964B23E6005 /* RatingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0252F59F2B2852A81A8FB56F /* RatingEngine.swift */; };
+		A1B2C3D4E5F607182930001A /* ZoomableImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F607182930001B /* ZoomableImageView.swift */; };
+		A1B2C3D4E5F607182930002A /* XMPWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F607182930002B /* XMPWriter.swift */; };
+		A1B2C3D4E5F607182930003A /* ExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F607182930003B /* ExportService.swift */; };
+		A1B2C3D4E5F607182930004A /* CullingEnhancementUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F607182930004B /* CullingEnhancementUITests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -93,6 +97,10 @@
 		EFB7F185F169F5E033B697F1 /* ThumbnailStripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailStripView.swift; sourceTree = "<group>"; };
 		FB57DBDFB0D5675A8F620572 /* CullingConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CullingConfig.swift; sourceTree = "<group>"; };
 		FCE975693ABAA78E1853356C /* CullingTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CullingTab.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F607182930001B /* ZoomableImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoomableImageView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F607182930002B /* XMPWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XMPWriter.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F607182930003B /* ExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportService.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F607182930004B /* CullingEnhancementUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CullingEnhancementUITests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -120,6 +128,7 @@
 				950F762228EBD7BA89B8B2C0 /* DirectoryScanner.swift */,
 				BB2C3D4E5F60718293A4B5C6 /* EXIFReader.swift */,
 				DD4E5F60718293A4B5C6D7E8 /* ExifPanelView.swift */,
+				A1B2C3D4E5F607182930003B /* ExportService.swift */,
 				51D9ED12BDAF2634C06DA741 /* ExposureDetector.swift */,
 				CD58D52864274CD6EF36539F /* FullscreenViewer.swift */,
 				E283097C3245E4C2533065B6 /* GeneralTab.swift */,
@@ -143,6 +152,8 @@
 				2E6F8B5A1F51928F3F226F23 /* StarRatingView.swift */,
 				C8F78B4A7BDCFE1CE3947F19 /* SuperPickyApp.swift */,
 				EFB7F185F169F5E033B697F1 /* ThumbnailStripView.swift */,
+				A1B2C3D4E5F607182930002B /* XMPWriter.swift */,
+				A1B2C3D4E5F607182930001B /* ZoomableImageView.swift */,
 			);
 			path = SuperPickyApp;
 			sourceTree = "<group>";
@@ -168,6 +179,7 @@
 		F4BF3F945E2DB827478F7D52 /* SuperPickyUITests */ = {
 			isa = PBXGroup;
 			children = (
+				A1B2C3D4E5F607182930004B /* CullingEnhancementUITests.swift */,
 				7FC42B7AF80A2E12BBE315A0 /* MockUITests.swift */,
 				A116EA5C6473F4DDDF1E4CFB /* ProcessingFlowUITests.swift */,
 			);
@@ -256,6 +268,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1B2C3D4E5F607182930004A /* CullingEnhancementUITests.swift in Sources */,
 				3889D1E2499F4D32B9C4F63A /* MockUITests.swift in Sources */,
 				0A6A3CA41751F6A2A9EDA02F /* ProcessingFlowUITests.swift in Sources */,
 			);
@@ -298,6 +311,9 @@
 				D26E06E986C669DB868B7F06 /* StarRatingView.swift in Sources */,
 				04AFCB4EB5F25BCE9F245A56 /* SuperPickyApp.swift in Sources */,
 				628781342964039FC54E5D63 /* ThumbnailStripView.swift in Sources */,
+				A1B2C3D4E5F607182930002A /* XMPWriter.swift in Sources */,
+				A1B2C3D4E5F607182930001A /* ZoomableImageView.swift in Sources */,
+				A1B2C3D4E5F607182930003A /* ExportService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
