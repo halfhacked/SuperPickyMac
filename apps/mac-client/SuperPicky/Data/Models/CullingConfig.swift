@@ -66,7 +66,7 @@ final class CullingConfig {
         self.exposureDetectionEnabled = defaults.object(forKey: "exposureDetectionEnabled") as? Bool ?? true
         self.exposureThreshold = defaults.object(forKey: "exposureThreshold") as? Float ?? 0.10
         self.burstDetectionEnabled = defaults.object(forKey: "burstDetectionEnabled") as? Bool ?? true
-        self.autoOrganize = defaults.object(forKey: "autoOrganize") as? Bool ?? true
+        self.autoOrganize = defaults.object(forKey: "autoOrganize") as? Bool ?? false
         self.namingStandard = NamingStandard(rawValue: defaults.string(forKey: "namingStandard") ?? "") ?? .osea
         self.backendPort = defaults.object(forKey: "backendPort") as? Int ?? 8420
     }
