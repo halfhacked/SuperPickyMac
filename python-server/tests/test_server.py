@@ -13,12 +13,12 @@ def client():
          patch("superpicky_server.get_species") as mock_sp:
 
         mock_det.return_value = MagicMock()
-        mock_det.return_value.detect.return_value = {
+        mock_det.return_value.predict.return_value = {
             "birds": [{"bbox": [0.1, 0.2, 0.6, 0.8], "confidence": 0.94, "mask": "AQID"}]
         }
 
         mock_aes.return_value = MagicMock()
-        mock_aes.return_value.score.return_value = {"score": 6.23, "distribution": []}
+        mock_aes.return_value.predict.return_value = {"score": 6.23, "distribution": []}
 
         mock_kp.return_value = MagicMock()
         mock_kp.return_value.predict.return_value = {

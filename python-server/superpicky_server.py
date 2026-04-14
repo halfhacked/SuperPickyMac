@@ -2,14 +2,27 @@
 """SuperPicky Inference Server — pure model inference only."""
 import argparse
 import os
-from flask import Flask, request, jsonify
+from typing import Any, Tuple
+
+from flask import Flask, jsonify, request
+from flask.wrappers import Response
 from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)
 
-_models = {}
+_models: dict = {}
 MODELS_DIR = os.environ.get("MODELS_DIR", os.path.expanduser("~/projects/SuperPicky/models"))
+
+
+def _error(message: str, status: int) -> Tuple[Response, int]:
+    """Uniform JSON error response."""
+    return jsonify({"error": message}), status
+
+
+def _require_image() -> Any:
+    """Pull the 'image' file from the request, or None if missing."""
+    return request.files.get("image")
 
 
 def get_detector():
@@ -47,41 +60,56 @@ def get_species():
     return _models["species"]
 
 
+@app.errorhandler(Exception)
+def _handle_unexpected(exc: Exception) -> Tuple[Response, int]:
+    # Flask's own HTTP errors carry their own status codes; pass those through.
+    code = getattr(exc, "code", None)
+    if isinstance(code, int):
+        return _error(str(exc), code)
+    app.logger.exception("Inference endpoint failed")
+    return _error(f"{type(exc).__name__}: {exc}", 500)
+
+
 @app.route("/health", methods=["GET"])
-def health():
+def health() -> Response:
     from inference.device import get_best_device
-    return jsonify({"status": "ready", "models_loaded": list(_models.keys()), "device": get_best_device(), "version": "1.0.0"})
+    return jsonify({
+        "status": "ready",
+        "models_loaded": list(_models.keys()),
+        "device": get_best_device(),
+        "version": "1.0.0",
+    })
 
 
 @app.route("/detect", methods=["POST"])
 def detect():
-    f = request.files.get("image")
+    f = _require_image()
     if not f:
-        return jsonify({"error": "No image provided"}), 400
-    return jsonify(get_detector().detect(f.read()))
+        return _error("No image provided", 400)
+    return jsonify(get_detector().predict(f.read()))
 
 
 @app.route("/aesthetics", methods=["POST"])
 def aesthetics():
-    f = request.files.get("image")
+    f = _require_image()
     if not f:
-        return jsonify({"error": "No image provided"}), 400
-    return jsonify(get_aesthetics().score(f.read()))
+        return _error("No image provided", 400)
+    return jsonify(get_aesthetics().predict(f.read()))
 
 
 @app.route("/keypoints", methods=["POST"])
 def keypoints():
-    f = request.files.get("image")
+    f = _require_image()
     if not f:
-        return jsonify({"error": "No image provided"}), 400
+        return _error("No image provided", 400)
     return jsonify(get_keypoints().predict(f.read()))
 
 
 @app.route("/flight", methods=["POST"])
 def flight():
-    f = request.files.get("image")
+    f = _require_image()
     if not f:
-        return jsonify({"error": "No image provided"}), 400
+        return _error("No image provided", 400)
     return jsonify(get_flight().predict(f.read()))
 
 
@@ -95,13 +123,15 @@ def identify():
         return jsonify(get_species().predict_file(file_path, top_k=top_k))
 
     # Fallback: image bytes (for tests / backward compat)
-    f = request.files.get("image")
+    f = _require_image()
     if not f:
-        return jsonify({"error": "No image or file_path provided"}), 400
+        return _error("No image or file_path provided", 400)
     temperature = request.args.get("temperature", 0.9, type=float)
     lat = request.args.get("lat", None, type=float)
     lon = request.args.get("lon", None, type=float)
-    return jsonify(get_species().predict(f.read(), top_k=top_k, temperature=temperature, lat=lat, lon=lon))
+    return jsonify(get_species().predict(
+        f.read(), top_k=top_k, temperature=temperature, lat=lat, lon=lon,
+    ))
 
 
 if __name__ == "__main__":
