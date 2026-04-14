@@ -6,7 +6,7 @@ struct FullscreenViewer: View {
     @Binding var isPresented: Bool
     var onRatePhoto: ((UUID, Int) -> Void)?
     @State private var showInfo = false
-    @State private var zoomState = ZoomState()
+    @Bindable var zoomState: ZoomState
     @State private var image: NSImage?
 
     var body: some View {
@@ -38,10 +38,14 @@ struct FullscreenViewer: View {
             }
         }
         .task(id: selectedPhotoID) {
-            image = nil
             zoomState.reset()
-            guard let photo = selectedPhoto else { return }
-            image = await loadFullscreenImage(path: photo.filePath)
+            guard let photo = selectedPhoto else { image = nil; return }
+            // Fast: load embedded preview first
+            let preview = await loadImage(path: photo.filePath, fullRes: false)
+            image = preview
+            // Then upgrade to full-res in background
+            let full = await loadImage(path: photo.filePath, fullRes: true)
+            if let full { image = full }
         }
     }
 
@@ -63,7 +67,7 @@ struct FullscreenViewer: View {
         onRatePhoto?(id, rating)
     }
 
-    private func loadFullscreenImage(path: String) async -> NSImage? {
+    private func loadImage(path: String, fullRes: Bool) async -> NSImage? {
         let url = URL(fileURLWithPath: path)
         guard FileManager.default.fileExists(atPath: path) else { return nil }
         return await withCheckedContinuation { continuation in
@@ -72,13 +76,19 @@ struct FullscreenViewer: View {
                     continuation.resume(returning: nil)
                     return
                 }
-                // Full resolution for fullscreen
-                let options: [CFString: Any] = [
-                    kCGImageSourceCreateThumbnailFromImageAlways: true,
-                    kCGImageSourceCreateThumbnailWithTransform: true,
-                    kCGImageSourceThumbnailMaxPixelSize: 4000,
-                ]
-                guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+                let cgImage: CGImage?
+                if fullRes {
+                    cgImage = CGImageSourceCreateImageAtIndex(source, 0, [
+                        kCGImageSourceCreateThumbnailWithTransform: true,
+                    ] as CFDictionary)
+                } else {
+                    cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                        kCGImageSourceThumbnailMaxPixelSize: 2000,
+                        kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
+                        kCGImageSourceCreateThumbnailWithTransform: true,
+                    ] as CFDictionary)
+                }
+                guard let cgImage else {
                     continuation.resume(returning: nil)
                     return
                 }
