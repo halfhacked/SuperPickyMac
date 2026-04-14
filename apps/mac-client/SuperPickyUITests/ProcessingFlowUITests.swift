@@ -104,21 +104,23 @@ final class ProcessingFlowUITests: XCTestCase {
 
     /// 09: Expand species with burst — "Burst" child appears
     func test09_ExpandBurstSpecies() throws {
-        // Find the disclosure group for a species with bursts and click its arrow
-        let disclosureButtons = Self.app.disclosureTriangles
-        if disclosureButtons.count > 0 {
-            let triangle = disclosureButtons.firstMatch
-            // Click to expand — retry once if "Burst" doesn't appear (CI timing)
-            triangle.click()
-            let burstLabel = Self.app.staticTexts["Burst"]
-            if !burstLabel.waitForExistence(timeout: 5) {
-                // Second attempt — triangle may not have toggled
-                triangle.click()
-                XCTAssertTrue(burstLabel.waitForExistence(timeout: 5), "Burst group should appear under species")
-            }
-        } else {
-            // No disclosure groups — burst detection might not have found groups
-            // This is acceptable if the test photos didn't produce bursts
+        // Sidebar sections (Folders, Ratings, Tags, Species) each have a disclosure triangle.
+        // Species burst DisclosureGroups add more triangles beyond those 4 section headers.
+        let sectionHeaderCount = 4
+        let allTriangles = Self.app.disclosureTriangles
+        guard allTriangles.count > sectionHeaderCount else {
+            // No species burst groups — acceptable if test photos didn't produce bursts
+            return
+        }
+
+        // Click the first species burst triangle (index past section headers)
+        let burstTriangle = allTriangles.element(boundBy: sectionHeaderCount)
+        burstTriangle.click()
+        let burstLabel = Self.app.staticTexts["Burst"]
+        if !burstLabel.waitForExistence(timeout: 5) {
+            // Retry — triangle may not have toggled on first click
+            burstTriangle.click()
+            XCTAssertTrue(burstLabel.waitForExistence(timeout: 5), "Burst group should appear under species")
         }
     }
 
