@@ -364,7 +364,6 @@ struct ContentView: View {
     @State private var showExifPanel = true
     @State private var showFullscreen = false
     @State private var isExporting = false
-    @FocusState private var isContentFocused: Bool
     @State private var exportProgress = 0
     @State private var exportTotal = 0
     @State private var showExportComplete = false
@@ -390,34 +389,9 @@ struct ContentView: View {
             .frame(minHeight: 60, idealHeight: 80, maxHeight: 120)
         }
         .background(Color(nsColor: .controlBackgroundColor))
-        .focusable()
-        .focusEffectDisabled()
-        .focused($isContentFocused)
-        .onAppear { isContentFocused = true }
-        .onChange(of: selectedPhotoID) { _, _ in
-            // Reclaim focus when photo selection changes (e.g. thumbnail click)
-            isContentFocused = true
-        }
-        .onKeyPress("i") {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                showExifPanel.toggle()
-            }
-            return .handled
-        }
-        .onKeyPress("f") {
-            showFullscreen = true
-            return .handled
-        }
-        .onKeyPress(.return) {
-            showFullscreen = true
-            return .handled
-        }
-        .onKeyPress("0") { rateSelectedPhoto(0); return .handled }
-        .onKeyPress("1") { rateSelectedPhoto(1); return .handled }
-        .onKeyPress("2") { rateSelectedPhoto(2); return .handled }
-        .onKeyPress("3") { rateSelectedPhoto(3); return .handled }
-        .onKeyPress("4") { rateSelectedPhoto(4); return .handled }
-        .onKeyPress("5") { rateSelectedPhoto(5); return .handled }
+        .background(KeyboardMonitor { key in
+            return handleKey(key)
+        })
         .overlay {
             if showFullscreen {
                 FullscreenViewer(
@@ -475,6 +449,39 @@ struct ContentView: View {
         } message: {
             Text("No photos match the current filter")
         }
+    }
+
+    private func handleKey(_ key: KeyboardMonitor.KeyEvent) -> Bool {
+        // Arrow keys navigate photos
+        if key.isLeftArrow { navigatePhoto(direction: -1); return true }
+        if key.isRightArrow { navigatePhoto(direction: 1); return true }
+
+        // Escape exits fullscreen
+        if key.isEscape && showFullscreen { showFullscreen = false; return true }
+
+        switch key.characters {
+        case "i":
+            withAnimation(.easeInOut(duration: 0.2)) { showExifPanel.toggle() }
+            return true
+        case "f":
+            showFullscreen.toggle()
+            return true
+        case "0": rateSelectedPhoto(0); return true
+        case "1": rateSelectedPhoto(1); return true
+        case "2": rateSelectedPhoto(2); return true
+        case "3": rateSelectedPhoto(3); return true
+        case "4": rateSelectedPhoto(4); return true
+        case "5": rateSelectedPhoto(5); return true
+        default: return false
+        }
+    }
+
+    private func navigatePhoto(direction: Int) {
+        guard let currentID = selectedPhotoID,
+              let currentIndex = photos.firstIndex(where: { $0.id == currentID }) else { return }
+        let newIndex = currentIndex + direction
+        guard photos.indices.contains(newIndex) else { return }
+        selectedPhotoID = photos[newIndex].id
     }
 
     private func rateSelectedPhoto(_ rating: Int) {

@@ -8,8 +8,6 @@ struct FullscreenViewer: View {
     @State private var showInfo = false
     @State private var zoomState = ZoomState()
     @State private var image: NSImage?
-    @State private var mouseLocation: CGPoint = .zero
-    @FocusState private var isFocused: Bool
 
     var body: some View {
         GeometryReader { geo in
@@ -38,37 +36,7 @@ struct FullscreenViewer: View {
                     }
                 }
             }
-            .onContinuousHover { phase in
-                if case .active(let location) = phase {
-                    mouseLocation = location
-                }
-            }
-            .onKeyPress("z") {
-                guard let img = image else { return .ignored }
-                zoomState.toggleFitActualPixelsAt(
-                    imagePixelWidth: img.size.width,
-                    viewSize: geo.size,
-                    mouseInView: mouseLocation
-                )
-                return .handled
-            }
         }
-        .focusable()
-        .focusEffectDisabled()
-        .focused($isFocused)
-        .onAppear { isFocused = true }
-        .onKeyPress(.leftArrow) { navigatePhoto(direction: -1); return .handled }
-        .onKeyPress(.rightArrow) { navigatePhoto(direction: 1); return .handled }
-        .onKeyPress(.escape) { isPresented = false; return .handled }
-        .onKeyPress("f") { isPresented = false; return .handled }
-        .onKeyPress(.return) { isPresented = false; return .handled }
-        .onKeyPress("i") { showInfo.toggle(); return .handled }
-        .onKeyPress("0") { rateSelected(0); return .handled }
-        .onKeyPress("1") { rateSelected(1); return .handled }
-        .onKeyPress("2") { rateSelected(2); return .handled }
-        .onKeyPress("3") { rateSelected(3); return .handled }
-        .onKeyPress("4") { rateSelected(4); return .handled }
-        .onKeyPress("5") { rateSelected(5); return .handled }
         .task(id: selectedPhotoID) {
             image = nil
             zoomState.reset()
