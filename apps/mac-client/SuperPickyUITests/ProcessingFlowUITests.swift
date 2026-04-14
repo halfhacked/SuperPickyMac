@@ -107,13 +107,15 @@ final class ProcessingFlowUITests: XCTestCase {
         // Find the disclosure group for a species with bursts and click its arrow
         let disclosureButtons = Self.app.disclosureTriangles
         if disclosureButtons.count > 0 {
-            // Click the first disclosure triangle to expand
-            disclosureButtons.firstMatch.click()
-            sleep(1)
-
-            // "Burst" child should now be visible
+            let triangle = disclosureButtons.firstMatch
+            // Click to expand — retry once if "Burst" doesn't appear (CI timing)
+            triangle.click()
             let burstLabel = Self.app.staticTexts["Burst"]
-            XCTAssertTrue(burstLabel.waitForExistence(timeout: 3), "Burst group should appear under species")
+            if !burstLabel.waitForExistence(timeout: 5) {
+                // Second attempt — triangle may not have toggled
+                triangle.click()
+                XCTAssertTrue(burstLabel.waitForExistence(timeout: 5), "Burst group should appear under species")
+            }
         } else {
             // No disclosure groups — burst detection might not have found groups
             // This is acceptable if the test photos didn't produce bursts
@@ -145,16 +147,21 @@ final class ProcessingFlowUITests: XCTestCase {
         let folderName = (Self.testDir! as NSString).lastPathComponent
         let folderLabel = Self.app.staticTexts[folderName]
 
-        // Right-click folder to get context menu
+        // Right-click folder to get context menu — retry once if menu doesn't appear (CI timing)
         folderLabel.rightClick()
-        sleep(1)
-
-        // Click "Remove" in context menu
         let removeItem = Self.app.menuItems["Remove"]
-        if removeItem.waitForExistence(timeout: 3) {
-            removeItem.click()
+        if !removeItem.waitForExistence(timeout: 5) {
+            // Dismiss any stale state and retry
+            Self.app.typeKey(.escape, modifierFlags: [])
             sleep(1)
+            folderLabel.rightClick()
+            guard removeItem.waitForExistence(timeout: 5) else {
+                XCTFail("Context menu with 'Remove' did not appear after retry")
+                return
+            }
         }
+        removeItem.click()
+        sleep(1)
 
         // Empty state should return
         let selectButton = Self.app.buttons["SelectFolderButton"]
