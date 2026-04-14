@@ -10,34 +10,33 @@ final class ProcessManager {
     private var healthCheckTask: Task<Void, Never>?
 
     let port: Int
-    private let serverDir: String
-    private let pythonPath: String
-    private let modelsDir: String
 
     init(port: Int = 8420) {
         self.port = port
+    }
 
-        // Dev mode: use project paths
-        let projectServerDir = NSString("~/projects/SuperPickyMac/python-server").expandingTildeInPath
-        let venvPython = projectServerDir + "/.venv/bin/python"
-        let modelsPath = NSString("~/projects/SuperPicky/models").expandingTildeInPath
+    /// Server script path — bundled inside the app, or dev fallback
+    private var serverDir: String {
+        let bundled = ServerSetup.bundledServerDir.path
+        let dev = NSString("~/projects/SuperPickyMac/python-server").expandingTildeInPath
+        return FileManager.default.fileExists(atPath: bundled + "/superpicky_server.py") ? bundled : dev
+    }
 
-        if FileManager.default.fileExists(atPath: venvPython) {
-            self.pythonPath = venvPython
-        } else {
-            self.pythonPath = "/usr/bin/env python3"
-        }
-
-        self.serverDir = projectServerDir
-        self.modelsDir = modelsPath
+    /// Python executable — managed venv, or dev venv fallback
+    private var pythonPath: String {
+        let managed = ServerSetup.pythonPath
+        let dev = NSString("~/projects/SuperPickyMac/python-server/.venv/bin/python").expandingTildeInPath
+        if FileManager.default.fileExists(atPath: managed) { return managed }
+        if FileManager.default.fileExists(atPath: dev) { return dev }
+        return "/usr/bin/env python3"
     }
 
     func start() {
         guard !isRunning else { return }
 
-        // First check if a server is already running on this port
         healthCheckTask = Task { [weak self] in
             guard let self else { return }
+            // Check if server already running
             let client = HTTPInferenceClient(port: self.port)
             do {
                 let health = try await client.healthCheck()
@@ -49,43 +48,36 @@ final class ProcessManager {
                     self.logger.info("Connected to existing server on port \(self.port)")
                     return
                 }
-            } catch {
-                // No existing server, start one
-            }
+            } catch {}
             await self.launchServer()
         }
     }
 
     private func launchServer() async {
-        let serverScript = serverDir + "/superpicky_server.py"
+        let script = serverDir + "/superpicky_server.py"
 
-        guard FileManager.default.fileExists(atPath: serverScript) else {
-            logger.error("Server script not found at \(serverScript)")
+        guard FileManager.default.fileExists(atPath: script) else {
+            logger.error("Server script not found at \(script)")
             return
         }
 
         let proc = Process()
         proc.currentDirectoryURL = URL(fileURLWithPath: serverDir)
-
-        if FileManager.default.fileExists(atPath: pythonPath) {
-            proc.executableURL = URL(fileURLWithPath: pythonPath)
-            proc.arguments = [serverScript, "--port", "\(port)"]
-        } else {
-            proc.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-            proc.arguments = ["python3", serverScript, "--port", "\(port)"]
-        }
+        proc.executableURL = URL(fileURLWithPath: pythonPath)
+        proc.arguments = [script, "--port", "\(port)"]
 
         var env = ProcessInfo.processInfo.environment
-        env["MODELS_DIR"] = modelsDir
+        let modelsDir = NSString("~/projects/SuperPicky/models").expandingTildeInPath
+        if FileManager.default.fileExists(atPath: modelsDir) {
+            env["MODELS_DIR"] = modelsDir
+        }
         proc.environment = env
 
-        // Log stderr for debugging
         let errPipe = Pipe()
         proc.standardOutput = FileHandle.nullDevice
         proc.standardError = errPipe
 
         proc.terminationHandler = { [weak self] proc in
-            // Read any error output
             let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
             if let errStr = String(data: errData, encoding: .utf8), !errStr.isEmpty {
                 self?.logger.error("Python server stderr: \(errStr.prefix(500))")
@@ -93,7 +85,6 @@ final class ProcessManager {
             DispatchQueue.main.async {
                 self?.isRunning = false
                 self?.isReady = false
-                self?.logger.info("Python server exited with code \(proc.terminationStatus)")
             }
         }
 
@@ -121,9 +112,7 @@ final class ProcessManager {
                     logger.info("Python server ready")
                     return
                 }
-            } catch {
-                // Not ready yet
-            }
+            } catch {}
             try? await Task.sleep(for: .seconds(1))
         }
         logger.error("Python server failed to become ready within 120s")
@@ -136,6 +125,5 @@ final class ProcessManager {
         process = nil
         isRunning = false
         isReady = false
-        logger.info("Python server stopped")
     }
 }
