@@ -9,6 +9,13 @@ struct ExportResult: Sendable {
 
 struct ExportService {
 
+    /// Compute the picks export destination: `<folder>-picks/` next to the source folder.
+    static func picksDestination(for folder: URL) -> URL {
+        let parent = folder.deletingLastPathComponent()
+        let name = folder.lastPathComponent + "-picks"
+        return parent.appendingPathComponent(name)
+    }
+
     /// Export photos to destination folder with XMP sidecars.
     ///
     /// For each photo:

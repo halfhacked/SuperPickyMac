@@ -70,7 +70,7 @@ final class ScreenshotAuditTests: XCTestCase {
         screenshot("04_main_view_thumbnails")
 
         // Click a few thumbnails and capture
-        let images = Self.app.images.allElementsBoundByIndex
+        let images = Self.app.images.matching(NSPredicate(format: "identifier BEGINSWITH 'Thumbnail_'")).allElementsBoundByIndex
         if images.count >= 2 {
             images[1].click()
             sleep(1)
@@ -88,7 +88,7 @@ final class ScreenshotAuditTests: XCTestCase {
         }
 
         // Click different photos to see EXIF change
-        let images = Self.app.images.allElementsBoundByIndex
+        let images = Self.app.images.matching(NSPredicate(format: "identifier BEGINSWITH 'Thumbnail_'")).allElementsBoundByIndex
         if images.count >= 5 {
             images[4].click()
             sleep(1)
@@ -137,13 +137,12 @@ final class ScreenshotAuditTests: XCTestCase {
             sleep(1)
         }
 
-        // Scroll to end of thumbnail strip
-        let images = Self.app.images.allElementsBoundByIndex
-        if let last = images.last {
-            last.click()
-            sleep(1)
-            screenshot("11_last_photo")
+        // Navigate to last photo via arrow keys (more reliable than clicking off-screen thumbnails)
+        for _ in 0..<20 {
+            Self.app.typeKey(.rightArrow, modifierFlags: [])
         }
+        sleep(1)
+        screenshot("11_last_photo")
     }
 
     // MARK: - Helpers

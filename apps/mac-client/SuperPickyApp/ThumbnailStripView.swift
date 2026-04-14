@@ -46,10 +46,22 @@ struct ThumbnailCell: View {
             if photo.isPick {
                 Image(systemName: "flag.fill")
                     .font(.system(size: 8))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(.orange)
                     .padding(3)
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 2))
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(2)
+                    .transition(.scale.combined(with: .opacity))
+            }
+
+            // Burst best bottom-right
+            if photo.isBurstBest {
+                Image(systemName: "crown.fill")
+                    .font(.system(size: 8))
+                    .foregroundStyle(.yellow)
+                    .padding(3)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 2))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                     .padding(2)
             }
 
@@ -60,10 +72,11 @@ struct ThumbnailCell: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
                 .padding(2)
         }
+        .animation(.spring(duration: 0.3, bounce: 0.4), value: photo.isPick)
         .clipShape(RoundedRectangle(cornerRadius: 4))
         .overlay(
             RoundedRectangle(cornerRadius: 4)
-                .stroke(isSelected ? Color.accentColor : .clear, lineWidth: 2)
+                .stroke(isSelected ? Color.accentColor : (photo.isPick ? Color.orange.opacity(0.6) : .clear), lineWidth: 2)
         )
         .accessibilityIdentifier("Thumbnail_\(photo.filename)")
     }

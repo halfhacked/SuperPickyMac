@@ -7,9 +7,11 @@ enum SidebarSelection: Hashable {
     case picks
     case species(String)
     case burstGroup(UUID)
+    case singles(String) // species name
 }
 
 struct SourceListView: View {
+    @Environment(CullingConfig.self) private var config
     @Binding var selection: SidebarSelection?
     @Binding var folders: [URL]
     let ratingCounts: [Int: Int]
@@ -112,7 +114,7 @@ struct SourceListView: View {
                             // No bursts — flat selectable row
                             Label {
                                 HStack {
-                                    Text(species.name)
+                                    Text(species.isUnidentified ? config.localized("Unidentified") : config.localizedName(en: species.name, cn: species.cnName))
                                     Spacer()
                                     Text("\(species.count)")
                                         .foregroundStyle(.secondary)
@@ -151,11 +153,12 @@ struct SourceListView: View {
                                         Image(systemName: "photo")
                                             .foregroundStyle(.secondary)
                                     }
+                                    .tag(SidebarSelection.singles(species.name))
                                 }
                             } label: {
                                 Label {
                                     HStack {
-                                        Text(species.name)
+                                        Text(species.isUnidentified ? config.localized("Unidentified") : config.localizedName(en: species.name, cn: species.cnName))
                                         Spacer()
                                         Text("\(species.count)")
                                             .foregroundStyle(.secondary)
@@ -187,7 +190,7 @@ struct SourceListView: View {
         onRemoveFolder(folder)
     }
 
-    private func ratingLabel(_ rating: Int) -> String {
+    private func ratingLabel(_ rating: Int) -> LocalizedStringKey {
         switch rating {
         case 5: "Excellent"
         case 4: "Good"
@@ -259,7 +262,7 @@ struct ServerStatusView: View {
         .accessibilityIdentifier("ServerStatus")
     }
 
-    private var statusText: String {
+    private var statusText: LocalizedStringKey {
         if processManager.isReady {
             return "Models ready"
         } else if processManager.isRunning {

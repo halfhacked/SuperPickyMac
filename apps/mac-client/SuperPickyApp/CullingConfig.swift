@@ -35,6 +35,25 @@ enum FocusPointStatus: String, Codable, Sendable {
     case onBird, offBird, notAvailable
 }
 
+enum AppLanguage: String, CaseIterable, Codable, Sendable {
+    case en
+    case zhHans = "zh-Hans"
+
+    var displayName: String {
+        switch self {
+        case .en: "English"
+        case .zhHans: "中文（简体）"
+        }
+    }
+
+    var locale: Locale {
+        switch self {
+        case .en: Locale(identifier: "en")
+        case .zhHans: Locale(identifier: "zh-Hans")
+        }
+    }
+}
+
 enum AppTheme: String, CaseIterable, Codable, Sendable {
     case system
     case dark
@@ -53,7 +72,7 @@ enum RawFormat: String, CaseIterable, Sendable {
     case cr2, cr3, nef, arw, raf, orf, rw2, pef, dng, iiq, hif, heif, heic
 }
 
-@MainActor @Observable
+@Observable
 final class CullingConfig {
     var skillLevel: SkillLevel {
         didSet {
@@ -69,8 +88,8 @@ final class CullingConfig {
     var burstDetectionEnabled: Bool { didSet { save() } }
     var namingStandard: NamingStandard { didSet { save() } }
     var backendPort: Int { didSet { save() } }
-    var writeKeywords: Bool { didSet { save() } }
-    var keywordFormat: String { didSet { save() } }
+    var autoAdvance: Bool { didSet { save() } }
+    var appLanguage: AppLanguage { didSet { save() } }
     var appTheme: AppTheme { didSet { save() } }
 
     init() {
@@ -84,8 +103,8 @@ final class CullingConfig {
         self.burstDetectionEnabled = defaults.object(forKey: "burstDetectionEnabled") as? Bool ?? true
         self.namingStandard = NamingStandard(rawValue: defaults.string(forKey: "namingStandard") ?? "") ?? .osea
         self.backendPort = defaults.object(forKey: "backendPort") as? Int ?? 8420
-        self.writeKeywords = defaults.object(forKey: "writeKeywords") as? Bool ?? true
-        self.keywordFormat = defaults.string(forKey: "keywordFormat") ?? "{cn} {en} {pinyin}"
+        self.autoAdvance = defaults.object(forKey: "autoAdvance") as? Bool ?? false
+        self.appLanguage = AppLanguage(rawValue: defaults.string(forKey: "appLanguage") ?? "") ?? .en
         self.appTheme = AppTheme(rawValue: defaults.string(forKey: "appTheme") ?? "") ?? .dark
     }
 
@@ -99,8 +118,23 @@ final class CullingConfig {
         defaults.set(burstDetectionEnabled, forKey: "burstDetectionEnabled")
         defaults.set(namingStandard.rawValue, forKey: "namingStandard")
         defaults.set(backendPort, forKey: "backendPort")
-        defaults.set(writeKeywords, forKey: "writeKeywords")
-        defaults.set(keywordFormat, forKey: "keywordFormat")
+        defaults.set(autoAdvance, forKey: "autoAdvance")
+        defaults.set(appLanguage.rawValue, forKey: "appLanguage")
         defaults.set(appTheme.rawValue, forKey: "appTheme")
+    }
+
+    /// Look up a localized string. Reading `appLanguage` makes SwiftUI
+    /// re-render views that call this when the language changes.
+    func localized(_ key: String) -> String {
+        LocalizationManager.string(key, language: appLanguage)
+    }
+
+    /// Whether the effective language prefers Chinese names.
+    var prefersChinese: Bool { appLanguage == .zhHans }
+
+    /// Pick the correct name given an English name and optional Chinese name.
+    func localizedName(en: String, cn: String?) -> String {
+        if prefersChinese, let cn { return cn }
+        return en
     }
 }

@@ -12,6 +12,8 @@ import Foundation
         starRating: Int = 0,
         speciesCommonName: String? = nil,
         speciesScientificName: String? = nil,
+        speciesCnName: String? = nil,
+        speciesPinyin: String? = nil,
         isFlying: Bool = false
     ) -> Photo {
         var photo = Photo(
@@ -22,6 +24,8 @@ import Foundation
         photo.starRating = starRating
         photo.speciesCommonName = speciesCommonName
         photo.speciesScientificName = speciesScientificName
+        photo.speciesCnName = speciesCnName
+        photo.speciesPinyin = speciesPinyin
         photo.isFlying = isFlying
         return photo
     }
@@ -33,6 +37,21 @@ import Foundation
                               speciesScientificName: "Haliaeetus leucocephalus")
         let xml = XMPWriter.generate(photo: photo)
         #expect(xml.contains("xmp:Rating=\"4\""))
+    }
+
+    // MARK: - Pick status
+
+    @Test func xmpContainsPickStatusForPicked() {
+        var photo = makePhoto(starRating: 5)
+        photo.isPick = true
+        let xml = XMPWriter.generate(photo: photo)
+        #expect(xml.contains("xmp:PickStatus=\"1\""))
+    }
+
+    @Test func xmpContainsPickStatusZeroForUnpicked() {
+        let photo = makePhoto(starRating: 3)
+        let xml = XMPWriter.generate(photo: photo)
+        #expect(xml.contains("xmp:PickStatus=\"0\""))
     }
 
     // MARK: - Species keywords
@@ -123,6 +142,34 @@ import Foundation
         #expect(xml.hasPrefix("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"))
         #expect(xml.contains("<x:xmpmeta xmlns:x=\"adobe:ns:meta/\">"))
         #expect(xml.contains("</x:xmpmeta>"))
+    }
+
+    // MARK: - Chinese name and pinyin
+
+    @Test func xmpContainsCnNameAndPinyin() {
+        let photo = makePhoto(starRating: 4, speciesCommonName: "Common Kingfisher",
+                              speciesScientificName: "Alcedo atthis",
+                              speciesCnName: "普通翠鸟", speciesPinyin: "putongtsuiniao")
+        let xml = XMPWriter.generate(photo: photo)
+        #expect(xml.contains("<rdf:li>普通翠鸟</rdf:li>"))
+        #expect(xml.contains("<rdf:li>putongtsuiniao</rdf:li>"))
+    }
+
+    @Test func xmpOmitsNilCnNameAndPinyin() {
+        let photo = makePhoto(starRating: 4, speciesCommonName: "Bald Eagle",
+                              speciesScientificName: "Haliaeetus leucocephalus")
+        let xml = XMPWriter.generate(photo: photo)
+        #expect(xml.contains("<rdf:li>Bald Eagle</rdf:li>"))
+        // Should not have extra empty tags
+        let liCount = xml.components(separatedBy: "<rdf:li>").count - 1
+        #expect(liCount == 3) // common + scientific + hierarchical Bird|common
+    }
+
+    @Test func xmpWithCnNameOnly() {
+        let photo = makePhoto(starRating: 3, speciesCnName: "普通翠鸟")
+        let xml = XMPWriter.generate(photo: photo)
+        #expect(xml.contains("<rdf:li>普通翠鸟</rdf:li>"))
+        #expect(xml.contains("dc:subject"))
     }
 
     // MARK: - Species with common name only (no scientific)

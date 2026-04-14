@@ -28,8 +28,6 @@ final class PipelineCoordinator {
         ratingConfig: RatingEngine.Config,
         exposureEnabled: Bool,
         exposureThreshold: Float,
-        writeKeywords: Bool = false,
-        keywordFormat: String = "{cn} {en} {pinyin}",
         onPhotoProcessed: (@Sendable () async -> Void)? = nil
     ) async {
         isProcessing = true
@@ -81,8 +79,6 @@ final class PipelineCoordinator {
                     ratingConfig: ratingConfig,
                     exposureEnabled: exposureEnabled,
                     exposureThreshold: exposureThreshold,
-                    writeKeywords: writeKeywords,
-                    keywordFormat: keywordFormat
                 )
             } catch {
                 logger.error("Failed to process \(fileURL.lastPathComponent): \(error)")
@@ -91,6 +87,7 @@ final class PipelineCoordinator {
 
             do {
                 try db.save(&photo)
+                try? XMPWriter.write(photo: photo)
             } catch {
                 logger.error("Failed to save photo: \(error)")
             }
@@ -131,8 +128,6 @@ final class PipelineCoordinator {
         ratingConfig: RatingEngine.Config,
         exposureEnabled: Bool,
         exposureThreshold: Float,
-        writeKeywords: Bool,
-        keywordFormat: String
     ) async throws {
         // Single call to preen: YOLO detect + species identify (handles image loading, GPS, everything)
         let identifyResult = try await inferenceClient.identify(filePath: fileURL.path, topK: 1)
@@ -147,19 +142,10 @@ final class PipelineCoordinator {
         if let top = identifyResult.species.first {
             photo.speciesScientificName = top.scientificName
             photo.speciesCommonName = top.commonName
+            photo.speciesCnName = top.cnName
+            photo.speciesPinyin = top.pinyin
             photo.speciesConfidence = top.confidence
 
-            let aboveThreshold = top.thresholdUsed != "below_threshold"
-            if writeKeywords && aboveThreshold {
-                let keywords = KeywordWriter.formatKeywords(
-                    template: keywordFormat,
-                    en: top.commonName, cn: top.cnName,
-                    latin: top.scientificName, pinyin: top.pinyin
-                )
-                if !keywords.isEmpty {
-                    try? KeywordWriter.write(keywords: ["bird"] + keywords, to: fileURL.path)
-                }
-            }
         }
 
         // Load 1280px thumbnail for aesthetics/keypoints/flight (fast, small payload)
@@ -221,6 +207,5 @@ final class PipelineCoordinator {
             config: ratingConfig
         )
         photo.starRating = ratingResult.rating
-        photo.isPick = ratingResult.isPick
     }
 }

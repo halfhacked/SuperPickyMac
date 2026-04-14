@@ -2,7 +2,6 @@ import Foundation
 
 struct RatingResult: Sendable {
     let rating: Int
-    let isPick: Bool
     let reason: String
 }
 
@@ -30,23 +29,23 @@ struct RatingEngine: Sendable {
         config: Config
     ) -> RatingResult {
         guard detected else {
-            return RatingResult(rating: 0, isPick: false, reason: "No bird detected")
+            return RatingResult(rating: 0, reason: "No bird detected")
         }
 
         guard confidence >= 0.5 else {
-            return RatingResult(rating: 0, isPick: false, reason: "Low confidence: \(confidence)")
+            return RatingResult(rating: 0, reason: "Low confidence: \(confidence)")
         }
 
         guard sharpness >= Self.minimumSharpness else {
-            return RatingResult(rating: 0, isPick: false, reason: "Very low sharpness: \(sharpness)")
+            return RatingResult(rating: 0, reason: "Very low sharpness: \(sharpness)")
         }
 
         if let aesthetics, aesthetics < Self.minimumAesthetics {
-            return RatingResult(rating: 0, isPick: false, reason: "Very low aesthetics: \(aesthetics)")
+            return RatingResult(rating: 0, reason: "Very low aesthetics: \(aesthetics)")
         }
 
         if allKeypointsHidden {
-            return RatingResult(rating: 1, isPick: false, reason: "All keypoints hidden")
+            return RatingResult(rating: 1, reason: "All keypoints hidden")
         }
 
         var adjSharpness = sharpness * focusSharpnessWeight
@@ -82,8 +81,6 @@ struct RatingEngine: Sendable {
             rating = max(0, rating - 1)
         }
 
-        let isPick = rating == 5
-
-        return RatingResult(rating: rating, isPick: isPick, reason: "Rating: \(rating)")
+        return RatingResult(rating: rating, reason: "Rating: \(rating)")
     }
 }

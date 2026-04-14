@@ -50,6 +50,12 @@ final class ReportDatabase: Sendable {
             try db.create(indexOn: "photos", columns: ["speciesScientificName"])
             try db.create(indexOn: "photos", columns: ["burstGroupID"])
         }
+        migrator.registerMigration("v2_cn_pinyin") { db in
+            try db.alter(table: "photos") { t in
+                t.add(column: "speciesCnName", .text)
+                t.add(column: "speciesPinyin", .text)
+            }
+        }
         migrator.registerMigration("v2") { db in
             try db.alter(table: "photos") { t in
                 t.add(column: "isManualRating", .boolean).notNull().defaults(to: false)
