@@ -94,6 +94,10 @@ struct ZoomableImageView: View {
                         zoomState.zoom(by: factor)
                     }
                 )
+                .onChange(of: zoomState.offset) { _, newOffset in
+                    // Sync dragStart when offset changes externally (e.g. Z key zoom)
+                    dragStart = newOffset
+                }
                 .onChange(of: zoomState.scale) { _, newScale in
                     if newScale <= 1.0 { dragStart = .zero }
                 }

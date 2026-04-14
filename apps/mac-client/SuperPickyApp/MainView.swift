@@ -364,6 +364,7 @@ struct ContentView: View {
     @State private var showExifPanel = true
     @State private var showFullscreen = false
     @State private var zoomState = ZoomState()
+    @State private var fullscreenZoomState = ZoomState()
     @State private var previewSize: CGSize = .zero
     @State private var previewOriginInWindow: CGPoint = .zero
     @State private var isExporting = false
@@ -411,7 +412,8 @@ struct ContentView: View {
                     photos: photos,
                     selectedPhotoID: $selectedPhotoID,
                     isPresented: $showFullscreen,
-                    onRatePhoto: onRatePhoto
+                    onRatePhoto: onRatePhoto,
+                    zoomState: fullscreenZoomState
                 )
             }
         }
@@ -495,18 +497,30 @@ struct ContentView: View {
             } else {
                 imagePixelWidth = previewSize.width * 2
             }
-            // Convert window coords (bottom-left origin) to preview-local (top-left)
+
+            let activeZoom = showFullscreen ? fullscreenZoomState : zoomState
+            let viewSize: CGSize
             let mouse = key.mouseLocationInWindow
             let windowHeight = NSApp.keyWindow?.frame.height ?? 800
             let mouseFlipped = CGPoint(x: mouse.x, y: windowHeight - mouse.y)
-            let mouseInPreview = CGPoint(
-                x: mouseFlipped.x - previewOriginInWindow.x,
-                y: mouseFlipped.y - previewOriginInWindow.y
-            )
-            zoomState.toggleFitActualPixelsAt(
+            let mouseInView: CGPoint
+
+            if showFullscreen {
+                // Fullscreen covers the whole window
+                viewSize = NSApp.keyWindow?.frame.size ?? previewSize
+                mouseInView = mouseFlipped
+            } else {
+                viewSize = previewSize
+                mouseInView = CGPoint(
+                    x: mouseFlipped.x - previewOriginInWindow.x,
+                    y: mouseFlipped.y - previewOriginInWindow.y
+                )
+            }
+
+            activeZoom.toggleFitActualPixelsAt(
                 imagePixelWidth: imagePixelWidth,
-                viewSize: previewSize,
-                mouseInView: mouseInPreview
+                viewSize: viewSize,
+                mouseInView: mouseInView
             )
             return true
         default: return false
