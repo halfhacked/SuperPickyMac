@@ -394,6 +394,10 @@ struct ContentView: View {
         .focusEffectDisabled()
         .focused($isContentFocused)
         .onAppear { isContentFocused = true }
+        .onChange(of: selectedPhotoID) { _, _ in
+            // Reclaim focus when photo selection changes (e.g. thumbnail click)
+            isContentFocused = true
+        }
         .onKeyPress("i") {
             withAnimation(.easeInOut(duration: 0.2)) {
                 showExifPanel.toggle()
@@ -401,6 +405,10 @@ struct ContentView: View {
             return .handled
         }
         .onKeyPress("f") {
+            showFullscreen = true
+            return .handled
+        }
+        .onKeyPress(.return) {
             showFullscreen = true
             return .handled
         }
