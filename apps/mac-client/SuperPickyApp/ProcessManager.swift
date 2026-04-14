@@ -10,26 +10,11 @@ final class ProcessManager {
     private var healthCheckTask: Task<Void, Never>?
 
     let port: Int
-    private let serverDir: String
-    private let pythonPath: String
-    private let modelsDir: String
+    private let configuration: ProcessConfiguration
 
-    init(port: Int = 8420) {
+    init(port: Int = 8420, configuration: ProcessConfiguration = .resolve()) {
         self.port = port
-
-        // Dev mode: use project paths
-        let projectServerDir = NSString("~/projects/SuperPickyMac/python-server").expandingTildeInPath
-        let venvPython = projectServerDir + "/.venv/bin/python"
-        let modelsPath = NSString("~/projects/SuperPicky/models").expandingTildeInPath
-
-        if FileManager.default.fileExists(atPath: venvPython) {
-            self.pythonPath = venvPython
-        } else {
-            self.pythonPath = "/usr/bin/env python3"
-        }
-
-        self.serverDir = projectServerDir
-        self.modelsDir = modelsPath
+        self.configuration = configuration
     }
 
     func start() {
@@ -57,7 +42,7 @@ final class ProcessManager {
     }
 
     private func launchServer() async {
-        let serverScript = serverDir + "/superpicky_server.py"
+        let serverScript = configuration.serverDir + "/superpicky_server.py"
 
         guard FileManager.default.fileExists(atPath: serverScript) else {
             logger.error("Server script not found at \(serverScript)")
@@ -65,10 +50,10 @@ final class ProcessManager {
         }
 
         let proc = Process()
-        proc.currentDirectoryURL = URL(fileURLWithPath: serverDir)
+        proc.currentDirectoryURL = URL(fileURLWithPath: configuration.serverDir)
 
-        if FileManager.default.fileExists(atPath: pythonPath) {
-            proc.executableURL = URL(fileURLWithPath: pythonPath)
+        if FileManager.default.fileExists(atPath: configuration.pythonPath) {
+            proc.executableURL = URL(fileURLWithPath: configuration.pythonPath)
             proc.arguments = [serverScript, "--port", "\(port)"]
         } else {
             proc.executableURL = URL(fileURLWithPath: "/usr/bin/env")
@@ -76,7 +61,7 @@ final class ProcessManager {
         }
 
         var env = ProcessInfo.processInfo.environment
-        env["MODELS_DIR"] = modelsDir
+        env["MODELS_DIR"] = configuration.modelsDir
         proc.environment = env
 
         // Log stderr for debugging
