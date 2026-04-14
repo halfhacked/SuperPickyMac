@@ -59,21 +59,21 @@ import ImageIO
         let result = EXIFReader.read(from: path)
         #expect(result != nil)
         let data = result!
-        #expect(data.cameraMake == nil)
-        #expect(data.cameraModel == nil)
-        #expect(data.lensModel == nil)
-        #expect(data.focalLength == nil)
-        #expect(data.aperture == nil)
-        #expect(data.shutterSpeed == nil)
-        #expect(data.iso == nil)
-        #expect(data.dateTimeOriginal == nil)
-        #expect(data.exposureBias == nil)
-        #expect(data.meteringMode == nil)
-        #expect(data.whiteBalance == nil)
+        #expect(data.camera.make == nil)
+        #expect(data.camera.model == nil)
+        #expect(data.camera.lens == nil)
+        #expect(data.exposure.focalLength == nil)
+        #expect(data.exposure.aperture == nil)
+        #expect(data.exposure.shutterSpeed == nil)
+        #expect(data.exposure.iso == nil)
+        #expect(data.image.dateTimeOriginal == nil)
+        #expect(data.exposure.exposureBias == nil)
+        #expect(data.exposure.meteringMode == nil)
+        #expect(data.exposure.whiteBalance == nil)
         #expect(data.keywords.isEmpty)
         // Dimensions should still be readable from the image itself
-        #expect(data.imageWidth == 100)
-        #expect(data.imageHeight == 80)
+        #expect(data.image.width == 100)
+        #expect(data.image.height == 80)
     }
 
     @Test func readExtractsFullEXIFData() {
@@ -107,17 +107,17 @@ import ImageIO
         let result = EXIFReader.read(from: path)
         #expect(result != nil)
         let data = result!
-        #expect(data.cameraMake == "Canon")
-        #expect(data.cameraModel == "EOS R5")
-        #expect(data.lensModel == "RF100-500mm F4.5-7.1 L IS USM")
-        #expect(data.focalLength == 200.0)
-        #expect(data.aperture == 2.8)
-        #expect(data.shutterSpeed == "1/500")
-        #expect(data.iso == 800)
-        #expect(data.dateTimeOriginal == "2024:03:15 14:30:22")
-        #expect(data.imageWidth == 8192)
-        #expect(data.imageHeight == 5464)
-        #expect(data.exposureBias == -0.3)
+        #expect(data.camera.make == "Canon")
+        #expect(data.camera.model == "EOS R5")
+        #expect(data.camera.lens == "RF100-500mm F4.5-7.1 L IS USM")
+        #expect(data.exposure.focalLength == 200.0)
+        #expect(data.exposure.aperture == 2.8)
+        #expect(data.exposure.shutterSpeed == "1/500")
+        #expect(data.exposure.iso == 800)
+        #expect(data.image.dateTimeOriginal == "2024:03:15 14:30:22")
+        #expect(data.image.width == 8192)
+        #expect(data.image.height == 5464)
+        #expect(data.exposure.exposureBias == -0.3)
         #expect(data.keywords == ["Bird", "Eagle", "Wildlife"])
     }
 
@@ -134,6 +134,6 @@ import ImageIO
 
         let result = EXIFReader.read(from: path)
         #expect(result != nil)
-        #expect(result!.shutterSpeed == "2.5s")
+        #expect(result!.exposure.shutterSpeed == "2.5s")
     }
 }

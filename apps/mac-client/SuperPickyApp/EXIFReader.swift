@@ -3,41 +3,63 @@ import CoreGraphics
 import ImageIO
 
 /// Metadata extracted from an image file's EXIF, TIFF, and IPTC dictionaries.
+///
+/// Fields are grouped into nested sections by concern:
+/// - ``Camera`` — make, model, lens
+/// - ``Exposure`` — focal length, aperture, shutter speed, ISO, etc.
+/// - ``Image`` — pixel dimensions and capture date
+/// - ``Location`` — GPS coordinates and IPTC place names
+/// IPTC keywords stay at the top level since they are commonly accessed
+/// independently of any single section.
 struct EXIFData: Sendable {
-    var cameraMake: String?
-    var cameraModel: String?
-    var lensModel: String?
-    var focalLength: Double?       // mm
-    var aperture: Double?          // f-number
-    var shutterSpeed: String?      // formatted: "1/500" or "2.5s"
-    var iso: Int?
-    var dateTimeOriginal: String?  // raw EXIF string "2024:03:15 14:30:22"
-    var imageWidth: Int?
-    var imageHeight: Int?
-    var exposureBias: Double?
-    var meteringMode: String?
-    var whiteBalance: String?
-    var keywords: [String] = []    // IPTC keywords, empty if none
+    struct Camera: Sendable {
+        var make: String?
+        var model: String?
+        var lens: String?
+    }
 
-    // GPS
-    var latitude: Double?
-    var longitude: Double?
-    var altitude: Double?          // meters
+    struct Exposure: Sendable {
+        var focalLength: Double?       // mm
+        var aperture: Double?          // f-number
+        var shutterSpeed: String?      // formatted: "1/500" or "2.5s"
+        var iso: Int?
+        var exposureBias: Double?
+        var meteringMode: String?
+        var whiteBalance: String?
+    }
 
-    // IPTC location
-    var city: String?
-    var state: String?
-    var country: String?
+    struct Image: Sendable {
+        var width: Int?
+        var height: Int?
+        var dateTimeOriginal: String?  // raw EXIF string "2024:03:15 14:30:22"
+    }
+
+    struct Location: Sendable {
+        var latitude: Double?
+        var longitude: Double?
+        var altitude: Double?          // meters
+        var city: String?
+        var state: String?
+        var country: String?
+    }
+
+    var camera = Camera()
+    var exposure = Exposure()
+    var image = Image()
+    var location = Location()
+    var keywords: [String] = []        // IPTC keywords, empty if none
 
     /// True when no meaningful EXIF metadata is present.
-    /// Excludes imageWidth/imageHeight since those are always available from the image container.
+    /// Excludes image width/height since those are always available from the image container.
     var isEmpty: Bool {
-        cameraMake == nil && cameraModel == nil && lensModel == nil &&
-        focalLength == nil && aperture == nil && shutterSpeed == nil &&
-        iso == nil && dateTimeOriginal == nil && exposureBias == nil &&
-        meteringMode == nil && whiteBalance == nil && keywords.isEmpty &&
-        latitude == nil && longitude == nil && altitude == nil &&
-        city == nil && state == nil && country == nil
+        camera.make == nil && camera.model == nil && camera.lens == nil &&
+        exposure.focalLength == nil && exposure.aperture == nil && exposure.shutterSpeed == nil &&
+        exposure.iso == nil && exposure.exposureBias == nil &&
+        exposure.meteringMode == nil && exposure.whiteBalance == nil &&
+        image.dateTimeOriginal == nil &&
+        location.latitude == nil && location.longitude == nil && location.altitude == nil &&
+        location.city == nil && location.state == nil && location.country == nil &&
+        keywords.isEmpty
     }
 }
 
@@ -55,73 +77,89 @@ enum EXIFReader {
         let tiff = properties[kCGImagePropertyTIFFDictionary as String] as? [String: Any]
         let exifAux = properties[kCGImagePropertyExifAuxDictionary as String] as? [String: Any]
         let iptc = properties[kCGImagePropertyIPTCDictionary as String] as? [String: Any]
+        let gps = properties[kCGImagePropertyGPSDictionary as String] as? [String: Any]
 
-        var data = EXIFData()
+        return EXIFData(
+            camera: readCamera(tiff: tiff, exif: exif, exifAux: exifAux),
+            exposure: readExposure(exif: exif),
+            image: readImage(properties: properties, exif: exif),
+            location: readLocation(gps: gps, iptc: iptc),
+            keywords: (iptc?[kCGImagePropertyIPTCKeywords as String] as? [String]) ?? []
+        )
+    }
 
-        // TIFF
-        data.cameraMake = tiff?[kCGImagePropertyTIFFMake as String] as? String
-        data.cameraModel = tiff?[kCGImagePropertyTIFFModel as String] as? String
+    // MARK: - Section readers
 
+    private static func readCamera(
+        tiff: [String: Any]?,
+        exif: [String: Any]?,
+        exifAux: [String: Any]?
+    ) -> EXIFData.Camera {
+        var camera = EXIFData.Camera()
+        camera.make = tiff?[kCGImagePropertyTIFFMake as String] as? String
+        camera.model = tiff?[kCGImagePropertyTIFFModel as String] as? String
         // Lens: prefer ExifAux, fallback to Exif
-        data.lensModel = (exifAux?[kCGImagePropertyExifAuxLensModel as String] as? String)
+        camera.lens = (exifAux?[kCGImagePropertyExifAuxLensModel as String] as? String)
             ?? (exif?[kCGImagePropertyExifLensModel as String] as? String)
+        return camera
+    }
 
-        // Exif numerics
-        data.focalLength = doubleValue(exif, key: kCGImagePropertyExifFocalLength as String)
-        data.aperture = doubleValue(exif, key: kCGImagePropertyExifFNumber as String)
-        data.exposureBias = doubleValue(exif, key: kCGImagePropertyExifExposureBiasValue as String)
+    private static func readExposure(exif: [String: Any]?) -> EXIFData.Exposure {
+        var exposure = EXIFData.Exposure()
+        exposure.focalLength = doubleValue(exif, key: kCGImagePropertyExifFocalLength as String)
+        exposure.aperture = doubleValue(exif, key: kCGImagePropertyExifFNumber as String)
+        exposure.exposureBias = doubleValue(exif, key: kCGImagePropertyExifExposureBiasValue as String)
 
-        // ISO
         if let isoArray = exif?[kCGImagePropertyExifISOSpeedRatings as String] as? [Any],
            let first = isoArray.first {
-            data.iso = intValue(first)
+            exposure.iso = intValue(first)
         }
 
-        // Shutter speed (ExposureTime)
-        if let exposure = doubleValue(exif, key: kCGImagePropertyExifExposureTime as String) {
-            data.shutterSpeed = formatShutterSpeed(exposure)
+        if let exposureTime = doubleValue(exif, key: kCGImagePropertyExifExposureTime as String) {
+            exposure.shutterSpeed = formatShutterSpeed(exposureTime)
         }
 
-        // Date
-        data.dateTimeOriginal = exif?[kCGImagePropertyExifDateTimeOriginal as String] as? String
-
-        // Metering mode
         if let mode = exif?[kCGImagePropertyExifMeteringMode as String] {
-            data.meteringMode = describeMeteringMode(intValue(mode))
+            exposure.meteringMode = describeMeteringMode(intValue(mode))
         }
 
-        // White balance
         if let wb = exif?[kCGImagePropertyExifWhiteBalance as String] {
-            data.whiteBalance = intValue(wb) == 0 ? "Auto" : "Manual"
+            exposure.whiteBalance = intValue(wb) == 0 ? "Auto" : "Manual"
         }
 
-        // Dimensions (top-level)
-        data.imageWidth = properties[kCGImagePropertyPixelWidth as String] as? Int
-        data.imageHeight = properties[kCGImagePropertyPixelHeight as String] as? Int
+        return exposure
+    }
 
-        // IPTC keywords
-        if let kw = iptc?[kCGImagePropertyIPTCKeywords as String] as? [String] {
-            data.keywords = kw
-        }
+    private static func readImage(
+        properties: [String: Any],
+        exif: [String: Any]?
+    ) -> EXIFData.Image {
+        var image = EXIFData.Image()
+        image.width = properties[kCGImagePropertyPixelWidth as String] as? Int
+        image.height = properties[kCGImagePropertyPixelHeight as String] as? Int
+        image.dateTimeOriginal = exif?[kCGImagePropertyExifDateTimeOriginal as String] as? String
+        return image
+    }
 
-        // GPS
-        let gps = properties[kCGImagePropertyGPSDictionary as String] as? [String: Any]
+    private static func readLocation(
+        gps: [String: Any]?,
+        iptc: [String: Any]?
+    ) -> EXIFData.Location {
+        var location = EXIFData.Location()
         if let lat = doubleValue(gps, key: kCGImagePropertyGPSLatitude as String) {
             let ref = gps?[kCGImagePropertyGPSLatitudeRef as String] as? String
-            data.latitude = ref == "S" ? -lat : lat
+            location.latitude = ref == "S" ? -lat : lat
         }
         if let lon = doubleValue(gps, key: kCGImagePropertyGPSLongitude as String) {
             let ref = gps?[kCGImagePropertyGPSLongitudeRef as String] as? String
-            data.longitude = ref == "W" ? -lon : lon
+            location.longitude = ref == "W" ? -lon : lon
         }
-        data.altitude = doubleValue(gps, key: kCGImagePropertyGPSAltitude as String)
+        location.altitude = doubleValue(gps, key: kCGImagePropertyGPSAltitude as String)
 
-        // IPTC location
-        data.city = iptc?[kCGImagePropertyIPTCCity as String] as? String
-        data.state = iptc?[kCGImagePropertyIPTCProvinceState as String] as? String
-        data.country = iptc?[kCGImagePropertyIPTCCountryPrimaryLocationName as String] as? String
-
-        return data
+        location.city = iptc?[kCGImagePropertyIPTCCity as String] as? String
+        location.state = iptc?[kCGImagePropertyIPTCProvinceState as String] as? String
+        location.country = iptc?[kCGImagePropertyIPTCCountryPrimaryLocationName as String] as? String
+        return location
     }
 
     // MARK: - Private helpers

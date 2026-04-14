@@ -118,16 +118,16 @@ import ImageIO
         let data = EXIFReader.read(from: photoURL.path)
         let exif = try #require(data)
 
-        #expect(exif.cameraMake == "Canon")
-        #expect(exif.cameraModel == "EOS R5")
-        #expect(exif.lensModel == "RF 100-500mm F4.5-7.1 L IS USM")
-        #expect(exif.focalLength == 500)
-        #expect(exif.aperture == 7.1)
-        #expect(exif.shutterSpeed == "1/3200")
-        #expect(exif.iso == 3200)
-        #expect(exif.dateTimeOriginal == "2025:04:02 06:15:10")
-        #expect(exif.imageWidth == 200)
-        #expect(exif.imageHeight == 150)
+        #expect(exif.camera.make == "Canon")
+        #expect(exif.camera.model == "EOS R5")
+        #expect(exif.camera.lens == "RF 100-500mm F4.5-7.1 L IS USM")
+        #expect(exif.exposure.focalLength == 500)
+        #expect(exif.exposure.aperture == 7.1)
+        #expect(exif.exposure.shutterSpeed == "1/3200")
+        #expect(exif.exposure.iso == 3200)
+        #expect(exif.image.dateTimeOriginal == "2025:04:02 06:15:10")
+        #expect(exif.image.width == 200)
+        #expect(exif.image.height == 150)
         #expect(!exif.isEmpty)
     }
 
@@ -174,7 +174,7 @@ import ImageIO
         let exif = try #require(data)
 
         #expect(exif.keywords.isEmpty)
-        #expect(exif.aperture == 4.0) // EXIF still present
+        #expect(exif.exposure.aperture == 4.0) // EXIF still present
     }
 
     // MARK: - Scenario: EXIF panel shows fallback for photo without any metadata
@@ -189,7 +189,7 @@ import ImageIO
 
         // All fields nil/empty — panel should show "No EXIF data available"
         #expect(exif.isEmpty)
-        #expect(exif.cameraMake == nil)
+        #expect(exif.camera.make == nil)
         #expect(exif.keywords.isEmpty)
     }
 
@@ -216,10 +216,10 @@ import ImageIO
         let data2 = try #require(EXIFReader.read(from: photo2URL.path))
 
         // Different photos produce different EXIF data
-        #expect(data1.cameraMake == "Nikon")
-        #expect(data2.cameraMake == "Canon")
-        #expect(data1.iso == 1600)
-        #expect(data2.iso == 3200)
+        #expect(data1.camera.make == "Nikon")
+        #expect(data2.camera.make == "Canon")
+        #expect(data1.exposure.iso == 1600)
+        #expect(data2.exposure.iso == 3200)
         #expect(data1.keywords == ["bird", "kingfisher"])
         #expect(data2.keywords == ["bird", "eagle"])
     }
@@ -233,13 +233,13 @@ import ImageIO
         let fastURL = dir.appendingPathComponent("fast.jpg")
         createJPEGWithEXIF(at: fastURL, exposureTime: 1.0 / 2000.0)
         let fast = try #require(EXIFReader.read(from: fastURL.path))
-        #expect(fast.shutterSpeed == "1/2000")
+        #expect(fast.exposure.shutterSpeed == "1/2000")
 
         // Slow shutter: 1s
         let slowURL = dir.appendingPathComponent("slow.jpg")
         createJPEGWithEXIF(at: slowURL, exposureTime: 1.0)
         let slow = try #require(EXIFReader.read(from: slowURL.path))
-        #expect(slow.shutterSpeed == "1s")
+        #expect(slow.exposure.shutterSpeed == "1s")
     }
 
     // MARK: - Scenario: EXIF panel shows GPS coordinates
@@ -251,9 +251,9 @@ import ImageIO
                            latitude: 35.6762, longitude: 139.6503, altitude: 40)
 
         let data = try #require(EXIFReader.read(from: photoURL.path))
-        #expect(data.latitude == 35.6762)
-        #expect(data.longitude == 139.6503)
-        #expect(data.altitude == 40)
+        #expect(data.location.latitude == 35.6762)
+        #expect(data.location.longitude == 139.6503)
+        #expect(data.location.altitude == 40)
     }
 
     // MARK: - Scenario: GPS handles southern/western hemisphere
@@ -266,10 +266,10 @@ import ImageIO
 
         let data = try #require(EXIFReader.read(from: photoURL.path))
         // Negative values for S/W
-        #expect(data.latitude! < 0)
-        #expect(data.longitude! < 0)
-        let latRounded = (data.latitude! * 10000).rounded() / 10000
-        let lonRounded = (data.longitude! * 10000).rounded() / 10000
+        #expect(data.location.latitude! < 0)
+        #expect(data.location.longitude! < 0)
+        let latRounded = (data.location.latitude! * 10000).rounded() / 10000
+        let lonRounded = (data.location.longitude! * 10000).rounded() / 10000
         #expect(latRounded == -33.8688)
         #expect(lonRounded == -151.2093)
     }
@@ -284,11 +284,11 @@ import ImageIO
                            city: "London", state: "England", country: "United Kingdom")
 
         let data = try #require(EXIFReader.read(from: photoURL.path))
-        #expect(data.city == "London")
-        #expect(data.state == "England")
-        #expect(data.country == "United Kingdom")
-        #expect(data.latitude != nil)
-        #expect(data.longitude != nil)
+        #expect(data.location.city == "London")
+        #expect(data.location.state == "England")
+        #expect(data.location.country == "United Kingdom")
+        #expect(data.location.latitude != nil)
+        #expect(data.location.longitude != nil)
     }
 
     // MARK: - Scenario: Photo without GPS has nil coordinates
@@ -299,12 +299,12 @@ import ImageIO
         createJPEGWithEXIF(at: photoURL) // No GPS params
 
         let data = try #require(EXIFReader.read(from: photoURL.path))
-        #expect(data.latitude == nil)
-        #expect(data.longitude == nil)
-        #expect(data.altitude == nil)
-        #expect(data.city == nil)
-        #expect(data.state == nil)
-        #expect(data.country == nil)
+        #expect(data.location.latitude == nil)
+        #expect(data.location.longitude == nil)
+        #expect(data.location.altitude == nil)
+        #expect(data.location.city == nil)
+        #expect(data.location.state == nil)
+        #expect(data.location.country == nil)
     }
 
     // MARK: - Scenario: Read EXIF from real test-photos directory
@@ -325,14 +325,14 @@ import ImageIO
         }
 
         let data = try #require(EXIFReader.read(from: kingfisher.path))
-        #expect(data.cameraMake == "Nikon")
-        #expect(data.cameraModel == "Z9")
+        #expect(data.camera.make == "Nikon")
+        #expect(data.camera.model == "Z9")
         #expect(!data.keywords.isEmpty)
         #expect(data.keywords.contains("kingfisher"))
         #expect(data.keywords.contains("bird"))
-        #expect(data.latitude != nil)
-        #expect(data.longitude != nil)
-        #expect(data.city != nil)
+        #expect(data.location.latitude != nil)
+        #expect(data.location.longitude != nil)
+        #expect(data.location.city != nil)
         #expect(!data.isEmpty)
     }
 }
