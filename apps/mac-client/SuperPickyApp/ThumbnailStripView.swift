@@ -19,7 +19,7 @@ struct ThumbnailStripView: View {
                 .padding(.horizontal, 4)
                 .padding(.vertical, 2)
             }
-            .verticalScrollToHorizontal()
+            .background(ScrollWheelRedirector())
             .background(.bar)
             .onChange(of: selectedPhotoID) { _, newValue in
                 if let id = newValue {
@@ -124,41 +124,70 @@ struct AsyncThumbnailImage: View {
 
 // MARK: - Vertical scroll wheel → horizontal scroll
 
-/// NSView that intercepts vertical scroll wheel and redirects to the parent NSScrollView horizontally.
+/// Uses NSEvent.addLocalMonitorForEvents to intercept vertical scroll wheel
+/// events over this view and convert them to horizontal scrolling.
 struct ScrollWheelRedirector: NSViewRepresentable {
-    func makeNSView(context: Context) -> ScrollWheelRedirectorView {
-        ScrollWheelRedirectorView()
+    func makeNSView(context: Context) -> ScrollWheelMonitorView {
+        ScrollWheelMonitorView()
     }
-    func updateNSView(_ nsView: ScrollWheelRedirectorView, context: Context) {}
+    func updateNSView(_ nsView: ScrollWheelMonitorView, context: Context) {}
 }
 
-class ScrollWheelRedirectorView: NSView {
-    override func scrollWheel(with event: NSEvent) {
-        if abs(event.scrollingDeltaY) > abs(event.scrollingDeltaX) {
-            // Walk up the responder chain to find the NSScrollView
-            var responder: NSResponder? = self.nextResponder
-            while let r = responder {
-                if let scrollView = r as? NSScrollView {
-                    let clip = scrollView.contentView
-                    var origin = clip.bounds.origin
-                    let multiplier: CGFloat = event.hasPreciseScrollingDeltas ? 1.0 : 10.0
-                    origin.x -= event.scrollingDeltaY * multiplier
-                    let maxX = max(0, (scrollView.documentView?.bounds.width ?? 0) - scrollView.bounds.width)
-                    origin.x = min(max(0, origin.x), maxX)
-                    clip.scroll(to: origin)
-                    scrollView.reflectScrolledClipView(clip)
-                    return
-                }
-                responder = r.nextResponder
+class ScrollWheelMonitorView: NSView {
+    private var monitor: Any?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window != nil && monitor == nil {
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+                guard let self = self else { return event }
+                return self.handleScroll(event)
             }
         }
-        super.scrollWheel(with: event)
     }
-}
 
-extension View {
-    func verticalScrollToHorizontal() -> some View {
-        self.background(ScrollWheelRedirector())
+    override func removeFromSuperview() {
+        if let monitor = monitor {
+            NSEvent.removeMonitor(monitor)
+            self.monitor = nil
+        }
+        super.removeFromSuperview()
+    }
+
+    private func handleScroll(_ event: NSEvent) -> NSEvent? {
+        // Only intercept vertical scroll
+        guard abs(event.scrollingDeltaY) > abs(event.scrollingDeltaX) else { return event }
+
+        // Check if cursor is over our view's frame
+        guard let window = self.window else { return event }
+        let locationInWindow = event.locationInWindow
+        let locationInView = self.convert(locationInWindow, from: nil)
+        guard self.bounds.contains(locationInView) else { return event }
+
+        // Find the NSScrollView in our superview hierarchy
+        guard let scrollView = findScrollView() else { return event }
+
+        let clip = scrollView.contentView
+        var origin = clip.bounds.origin
+        let mult: CGFloat = event.hasPreciseScrollingDeltas ? 1.0 : 10.0
+        origin.x -= event.scrollingDeltaY * mult
+        let maxX = max(0, (scrollView.documentView?.bounds.width ?? 0) - scrollView.bounds.width)
+        origin.x = min(max(0, origin.x), maxX)
+        clip.scroll(to: origin)
+        scrollView.reflectScrolledClipView(clip)
+        return nil // Consume the event
+    }
+
+    private func findScrollView() -> NSScrollView? {
+        var view: NSView? = self.superview
+        while let v = view {
+            if let sv = v as? NSScrollView { return sv }
+            for sub in v.subviews where sub is NSScrollView {
+                return sub as? NSScrollView
+            }
+            view = v.superview
+        }
+        return nil
     }
 }
 
