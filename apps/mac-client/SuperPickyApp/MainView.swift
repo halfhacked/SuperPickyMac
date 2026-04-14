@@ -377,16 +377,8 @@ struct ContentView: View {
     var body: some View {
         VSplitView {
             ZStack(alignment: .topTrailing) {
-                PreviewView(photo: selectedPhoto, zoomState: zoomState)
-                    .onContinuousHover { phase in
-                        if case .active(let location) = phase {
-                            mouseInPreview = location
-                        }
-                    }
-                    .background(GeometryReader { geo in
-                        Color.clear.onAppear { previewSize = geo.size }
-                            .onChange(of: geo.size) { _, s in previewSize = s }
-                    })
+                PreviewView(photo: selectedPhoto, zoomState: zoomState,
+                            mouseInView: $mouseInPreview, viewSize: $previewSize)
 
                 if showExifPanel, let photo = selectedPhoto {
                     ExifPanelView(photo: photo)
