@@ -72,28 +72,4 @@ jobs:
             -destination 'platform=macOS' \
             -only-testing:SuperPickyUITests/CullingEnhancementUITests
 
-  xcuitest-l3:
-    name: XCUITest — L3 BDD (real server)
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-
-      - name: Install Python dependencies
-        working-directory: python-server
-        run: |
-          python -m venv .venv
-          .venv/bin/pip install flask flask-cors torch torchvision pillow numpy pypinyin birdpreen ultralytics huggingface_hub
-
-      - name: Download models
-        run: |
-          .venv/bin/python -c "from preen.model_download import download_models; download_models()"
-        working-directory: python-server
-
-      - name: Run L3 BDD tests
-        working-directory: .
-        run: bash scripts/run-l3.sh
+  # L3 BDD (real server + models) requires GPU — run locally with: scripts/run-l3.sh
