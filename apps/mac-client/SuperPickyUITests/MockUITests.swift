@@ -6,6 +6,7 @@ final class MockUITests: XCTestCase {
     func testEmptyStateShowsSelectFolder() throws {
         let app = XCUIApplication()
         app.launchEnvironment["TEST_MODE"] = "1"
+        app.launchArguments += ["-lastFolderPath", ""]
         app.launch()
         defer { app.terminate() }
 

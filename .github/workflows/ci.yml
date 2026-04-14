@@ -75,4 +75,10 @@ jobs:
             -destination 'platform=macOS' \
             -only-testing:SuperPickyUITests/CullingEnhancementUITests
 
-  # L3 BDD (real server + models) requires GPU — run locally: scripts/run-l3.sh
+      - name: ProcessingFlowUITests (mock mode)
+        working-directory: apps/mac-client
+        run: |
+          xcodebuild test \
+            -scheme SuperPicky \
+            -destination 'platform=macOS' \
+            -only-testing:SuperPickyUITests/ProcessingFlowUITests
