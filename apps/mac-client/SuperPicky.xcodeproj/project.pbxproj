@@ -10,6 +10,7 @@
 		AA1B2C3D4E5F60718293A4B5 /* EXIFReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB2C3D4E5F60718293A4B5C6 /* EXIFReader.swift */; };
 		CC3D4E5F60718293A4B5C6D7 /* ExifPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD4E5F60718293A4B5C6D7E8 /* ExifPanelView.swift */; };
 		AB1234567890ABCDEF123456 /* KeywordWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD2345678901BCDEF0123456 /* KeywordWriter.swift */; };
+		FE3456789012CDEF01234567 /* KeyboardMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = GF4567890123DEF012345678 /* KeyboardMonitor.swift */; };
 		013134A36705408051D6EB93 /* GeneralTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = E283097C3245E4C2533065B6 /* GeneralTab.swift */; };
 		03847CC9F325793585FF6A08 /* ProcessManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EF40EDEEEB854B306374ECC /* ProcessManager.swift */; };
 		04AFCB4EB5F25BCE9F245A56 /* SuperPickyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8F78B4A7BDCFE1CE3947F19 /* SuperPickyApp.swift */; };
@@ -75,6 +76,7 @@
 		4EAD42F7354C92EFBAC2DD94 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		BB2C3D4E5F60718293A4B5C6 /* EXIFReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EXIFReader.swift; sourceTree = "<group>"; };
 		CD2345678901BCDEF0123456 /* KeywordWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeywordWriter.swift; sourceTree = "<group>"; };
+		GF4567890123DEF012345678 /* KeyboardMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardMonitor.swift; sourceTree = "<group>"; };
 		DD4E5F60718293A4B5C6D7E8 /* ExifPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExifPanelView.swift; sourceTree = "<group>"; };
 		51D9ED12BDAF2634C06DA741 /* ExposureDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExposureDetector.swift; sourceTree = "<group>"; };
 		56C15A4232D9374F66F0B0DF /* HTTPInferenceClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPInferenceClient.swift; sourceTree = "<group>"; };
@@ -138,6 +140,7 @@
 				E283097C3245E4C2533065B6 /* GeneralTab.swift */,
 				56C15A4232D9374F66F0B0DF /* HTTPInferenceClient.swift */,
 				383C2AE26F03BE2BA8C8AF84 /* InferenceClient.swift */,
+				GF4567890123DEF012345678 /* KeyboardMonitor.swift */,
 				CD2345678901BCDEF0123456 /* KeywordWriter.swift */,
 				D16D64E760C59FE88930FB6D /* Logger.swift */,
 				978BD285BA4245F2711720E0 /* MainView.swift */,
@@ -301,6 +304,7 @@
 				013134A36705408051D6EB93 /* GeneralTab.swift in Sources */,
 				E677528D1FD37ED911F5B009 /* HTTPInferenceClient.swift in Sources */,
 				EEE71D9CDEA197DC1AB1542F /* InferenceClient.swift in Sources */,
+				FE3456789012CDEF01234567 /* KeyboardMonitor.swift in Sources */,
 				AB1234567890ABCDEF123456 /* KeywordWriter.swift in Sources */,
 				743E98D2D106B2DC4CD9A375 /* Logger.swift in Sources */,
 				EB526AFC3879286A8B692A21 /* MainView.swift in Sources */,
