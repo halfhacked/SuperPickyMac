@@ -86,6 +86,28 @@ final class KeyboardShortcutTests: XCTestCase {
 
         app.typeKey("0", modifierFlags: [])
         sleep(1)
+
+        // --- Z toggles zoom ---
+        app.typeKey("z", modifierFlags: [])
+        sleep(1)
+        // Should be zoomed in — no crash
+
+        app.typeKey("z", modifierFlags: [])
+        sleep(1)
+        // Should be back to fit
+
+        // --- Z works in fullscreen too ---
+        app.typeKey("f", modifierFlags: [])
+        sleep(1)
+
+        app.typeKey("z", modifierFlags: [])
+        sleep(1)
+
+        app.typeKey("z", modifierFlags: [])
+        sleep(1)
+
+        app.typeKey(.escape, modifierFlags: [])
+        sleep(1)
     }
 
     // MARK: - Helpers

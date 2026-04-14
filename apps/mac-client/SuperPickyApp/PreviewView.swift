@@ -2,7 +2,7 @@ import SwiftUI
 
 struct PreviewView: View {
     let photo: Photo?
-    @State private var zoomState = ZoomState()
+    @Bindable var zoomState: ZoomState
     @State private var previousPhotoID: UUID?
 
     var body: some View {
