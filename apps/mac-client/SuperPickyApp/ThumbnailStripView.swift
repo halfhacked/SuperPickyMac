@@ -69,7 +69,25 @@ struct ThumbnailCell: View {
     }
 }
 
-/// Loads a thumbnail from a file path asynchronously.
+/// In-memory thumbnail cache — survives LazyHStack recycling.
+private final class ThumbnailCache {
+    static let shared = ThumbnailCache()
+    private let cache = NSCache<NSString, NSImage>()
+
+    init() {
+        cache.countLimit = 500
+    }
+
+    func get(_ key: String) -> NSImage? {
+        cache.object(forKey: key as NSString)
+    }
+
+    func set(_ key: String, image: NSImage) {
+        cache.setObject(image, forKey: key as NSString)
+    }
+}
+
+/// Loads a thumbnail from a file path asynchronously with caching.
 struct AsyncThumbnailImage: View {
     let filePath: String
     @State private var image: NSImage?
@@ -90,7 +108,15 @@ struct AsyncThumbnailImage: View {
             }
         }
         .task {
-            image = await loadThumbnail()
+            // Check cache first
+            if let cached = ThumbnailCache.shared.get(filePath) {
+                image = cached
+                return
+            }
+            if let loaded = await loadThumbnail() {
+                ThumbnailCache.shared.set(filePath, image: loaded)
+                image = loaded
+            }
         }
     }
 
@@ -98,14 +124,12 @@ struct AsyncThumbnailImage: View {
         let url = URL(fileURLWithPath: filePath)
         guard FileManager.default.fileExists(atPath: filePath) else { return nil }
 
-        // Load and resize on background thread
         return await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
                     continuation.resume(returning: nil)
                     return
                 }
-                // Request a thumbnail at max 160px (2x for retina)
                 let options: [CFString: Any] = [
                     kCGImageSourceThumbnailMaxPixelSize: 160,
                     kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
