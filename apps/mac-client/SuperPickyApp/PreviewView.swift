@@ -38,6 +38,7 @@ struct AsyncPreviewImage: View {
     let filePath: String
     @Bindable var zoomState: ZoomState
     @State private var image: NSImage?
+    @State private var isFullRes = false
 
     var body: some View {
         ZStack {
@@ -49,13 +50,24 @@ struct AsyncPreviewImage: View {
             }
         }
         .task(id: filePath) {
-            // Keep old image visible until new one loads (no white flash)
-            let newImage = await loadImage()
+            isFullRes = false
+            let newImage = await loadImage(maxSize: 2000)
             image = newImage
+        }
+        .onChange(of: zoomState.scale) { _, newScale in
+            // Load full-res when user zooms in
+            if newScale > 1.0 && !isFullRes {
+                isFullRes = true
+                Task {
+                    if let fullRes = await loadImage(maxSize: nil) {
+                        image = fullRes
+                    }
+                }
+            }
         }
     }
 
-    private func loadImage() async -> NSImage? {
+    private func loadImage(maxSize: Int?) async -> NSImage? {
         let url = URL(fileURLWithPath: filePath)
         guard FileManager.default.fileExists(atPath: filePath) else { return nil }
 
@@ -65,12 +77,13 @@ struct AsyncPreviewImage: View {
                     continuation.resume(returning: nil)
                     return
                 }
-                // Extract embedded preview (fast for RAW — no full decode)
-                let options: [CFString: Any] = [
-                    kCGImageSourceThumbnailMaxPixelSize: 2000,
+                var options: [CFString: Any] = [
                     kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
                     kCGImageSourceCreateThumbnailWithTransform: true,
                 ]
+                if let maxSize {
+                    options[kCGImageSourceThumbnailMaxPixelSize] = maxSize
+                }
                 guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
                     continuation.resume(returning: nil)
                     return
