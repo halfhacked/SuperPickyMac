@@ -13,58 +13,58 @@ struct ExifPanelView: View {
             if loaded, let data = exifData, !data.isEmpty {
                 VStack(alignment: .leading, spacing: 0) {
                     // Camera section
-                    if data.cameraMake != nil || data.cameraModel != nil || data.lensModel != nil {
+                    if data.camera.make != nil || data.camera.model != nil || data.camera.lens != nil {
                         sectionHeader("Camera", showDivider: false)
-                        if let make = data.cameraMake, let model = data.cameraModel {
+                        if let make = data.camera.make, let model = data.camera.model {
                             exifRow(label: "Camera", value: "\(make) \(model)")
-                        } else if let model = data.cameraModel {
+                        } else if let model = data.camera.model {
                             exifRow(label: "Camera", value: model)
-                        } else if let make = data.cameraMake {
+                        } else if let make = data.camera.make {
                             exifRow(label: "Camera", value: make)
                         }
-                        if let lens = data.lensModel {
+                        if let lens = data.camera.lens {
                             exifRow(label: "Lens", value: lens)
                         }
                     }
 
                     // Exposure section
-                    if data.focalLength != nil || data.aperture != nil || data.shutterSpeed != nil || data.iso != nil {
+                    if data.exposure.focalLength != nil || data.exposure.aperture != nil || data.exposure.shutterSpeed != nil || data.exposure.iso != nil {
                         sectionHeader("Exposure")
-                        if let focal = data.focalLength {
+                        if let focal = data.exposure.focalLength {
                             exifRow(label: "Focal Length", value: "\(formatNumber(focal)) mm")
                         }
                         // Combine exposure like Lightroom: "1/2000 at f/6.3, ISO 1600"
                         exifRow(label: "Exposure", value: formatExposure(data))
-                        if let bias = data.exposureBias, bias != 0 {
+                        if let bias = data.exposure.exposureBias, bias != 0 {
                             let sign = bias >= 0 ? "+" : ""
                             exifRow(label: "Exp Comp", value: "\(sign)\(formatNumber(bias)) EV")
                         }
-                        if let metering = data.meteringMode {
+                        if let metering = data.exposure.meteringMode {
                             exifRow(label: "Metering", value: metering)
                         }
-                        if let wb = data.whiteBalance {
+                        if let wb = data.exposure.whiteBalance {
                             exifRow(label: "White Balance", value: wb)
                         }
                     }
 
                     // Image section
-                    if data.imageWidth != nil || data.dateTimeOriginal != nil {
+                    if data.image.width != nil || data.image.dateTimeOriginal != nil {
                         sectionHeader("Image")
-                        if let date = data.dateTimeOriginal {
+                        if let date = data.image.dateTimeOriginal {
                             exifRow(label: "Capture Date", value: formatDate(date))
                         }
-                        if let w = data.imageWidth, let h = data.imageHeight {
+                        if let w = data.image.width, let h = data.image.height {
                             exifRow(label: "Dimensions", value: "\(w) \u{00D7} \(h)")
                         }
                     }
 
                     // Location section
-                    if data.latitude != nil || data.city != nil {
+                    if data.location.latitude != nil || data.location.city != nil {
                         sectionHeader("Location")
-                        if let location = formatLocation(data) {
-                            exifRow(label: "Place", value: location)
+                        if let place = formatLocation(data) {
+                            exifRow(label: "Place", value: place)
                         }
-                        if let lat = data.latitude, let lon = data.longitude {
+                        if let lat = data.location.latitude, let lon = data.location.longitude {
                             HStack(alignment: .firstTextBaseline, spacing: 8) {
                                 Text("GPS")
                                     .font(.system(size: 11))
@@ -93,7 +93,7 @@ struct ExifPanelView: View {
                             .padding(.horizontal, 12)
                             .padding(.vertical, 3)
                         }
-                        if let alt = data.altitude {
+                        if let alt = data.location.altitude {
                             exifRow(label: "Altitude", value: "\(Int(alt)) m")
                         }
                     }
@@ -192,12 +192,12 @@ struct ExifPanelView: View {
 
     private func formatExposure(_ data: EXIFData) -> String {
         var parts: [String] = []
-        if let shutter = data.shutterSpeed { parts.append(shutter) }
-        if let aperture = data.aperture { parts.append("f/\(formatNumber(aperture))") }
-        if let iso = data.iso { parts.append("ISO \(iso)") }
+        if let shutter = data.exposure.shutterSpeed { parts.append(shutter) }
+        if let aperture = data.exposure.aperture { parts.append("f/\(formatNumber(aperture))") }
+        if let iso = data.exposure.iso { parts.append("ISO \(iso)") }
         if parts.isEmpty { return "—" }
         // "1/2000 at f/6.3, ISO 1600"
-        if parts.count >= 2, data.shutterSpeed != nil, data.aperture != nil {
+        if parts.count >= 2, data.exposure.shutterSpeed != nil, data.exposure.aperture != nil {
             let shutter = parts.removeFirst()
             let aperture = parts.removeFirst()
             var result = "\(shutter) at \(aperture)"
@@ -234,12 +234,12 @@ struct ExifPanelView: View {
     }
 
     private func formatLocation(_ data: EXIFData) -> String? {
-        let parts = [data.city, data.state, data.country].compactMap { $0 }
+        let parts = [data.location.city, data.location.state, data.location.country].compactMap { $0 }
         return parts.isEmpty ? nil : parts.joined(separator: ", ")
     }
 
     private func formatCoordinates(_ data: EXIFData) -> String? {
-        guard let lat = data.latitude, let lon = data.longitude else { return nil }
+        guard let lat = data.location.latitude, let lon = data.location.longitude else { return nil }
         let latDir = lat >= 0 ? "N" : "S"
         let lonDir = lon >= 0 ? "E" : "W"
         return String(format: "%.4f\u{00B0} %@, %.4f\u{00B0} %@",
