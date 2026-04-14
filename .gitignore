@@ -35,3 +35,6 @@ python-server/models/*.pth
 # Superpowers
 .superpowers/
 real-photos/
+
+# Claude Code agent worktrees
+.claude/
