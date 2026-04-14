@@ -366,7 +366,7 @@ struct ContentView: View {
     @State private var zoomState = ZoomState()
     @State private var fullscreenZoomState = ZoomState()
     @State private var previewSize: CGSize = .zero
-    @State private var previewOriginInWindow: CGPoint = .zero
+    @State private var mouseInPreview: CGPoint = .zero
     @State private var isExporting = false
     @State private var exportProgress = 0
     @State private var exportTotal = 0
@@ -378,15 +378,14 @@ struct ContentView: View {
         VSplitView {
             ZStack(alignment: .topTrailing) {
                 PreviewView(photo: selectedPhoto, zoomState: zoomState)
+                    .onContinuousHover { phase in
+                        if case .active(let location) = phase {
+                            mouseInPreview = location
+                        }
+                    }
                     .background(GeometryReader { geo in
-                        Color.clear.onAppear {
-                            previewSize = geo.size
-                            previewOriginInWindow = geo.frame(in: .global).origin
-                        }
-                        .onChange(of: geo.size) { _, _ in
-                            previewSize = geo.size
-                            previewOriginInWindow = geo.frame(in: .global).origin
-                        }
+                        Color.clear.onAppear { previewSize = geo.size }
+                            .onChange(of: geo.size) { _, s in previewSize = s }
                     })
 
                 if showExifPanel, let photo = selectedPhoto {
@@ -499,28 +498,14 @@ struct ContentView: View {
             }
 
             let activeZoom = showFullscreen ? fullscreenZoomState : zoomState
-            let viewSize: CGSize
-            let mouse = key.mouseLocationInWindow
-            let windowHeight = NSApp.keyWindow?.frame.height ?? 800
-            let mouseFlipped = CGPoint(x: mouse.x, y: windowHeight - mouse.y)
-            let mouseInView: CGPoint
-
-            if showFullscreen {
-                // Fullscreen covers the whole window
-                viewSize = NSApp.keyWindow?.frame.size ?? previewSize
-                mouseInView = mouseFlipped
-            } else {
-                viewSize = previewSize
-                mouseInView = CGPoint(
-                    x: mouseFlipped.x - previewOriginInWindow.x,
-                    y: mouseFlipped.y - previewOriginInWindow.y
-                )
-            }
+            let viewSize = showFullscreen
+                ? (NSApp.keyWindow?.frame.size ?? previewSize)
+                : previewSize
 
             activeZoom.toggleFitActualPixelsAt(
                 imagePixelWidth: imagePixelWidth,
                 viewSize: viewSize,
-                mouseInView: mouseInView
+                mouseInView: mouseInPreview
             )
             return true
         default: return false
