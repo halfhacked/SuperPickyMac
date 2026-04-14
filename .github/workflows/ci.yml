@@ -13,6 +13,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install exiftool
+        run: brew install exiftool
+
       - name: Swift Build
         working-directory: apps/mac-client
         run: swift build
@@ -42,8 +45,8 @@ jobs:
         working-directory: python-server
         run: .venv/bin/python -m pytest tests/test_server.py -v
 
-  xcuitest-mock:
-    name: XCUITest — Mock (no server)
+  xcuitest:
+    name: XCUITest (Mock)
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -64,6 +67,12 @@ jobs:
             -destination 'platform=macOS' \
             -only-testing:SuperPickyUITests/KeyboardShortcutTests
 
-      # CullingEnhancementUITests skipped — flaky export button matching on CI
+      - name: CullingEnhancementUITests
+        working-directory: apps/mac-client
+        run: |
+          xcodebuild test \
+            -scheme SuperPicky \
+            -destination 'platform=macOS' \
+            -only-testing:SuperPickyUITests/CullingEnhancementUITests
 
-  # L3 BDD (real server + models) requires GPU — run locally with: scripts/run-l3.sh
+  # L3 BDD (real server + models) requires GPU — run locally: scripts/run-l3.sh

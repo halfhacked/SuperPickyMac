@@ -37,15 +37,10 @@ import ImageIO
         NSTemporaryDirectory() + "KeywordWriterTests_\(name)"
     }
 
-    private static let hasExiftool: Bool = {
-        ["/opt/homebrew/bin/exiftool", "/usr/local/bin/exiftool", "/usr/bin/exiftool"]
-            .contains(where: { FileManager.default.fileExists(atPath: $0) })
-    }()
 
     // MARK: - Tests
 
-    @Test(.enabled(if: KeywordWriterTests.hasExiftool))
-    func writeKeywordsToJPEG() throws {
+    @Test func writeKeywordsToJPEG() throws {
         let path = tempPath("write_kw.jpg")
         defer { try? FileManager.default.removeItem(atPath: path) }
         createTestJPEG(at: path)
@@ -60,8 +55,7 @@ import ImageIO
         #expect(data!.keywords.count == 3)
     }
 
-    @Test(.enabled(if: KeywordWriterTests.hasExiftool))
-    func writeOverwritesExistingKeywords() throws {
+    @Test func writeOverwritesExistingKeywords() throws {
         let path = tempPath("overwrite_kw.jpg")
         defer { try? FileManager.default.removeItem(atPath: path) }
 
