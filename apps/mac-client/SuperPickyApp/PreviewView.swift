@@ -77,14 +77,24 @@ struct AsyncPreviewImage: View {
                     continuation.resume(returning: nil)
                     return
                 }
-                var options: [CFString: Any] = [
-                    kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
-                    kCGImageSourceCreateThumbnailWithTransform: true,
-                ]
+
+                let cgImage: CGImage?
                 if let maxSize {
-                    options[kCGImageSourceThumbnailMaxPixelSize] = maxSize
+                    // Preview: fast embedded thumbnail
+                    let options: [CFString: Any] = [
+                        kCGImageSourceThumbnailMaxPixelSize: maxSize,
+                        kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
+                        kCGImageSourceCreateThumbnailWithTransform: true,
+                    ]
+                    cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
+                } else {
+                    // Full-res: decode the actual image (not just embedded preview)
+                    cgImage = CGImageSourceCreateImageAtIndex(source, 0, [
+                        kCGImageSourceCreateThumbnailWithTransform: true,
+                    ] as CFDictionary)
                 }
-                guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+
+                guard let cgImage else {
                     continuation.resume(returning: nil)
                     return
                 }
