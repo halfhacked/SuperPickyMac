@@ -365,6 +365,7 @@ struct ContentView: View {
     @State private var showFullscreen = false
     @State private var zoomState = ZoomState()
     @State private var previewSize: CGSize = .zero
+    @State private var previewOriginInWindow: CGPoint = .zero
     @State private var isExporting = false
     @State private var exportProgress = 0
     @State private var exportTotal = 0
@@ -377,8 +378,14 @@ struct ContentView: View {
             ZStack(alignment: .topTrailing) {
                 PreviewView(photo: selectedPhoto, zoomState: zoomState)
                     .background(GeometryReader { geo in
-                        Color.clear.onAppear { previewSize = geo.size }
-                            .onChange(of: geo.size) { _, s in previewSize = s }
+                        Color.clear.onAppear {
+                            previewSize = geo.size
+                            previewOriginInWindow = geo.frame(in: .global).origin
+                        }
+                        .onChange(of: geo.size) { _, _ in
+                            previewSize = geo.size
+                            previewOriginInWindow = geo.frame(in: .global).origin
+                        }
                     })
 
                 if showExifPanel, let photo = selectedPhoto {
@@ -480,7 +487,6 @@ struct ContentView: View {
         case "5": rateSelectedPhoto(5); return true
         case "z":
             guard let photo = selectedPhoto else { return false }
-            // Read actual pixel width from file (no decode — just metadata)
             let imagePixelWidth: CGFloat
             if let source = CGImageSourceCreateWithURL(URL(fileURLWithPath: photo.filePath) as CFURL, nil),
                let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any],
@@ -489,12 +495,18 @@ struct ContentView: View {
             } else {
                 imagePixelWidth = previewSize.width * 2
             }
-            let mouseInWindow = NSApp.keyWindow?.mouseLocationOutsideOfEventStream ?? .zero
-            let mouseInView = CGPoint(x: mouseInWindow.x, y: previewSize.height - mouseInWindow.y)
+            // Convert window coords (bottom-left origin) to preview-local (top-left)
+            let mouse = key.mouseLocationInWindow
+            let windowHeight = NSApp.keyWindow?.frame.height ?? 800
+            let mouseFlipped = CGPoint(x: mouse.x, y: windowHeight - mouse.y)
+            let mouseInPreview = CGPoint(
+                x: mouseFlipped.x - previewOriginInWindow.x,
+                y: mouseFlipped.y - previewOriginInWindow.y
+            )
             zoomState.toggleFitActualPixelsAt(
                 imagePixelWidth: imagePixelWidth,
                 viewSize: previewSize,
-                mouseInView: mouseInView
+                mouseInView: mouseInPreview
             )
             return true
         default: return false
