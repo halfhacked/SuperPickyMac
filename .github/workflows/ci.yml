@@ -8,7 +8,7 @@ on:
 
 jobs:
   swift-build-test:
-    name: Swift Build & Test
+    name: Swift Build & Test (L1)
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -22,7 +22,7 @@ jobs:
         run: swift test
 
   python-test:
-    name: Python Test
+    name: Python Test (L1)
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -42,16 +42,58 @@ jobs:
         working-directory: python-server
         run: .venv/bin/python -m pytest tests/test_server.py -v
 
-  xcode-build:
-    name: Xcode Build
+  xcuitest-mock:
+    name: XCUITest — Mock (no server)
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
-      - name: Xcode Build
+      - name: MockUITests
         working-directory: apps/mac-client
         run: |
-          xcodebuild build \
+          xcodebuild test \
             -scheme SuperPicky \
             -destination 'platform=macOS' \
-            -configuration Debug
+            -only-testing:SuperPickyUITests/MockUITests
+
+      - name: KeyboardShortcutTests
+        working-directory: apps/mac-client
+        run: |
+          xcodebuild test \
+            -scheme SuperPicky \
+            -destination 'platform=macOS' \
+            -only-testing:SuperPickyUITests/KeyboardShortcutTests
+
+      - name: CullingEnhancementUITests
+        working-directory: apps/mac-client
+        run: |
+          xcodebuild test \
+            -scheme SuperPicky \
+            -destination 'platform=macOS' \
+            -only-testing:SuperPickyUITests/CullingEnhancementUITests
+
+  xcuitest-l3:
+    name: XCUITest — L3 BDD (real server)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install Python dependencies
+        working-directory: python-server
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install flask flask-cors torch torchvision pillow numpy pypinyin birdpreen ultralytics huggingface_hub
+
+      - name: Download models
+        run: |
+          .venv/bin/python -c "from preen.model_download import download_models; download_models()"
+        working-directory: python-server
+
+      - name: Run L3 BDD tests
+        working-directory: .
+        run: bash scripts/run-l3.sh
