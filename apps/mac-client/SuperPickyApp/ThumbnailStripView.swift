@@ -121,28 +121,7 @@ struct AsyncThumbnailImage: View {
     }
 
     private func loadThumbnail() async -> NSImage? {
-        let url = URL(fileURLWithPath: filePath)
-        guard FileManager.default.fileExists(atPath: filePath) else { return nil }
-
-        return await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
-                    continuation.resume(returning: nil)
-                    return
-                }
-                let options: [CFString: Any] = [
-                    kCGImageSourceThumbnailMaxPixelSize: 160,
-                    kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
-                    kCGImageSourceCreateThumbnailWithTransform: true,
-                ]
-                guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
-                    continuation.resume(returning: nil)
-                    return
-                }
-                let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
-                continuation.resume(returning: nsImage)
-            }
-        }
+        await ImageLoader.load(path: filePath, maxPixelSize: 160)
     }
 }
 
@@ -162,13 +141,11 @@ class ScrollWheelMonitorView: NSView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        print("[ScrollWheelMonitor] viewDidMoveToWindow, window=\(window != nil), monitor=\(monitor != nil)")
         if window != nil && monitor == nil {
             monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
                 guard let self = self else { return event }
                 return self.handleScroll(event)
             }
-            print("[ScrollWheelMonitor] Monitor installed")
         }
     }
 
@@ -190,14 +167,11 @@ class ScrollWheelMonitorView: NSView {
         let locationInView = self.convert(locationInWindow, from: nil)
 
         if !self.bounds.contains(locationInView) { return event }
-        print("[ScrollWheelMonitor] Scroll intercepted! deltaY=\(event.scrollingDeltaY)")
 
         // Find the NSScrollView in our superview hierarchy
         guard let scrollView = findScrollView() else {
-            print("[ScrollWheelMonitor] No NSScrollView found!")
             return event
         }
-        print("[ScrollWheelMonitor] Found scroll view, redirecting")
 
         // Convert vertical delta to horizontal and let NSScrollView handle clamping
         let clip = scrollView.contentView

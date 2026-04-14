@@ -8,6 +8,7 @@ struct FullscreenViewer: View {
     @State private var showInfo = false
     @Bindable var zoomState: ZoomState
     @State private var image: NSImage?
+    @State private var isFullRes = false
 
     var body: some View {
         GeometryReader { geo in
@@ -38,63 +39,25 @@ struct FullscreenViewer: View {
             }
         }
         .task(id: selectedPhotoID) {
+            isFullRes = false
             zoomState.reset()
             guard let photo = selectedPhoto else { image = nil; return }
-            // Fast: load embedded preview first
-            let preview = await loadImage(path: photo.filePath, fullRes: false)
-            image = preview
-            // Then upgrade to full-res in background
-            let full = await loadImage(path: photo.filePath, fullRes: true)
-            if let full { image = full }
+            image = await ImageLoader.load(path: photo.filePath, maxPixelSize: 2000)
+        }
+        .onChange(of: zoomState.scale) { _, newScale in
+            if newScale > 1.0 && !isFullRes, let photo = selectedPhoto {
+                isFullRes = true
+                Task {
+                    if let full = await ImageLoader.load(path: photo.filePath) {
+                        image = full
+                    }
+                }
+            }
         }
     }
 
     private var selectedPhoto: Photo? {
         guard let id = selectedPhotoID else { return nil }
         return photos.first { $0.id == id }
-    }
-
-    private func navigatePhoto(direction: Int) {
-        guard let currentID = selectedPhotoID,
-              let currentIndex = photos.firstIndex(where: { $0.id == currentID }) else { return }
-        let newIndex = currentIndex + direction
-        guard photos.indices.contains(newIndex) else { return }
-        selectedPhotoID = photos[newIndex].id
-    }
-
-    private func rateSelected(_ rating: Int) {
-        guard let id = selectedPhotoID else { return }
-        onRatePhoto?(id, rating)
-    }
-
-    private func loadImage(path: String, fullRes: Bool) async -> NSImage? {
-        let url = URL(fileURLWithPath: path)
-        guard FileManager.default.fileExists(atPath: path) else { return nil }
-        return await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
-                    continuation.resume(returning: nil)
-                    return
-                }
-                let cgImage: CGImage?
-                if fullRes {
-                    cgImage = CGImageSourceCreateImageAtIndex(source, 0, [
-                        kCGImageSourceCreateThumbnailWithTransform: true,
-                    ] as CFDictionary)
-                } else {
-                    cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, [
-                        kCGImageSourceThumbnailMaxPixelSize: 2000,
-                        kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
-                        kCGImageSourceCreateThumbnailWithTransform: true,
-                    ] as CFDictionary)
-                }
-                guard let cgImage else {
-                    continuation.resume(returning: nil)
-                    return
-                }
-                let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
-                continuation.resume(returning: nsImage)
-            }
-        }
     }
 }
