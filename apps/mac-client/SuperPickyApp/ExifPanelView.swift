@@ -31,13 +31,13 @@ struct ExifPanelView: View {
                     if data.exposure.focalLength != nil || data.exposure.aperture != nil || data.exposure.shutterSpeed != nil || data.exposure.iso != nil {
                         sectionHeader("Exposure")
                         if let focal = data.exposure.focalLength {
-                            exifRow(label: "Focal Length", value: "\(formatNumber(focal)) mm")
+                            exifRow(label: "Focal Length", value: "\(ExifFormatters.formatNumber(focal)) mm")
                         }
                         // Combine exposure like Lightroom: "1/2000 at f/6.3, ISO 1600"
-                        exifRow(label: "Exposure", value: formatExposure(data))
+                        exifRow(label: "Exposure", value: ExifFormatters.formatExposure(data))
                         if let bias = data.exposure.exposureBias, bias != 0 {
                             let sign = bias >= 0 ? "+" : ""
-                            exifRow(label: "Exp Comp", value: "\(sign)\(formatNumber(bias)) EV")
+                            exifRow(label: "Exp Comp", value: "\(sign)\(ExifFormatters.formatNumber(bias)) EV")
                         }
                         if let metering = data.exposure.meteringMode {
                             exifRow(label: "Metering", value: metering)
@@ -51,7 +51,7 @@ struct ExifPanelView: View {
                     if data.image.width != nil || data.image.dateTimeOriginal != nil {
                         sectionHeader("Image")
                         if let date = data.image.dateTimeOriginal {
-                            exifRow(label: "Capture Date", value: formatDate(date))
+                            exifRow(label: "Capture Date", value: ExifFormatters.formatDate(date))
                         }
                         if let w = data.image.width, let h = data.image.height {
                             exifRow(label: "Dimensions", value: "\(w) \u{00D7} \(h)")
@@ -61,7 +61,7 @@ struct ExifPanelView: View {
                     // Location section
                     if data.location.latitude != nil || data.location.city != nil {
                         sectionHeader("Location")
-                        if let place = formatLocation(data) {
+                        if let place = ExifFormatters.formatLocation(data) {
                             exifRow(label: "Place", value: place)
                         }
                         if let lat = data.location.latitude, let lon = data.location.longitude {
@@ -71,12 +71,12 @@ struct ExifPanelView: View {
                                     .foregroundStyle(.secondary)
                                     .frame(width: labelWidth, alignment: .trailing)
                                     .lineLimit(1)
-                                Text(formatCoordinates(data) ?? "")
+                                Text(ExifFormatters.formatCoordinates(data) ?? "")
                                     .font(.system(size: 12))
                                     .foregroundStyle(.primary)
                                     .accessibilityIdentifier("Exif_GPS")
                                 Button {
-                                    let label = formatLocation(data) ?? "Photo Location"
+                                    let label = ExifFormatters.formatLocation(data) ?? "Photo Location"
                                     let url = URL(string: "https://maps.apple.com/?ll=\(lat),\(lon)&q=\(label.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "Photo")&z=14")!
                                     NSWorkspace.shared.open(url)
                                 } label: {
@@ -179,113 +179,5 @@ struct ExifPanelView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 3)
-    }
-
-    // MARK: - Formatters
-
-    private func formatNumber(_ value: Double) -> String {
-        if value == value.rounded() {
-            return "\(Int(value))"
-        }
-        return String(format: "%.1f", value)
-    }
-
-    private func formatExposure(_ data: EXIFData) -> String {
-        var parts: [String] = []
-        if let shutter = data.exposure.shutterSpeed { parts.append(shutter) }
-        if let aperture = data.exposure.aperture { parts.append("f/\(formatNumber(aperture))") }
-        if let iso = data.exposure.iso { parts.append("ISO \(iso)") }
-        if parts.isEmpty { return "—" }
-        // "1/2000 at f/6.3, ISO 1600"
-        if parts.count >= 2, data.exposure.shutterSpeed != nil, data.exposure.aperture != nil {
-            let shutter = parts.removeFirst()
-            let aperture = parts.removeFirst()
-            var result = "\(shutter) at \(aperture)"
-            if !parts.isEmpty { result += ", \(parts.joined(separator: ", "))" }
-            return result
-        }
-        return parts.joined(separator: ", ")
-    }
-
-    private func formatDate(_ raw: String) -> String {
-        // "2025:03:15 07:30:22" → "Mar 15, 2025  07:30"
-        let parts = raw.split(separator: " ")
-        guard let datePart = parts.first else { return raw }
-        let dateComponents = datePart.split(separator: ":")
-        guard dateComponents.count == 3,
-              let year = Int(dateComponents[0]),
-              let month = Int(dateComponents[1]),
-              let day = Int(dateComponents[2]) else { return raw }
-
-        let months = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-        let monthName = month >= 1 && month <= 12 ? months[month] : "\(month)"
-
-        var result = "\(monthName) \(day), \(year)"
-        if parts.count > 1 {
-            let time = String(parts[1])
-            // Drop seconds: "07:30:22" → "07:30"
-            let timeParts = time.split(separator: ":")
-            if timeParts.count >= 2 {
-                result += "  \(timeParts[0]):\(timeParts[1])"
-            }
-        }
-        return result
-    }
-
-    private func formatLocation(_ data: EXIFData) -> String? {
-        let parts = [data.location.city, data.location.state, data.location.country].compactMap { $0 }
-        return parts.isEmpty ? nil : parts.joined(separator: ", ")
-    }
-
-    private func formatCoordinates(_ data: EXIFData) -> String? {
-        guard let lat = data.location.latitude, let lon = data.location.longitude else { return nil }
-        let latDir = lat >= 0 ? "N" : "S"
-        let lonDir = lon >= 0 ? "E" : "W"
-        return String(format: "%.4f\u{00B0} %@, %.4f\u{00B0} %@",
-                      abs(lat), latDir, abs(lon), lonDir)
-    }
-}
-
-// MARK: - FlowLayout for keyword tags
-
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 4
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let result = arrange(proposal: proposal, subviews: subviews)
-        return result.size
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let result = arrange(proposal: proposal, subviews: subviews)
-        for (index, offset) in result.offsets.enumerated() {
-            subviews[index].place(at: CGPoint(x: bounds.minX + offset.x, y: bounds.minY + offset.y),
-                                   proposal: .unspecified)
-        }
-    }
-
-    private func arrange(proposal: ProposedViewSize, subviews: Subviews) -> (offsets: [CGPoint], size: CGSize) {
-        let maxWidth = proposal.width ?? .infinity
-        var offsets: [CGPoint] = []
-        var x: CGFloat = 0
-        var y: CGFloat = 0
-        var rowHeight: CGFloat = 0
-        var maxX: CGFloat = 0
-
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if x + size.width > maxWidth && x > 0 {
-                x = 0
-                y += rowHeight + spacing
-                rowHeight = 0
-            }
-            offsets.append(CGPoint(x: x, y: y))
-            rowHeight = max(rowHeight, size.height)
-            x += size.width + spacing
-            maxX = max(maxX, x)
-        }
-
-        return (offsets, CGSize(width: maxX, height: y + rowHeight))
     }
 }
