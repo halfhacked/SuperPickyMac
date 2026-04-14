@@ -479,10 +479,20 @@ struct ContentView: View {
         case "4": rateSelectedPhoto(4); return true
         case "5": rateSelectedPhoto(5); return true
         case "z":
+            guard let photo = selectedPhoto else { return false }
+            // Read actual pixel width from file (no decode — just metadata)
+            let imagePixelWidth: CGFloat
+            if let source = CGImageSourceCreateWithURL(URL(fileURLWithPath: photo.filePath) as CFURL, nil),
+               let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any],
+               let w = props[kCGImagePropertyPixelWidth as String] as? CGFloat {
+                imagePixelWidth = w
+            } else {
+                imagePixelWidth = previewSize.width * 2
+            }
             let mouseInWindow = NSApp.keyWindow?.mouseLocationOutsideOfEventStream ?? .zero
             let mouseInView = CGPoint(x: mouseInWindow.x, y: previewSize.height - mouseInWindow.y)
             zoomState.toggleFitActualPixelsAt(
-                imagePixelWidth: previewSize.width * 2,
+                imagePixelWidth: imagePixelWidth,
                 viewSize: previewSize,
                 mouseInView: mouseInView
             )
