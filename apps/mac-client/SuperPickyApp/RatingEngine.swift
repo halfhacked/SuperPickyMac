@@ -56,27 +56,17 @@ struct RatingEngine: Sendable {
             adjAesthetics *= 1.1
         }
 
-        let moderateSharpness = (Self.minimumSharpness + config.sharpnessThreshold) / 2
-        let moderateAesthetics = (Self.minimumAesthetics + config.aestheticsThreshold) / 2
-
-        let sharpAboveThreshold = adjSharpness >= config.sharpnessThreshold
-        let aestheticsAboveThreshold = adjAesthetics >= config.aestheticsThreshold
-        let sharpAboveModerate = adjSharpness >= moderateSharpness
-        let aestheticsAboveModerate = adjAesthetics >= moderateAesthetics
-
-        var rating: Int
-
-        if sharpAboveThreshold && aestheticsAboveThreshold {
-            rating = 5
-        } else if (sharpAboveThreshold || aestheticsAboveThreshold) && (sharpAboveModerate && aestheticsAboveModerate) {
-            rating = 4
-        } else if sharpAboveModerate && aestheticsAboveModerate {
-            rating = 3
-        } else if sharpAboveModerate || aestheticsAboveModerate {
-            rating = 2
-        } else {
-            rating = 1
-        }
+        let sharpnessTier = Self.tier(
+            value: adjSharpness,
+            minimum: Self.minimumSharpness,
+            threshold: config.sharpnessThreshold
+        )
+        let aestheticsTier = Self.tier(
+            value: adjAesthetics,
+            minimum: Self.minimumAesthetics,
+            threshold: config.aestheticsThreshold
+        )
+        var rating = Self.starRating(sharpness: sharpnessTier, aesthetics: aestheticsTier)
 
         if isOverexposed || isUnderexposed {
             rating = max(0, rating - 1)
@@ -85,5 +75,40 @@ struct RatingEngine: Sendable {
         let isPick = rating == 5
 
         return RatingResult(rating: rating, isPick: isPick, reason: "Rating: \(rating)")
+    }
+
+    // MARK: - Decision table
+
+    /// Each input dimension is bucketed into a tier; the (sharpness, aesthetics)
+    /// tier pair then maps to a star rating via an exhaustive switch. This keeps
+    /// the decision boundaries explicit and forces the compiler to flag any
+    /// missing combination.
+    private enum Tier {
+        case rejected   // below moderate midpoint
+        case moderate   // at/above moderate midpoint, below configured threshold
+        case high       // at/above configured threshold
+    }
+
+    // Fixed minimums (sharpness 100, aesthetics 2.0) anchor the moderate midpoint
+    // halfway between the floor and the configured threshold.
+    private static func tier(value: Float, minimum: Float, threshold: Float) -> Tier {
+        if value >= threshold { return .high }
+        let moderate = (minimum + threshold) / 2
+        if value >= moderate { return .moderate }
+        return .rejected
+    }
+
+    private static func starRating(sharpness: Tier, aesthetics: Tier) -> Int {
+        switch (sharpness, aesthetics) {
+        case (.high,     .high):     return 5
+        case (.high,     .moderate): return 4
+        case (.moderate, .high):     return 4
+        case (.moderate, .moderate): return 3
+        case (.high,     .rejected): return 2
+        case (.rejected, .high):     return 2
+        case (.moderate, .rejected): return 2
+        case (.rejected, .moderate): return 2
+        case (.rejected, .rejected): return 1
+        }
     }
 }
