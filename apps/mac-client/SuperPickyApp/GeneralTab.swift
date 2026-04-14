@@ -17,6 +17,14 @@ struct GeneralTab: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
+            Toggle("Auto-advance after rating", isOn: $config.autoAdvance)
+
+            Picker("Language", selection: $config.appLanguage) {
+                ForEach(AppLanguage.allCases, id: \.self) { lang in
+                    Text(lang.displayName).tag(lang)
+                }
+            }
+
             Picker("Appearance", selection: $config.appTheme) {
                 Text("System").tag(AppTheme.system)
                 Text("Dark").tag(AppTheme.dark)

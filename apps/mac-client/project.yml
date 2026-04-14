@@ -22,6 +22,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.superpicky.SuperPicky
         GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDevelopmentRegion: en
         CODE_SIGN_IDENTITY: "-"
         CODE_SIGNING_REQUIRED: NO
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

@@ -12,13 +12,14 @@ struct SuperPickyApp: App {
                 .frame(minWidth: 900, minHeight: 600)
                 .environment(processManager)
                 .environment(config)
+                .environment(\.locale, config.appLanguage.locale)
                 .preferredColorScheme(config.appTheme.colorScheme)
                 .onAppear {
                     appDelegate.processManager = processManager
                     processManager.start()
+                    LocalizationManager.localizeMenuBar(language: config.appLanguage)
                 }
                 .onChange(of: config.appTheme) { _, theme in
-                    // Apply immediately to all windows including Settings
                     switch theme {
                     case .dark: NSApp.appearance = NSAppearance(named: .darkAqua)
                     case .light: NSApp.appearance = NSAppearance(named: .aqua)

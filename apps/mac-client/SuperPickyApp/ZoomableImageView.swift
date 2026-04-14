@@ -66,6 +66,7 @@ final class ZoomState {
 struct ZoomableImageView: View {
     let image: NSImage
     @Bindable var zoomState: ZoomState
+    var brightnessAdjustment: Double = 0
 
     @State private var dragStart: CGSize = .zero
 
@@ -74,6 +75,7 @@ struct ZoomableImageView: View {
             Image(nsImage: image)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
+                .brightness(brightnessAdjustment)
                 .scaleEffect(zoomState.scale)
                 .offset(zoomState.offset)
                 .frame(width: geo.size.width, height: geo.size.height)

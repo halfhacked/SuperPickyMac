@@ -3,6 +3,7 @@ import SwiftUI
 struct PreviewView: View {
     let photo: Photo?
     @Bindable var zoomState: ZoomState
+    var brightnessAdjustment: Double = 0
     @Binding var mouseInView: CGPoint
     @Binding var viewSize: CGSize
     @State private var previousPhotoID: UUID?
@@ -10,7 +11,7 @@ struct PreviewView: View {
     var body: some View {
         VStack(spacing: 0) {
             if let photo {
-                AsyncPreviewImage(filePath: photo.filePath, zoomState: zoomState)
+                AsyncPreviewImage(filePath: photo.filePath, zoomState: zoomState, brightnessAdjustment: brightnessAdjustment)
                     .accessibilityIdentifier("PhotoPreview")
                     .onContinuousHover { phase in
                         if case .active(let loc) = phase { mouseInView = loc }
@@ -33,10 +34,7 @@ struct PreviewView: View {
             }
         }
         .onChange(of: photo?.id) { _, newID in
-            if newID != previousPhotoID {
-                previousPhotoID = newID
-                zoomState.reset()
-            }
+            previousPhotoID = newID
         }
     }
 }
@@ -45,6 +43,7 @@ struct PreviewView: View {
 struct AsyncPreviewImage: View {
     let filePath: String
     @Bindable var zoomState: ZoomState
+    var brightnessAdjustment: Double = 0
     @State private var image: NSImage?
     @State private var isFullRes = false
 
@@ -52,15 +51,20 @@ struct AsyncPreviewImage: View {
         ZStack {
             Color(nsColor: .controlBackgroundColor)
             if let image {
-                ZoomableImageView(image: image, zoomState: zoomState)
+                ZoomableImageView(image: image, zoomState: zoomState, brightnessAdjustment: brightnessAdjustment)
             } else {
                 ProgressView()
             }
         }
         .task(id: filePath) {
             isFullRes = false
-            let newImage = await loadImage(maxSize: 2000)
-            image = newImage
+            if zoomState.scale > 1.0 {
+                // Already zoomed in — load full-res directly
+                isFullRes = true
+                image = await loadImage(maxSize: nil)
+            } else {
+                image = await loadImage(maxSize: 2000)
+            }
         }
         .onChange(of: zoomState.scale) { _, newScale in
             // Load full-res when user zooms in
@@ -82,6 +86,7 @@ struct AsyncPreviewImage: View {
 
 struct InfoBarView: View {
     let photo: Photo
+    @Environment(CullingConfig.self) private var config
 
     var body: some View {
         HStack(spacing: 16) {
@@ -100,24 +105,28 @@ struct InfoBarView: View {
             }
 
             if let sharpness = photo.sharpnessScore {
-                Label("Sharp: \(Int(sharpness))", systemImage: "scope")
+                Label {
+                    Text("\(config.localized("Sharp")): \(Int(sharpness))")
+                } icon: { Image(systemName: "scope") }
                     .font(.caption)
             }
 
             if let aesthetics = photo.aestheticsScore {
-                Label("Aesth: \(String(format: "%.1f", aesthetics))", systemImage: "sparkles")
+                Label {
+                    Text("\(config.localized("Aesth")): \(String(format: "%.1f", aesthetics))")
+                } icon: { Image(systemName: "sparkles") }
                     .font(.caption)
             }
 
             if photo.isFlying {
-                Label("Flying", systemImage: "bird")
+                Label { Text(config.localized("Flying")) } icon: { Image(systemName: "bird") }
                     .font(.caption)
                     .foregroundStyle(.green)
             }
 
             if let species = photo.speciesScientificName {
                 Label {
-                    Text(photo.speciesCommonName ?? species)
+                    Text(config.localizedName(en: photo.speciesCommonName ?? species, cn: photo.speciesCnName))
                     if let conf = photo.speciesConfidence {
                         Text("\(Int(conf * 100))%")
                             .foregroundStyle(.secondary)

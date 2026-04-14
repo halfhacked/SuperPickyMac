@@ -3,10 +3,11 @@ import SwiftUI
 /// Species with its burst groups for the sidebar hierarchy.
 struct SpeciesEntry: Identifiable {
     let name: String
+    let cnName: String?
     let count: Int
     let burstGroups: [BurstGroupEntry]
     let singlePhotos: Int
-    let isUnidentified: Bool // true if no species was detected
+    let isUnidentified: Bool
     var id: String { name }
 }
 
@@ -26,10 +27,22 @@ final class AppState {
     var picksCount: Int = 0
     var speciesEntries: [SpeciesEntry] = []
 
+    struct UndoAction {
+        let photoID: UUID
+        let previousRating: Int
+        let previousIsPick: Bool
+        let previousIsManualRating: Bool
+        let wasHidden: Bool
+    }
+
     // All photos from the current folder (unfiltered)
     private var allPhotos: [Photo] = []
+    var pickedPhotos: [Photo] { allPhotos.filter { $0.isPick } }
     // Filtered photos shown in the UI
     var photos: [Photo] = []
+    var lastAction: UndoAction?
+
+    private var cachedDB: ReportDatabase?
 
     // Per-folder processing state
     var processingFolder: URL?
@@ -48,15 +61,26 @@ final class AppState {
         folders.isEmpty || allPhotos.isEmpty
     }
 
+    private func db() throws -> ReportDatabase {
+        if let db = cachedDB { return db }
+        guard let folder = currentFolder else { throw CocoaError(.fileNoSuchFile) }
+        let db = try ReportDatabase(folderPath: folder)
+        cachedDB = db
+        return db
+    }
+
     /// Load photos from the database for the selected folder.
     /// Preserves current filter and selection when possible.
     func loadPhotos(for folder: URL) {
         currentFolder = folder
+        cachedDB = nil
+        lastAction = nil
         let previousSelection = selectedPhotoID
         do {
-            let db = try ReportDatabase(folderPath: folder)
-            allPhotos = try db.fetchAllPhotos()
-            ratingCounts = try db.ratingCounts()
+            let database = try ReportDatabase(folderPath: folder)
+            cachedDB = database
+            allPhotos = try database.fetchAllPhotos()
+            ratingCounts = try database.ratingCounts()
             flyingCount = allPhotos.filter { $0.isFlying }.count
             picksCount = allPhotos.filter { $0.isPick }.count
             buildSpeciesHierarchy()
@@ -80,29 +104,58 @@ final class AppState {
 
     /// Build species → burst group hierarchy from loaded photos.
     private func buildSpeciesHierarchy() {
+        // Assign each burst to its dominant species by highest confidence ID.
+        // A burst spanning multiple species classifications appears only once.
+        var burstToSpecies: [UUID: String] = [:]
+        var burstBestConfidence: [UUID: (species: String, confidence: Float)] = [:]
+        var burstPhotos: [UUID: [Photo]] = [:]
+
+        for photo in allPhotos {
+            guard let groupID = photo.burstGroupID else { continue }
+            burstPhotos[groupID, default: []].append(photo)
+
+            guard let name = photo.speciesCommonName ?? photo.speciesScientificName else { continue }
+            let confidence = photo.speciesConfidence ?? 0
+            if let current = burstBestConfidence[groupID] {
+                if confidence > current.confidence {
+                    burstBestConfidence[groupID] = (name, confidence)
+                }
+            } else {
+                burstBestConfidence[groupID] = (name, confidence)
+            }
+        }
+
+        for groupID in burstPhotos.keys {
+            burstToSpecies[groupID] = burstBestConfidence[groupID]?.species ?? "Unidentified"
+        }
+
         // Group photos by species
-        // Key: (displayName, isUnidentified)
         var bySpecies: [String: (photos: [Photo], isUnidentified: Bool)] = [:]
         for photo in allPhotos {
             let hasSpecies = photo.speciesScientificName != nil
-            let name = photo.speciesCommonName ?? photo.speciesScientificName ?? NSLocalizedString("Unidentified", comment: "Photos with no species detected")
+            let name = photo.speciesCommonName ?? photo.speciesScientificName ?? String(localized: "Unidentified")
             var entry = bySpecies[name] ?? (photos: [], isUnidentified: !hasSpecies)
             entry.photos.append(photo)
             bySpecies[name] = entry
         }
 
         speciesEntries = bySpecies.map { name, entry in
-            var burstMap: [UUID: [Photo]] = [:]
+            // Only include burst groups whose dominant species matches this entry
+            var burstGroupIDs: Set<UUID> = []
             var singleCount = 0
             for photo in entry.photos {
                 if let groupID = photo.burstGroupID {
-                    burstMap[groupID, default: []].append(photo)
+                    if burstToSpecies[groupID] == name {
+                        burstGroupIDs.insert(groupID)
+                    }
+                    // Photos in bursts owned by another species don't count as singles
                 } else {
                     singleCount += 1
                 }
             }
 
-            let burstGroups = burstMap.map { groupID, groupPhotos in
+            let burstGroups = burstGroupIDs.map { groupID in
+                let groupPhotos = burstPhotos[groupID] ?? []
                 let best = groupPhotos.first { $0.isBurstBest }
                 return BurstGroupEntry(
                     id: groupID,
@@ -113,6 +166,7 @@ final class AppState {
 
             return SpeciesEntry(
                 name: name,
+                cnName: entry.photos.first?.speciesCnName,
                 count: entry.photos.count,
                 burstGroups: burstGroups,
                 singlePhotos: singleCount,
@@ -135,30 +189,91 @@ final class AppState {
         currentFolder = nil
     }
 
-    /// Update a photo's star rating manually and persist to the database.
-    func ratePhoto(id: UUID, rating: Int) {
-        guard let folder = currentFolder else { return }
+    /// Mutate a photo, persist to DB + XMP, and update in-memory arrays.
+    /// Saves undo state before mutation. The `updateView` closure handles
+    /// how the filtered `photos` array should change (update in-place vs remove).
+    private func mutatePhoto(
+        id: UUID, wasHidden: Bool = false,
+        _ mutate: (inout Photo) -> Void,
+        updateView: ((_ photo: Photo) -> Void)? = nil
+    ) {
         do {
-            let db = try ReportDatabase(folderPath: folder)
-            guard var photo = try db.fetchPhoto(id: id) else { return }
+            let database = try db()
+            guard var photo = try database.fetchPhoto(id: id) else { return }
+            lastAction = UndoAction(
+                photoID: id, previousRating: photo.starRating,
+                previousIsPick: photo.isPick, previousIsManualRating: photo.isManualRating,
+                wasHidden: wasHidden
+            )
+            mutate(&photo)
+            try database.save(&photo)
+            try? XMPWriter.write(photo: photo)
+
+            if let idx = allPhotos.firstIndex(where: { $0.id == id }) {
+                allPhotos[idx] = photo
+            }
+            if let update = updateView {
+                update(photo)
+            } else if let idx = photos.firstIndex(where: { $0.id == id }) {
+                photos[idx] = photo
+            }
+
+            ratingCounts = (try? database.ratingCounts()) ?? ratingCounts
+            picksCount = allPhotos.filter { $0.isPick }.count
+        } catch {
+            // Silently fail
+        }
+    }
+
+    func ratePhoto(id: UUID, rating: Int) {
+        mutatePhoto(id: id) { photo in
             photo.starRating = rating
             photo.isManualRating = true
-            try db.save(&photo)
+        }
+    }
 
-            // Update in-memory arrays
-            if let idx = allPhotos.firstIndex(where: { $0.id == id }) {
-                allPhotos[idx].starRating = rating
-                allPhotos[idx].isManualRating = true
-            }
-            if let idx = photos.firstIndex(where: { $0.id == id }) {
-                photos[idx].starRating = rating
-                photos[idx].isManualRating = true
+    func togglePick(id: UUID) {
+        mutatePhoto(id: id) { photo in
+            photo.isPick.toggle()
+        }
+    }
+
+    func rejectPhoto(id: UUID) {
+        mutatePhoto(id: id, wasHidden: true, { photo in
+            photo.starRating = 0
+            photo.isManualRating = true
+        }, updateView: { [self] _ in
+            self.photos.removeAll { $0.id == id }
+        })
+    }
+
+    func undoLastAction() {
+        guard let action = lastAction else { return }
+        lastAction = nil
+        do {
+            let database = try db()
+            guard var photo = try database.fetchPhoto(id: action.photoID) else { return }
+            photo.starRating = action.previousRating
+            photo.isPick = action.previousIsPick
+            photo.isManualRating = action.previousIsManualRating
+            try database.save(&photo)
+            try? XMPWriter.write(photo: photo)
+
+            if let idx = allPhotos.firstIndex(where: { $0.id == action.photoID }) {
+                allPhotos[idx] = photo
             }
 
-            // Refresh rating counts
-            ratingCounts = (try? db.ratingCounts()) ?? ratingCounts
+            if action.wasHidden {
+                photos.append(photo)
+            } else if let idx = photos.firstIndex(where: { $0.id == action.photoID }) {
+                photos[idx] = photo
+            }
+
+            selectedPhotoID = action.photoID
+            ratingCounts = (try? database.ratingCounts()) ?? ratingCounts
+            picksCount = allPhotos.filter { $0.isPick }.count
         } catch {
-            // Silently fail — rating not persisted
+            // Silently fail
         }
     }
 
@@ -185,6 +300,13 @@ final class AppState {
             }
         case .burstGroup(let groupID):
             photos = allPhotos.filter { $0.burstGroupID == groupID }
+        case .singles(let speciesName):
+            let isUnidentified = speciesEntries.first { $0.name == speciesName }?.isUnidentified ?? false
+            photos = allPhotos.filter { photo in
+                photo.burstGroupID == nil && (isUnidentified
+                    ? photo.speciesScientificName == nil
+                    : (photo.speciesCommonName == speciesName || photo.speciesScientificName == speciesName))
+            }
         case nil:
             photos = allPhotos
         }
@@ -200,6 +322,12 @@ struct MainView: View {
     @Environment(ProcessManager.self) private var processManager
     @State private var appState = AppState()
     @State private var processingTask: Task<Void, Never>?
+    @State private var isExporting = false
+    @State private var exportProgress = 0
+    @State private var exportTotal = 0
+    @State private var showExportComplete = false
+    @State private var exportResultMessage = ""
+    @State private var exportDestination: URL?
     @AppStorage("lastFolderPath") private var lastFolderPath: String = ""
 
     private var isTestMode: Bool {
@@ -235,6 +363,18 @@ struct MainView: View {
                     selectedPhoto: appState.selectedPhoto,
                     onRatePhoto: { id, rating in
                         appState.ratePhoto(id: id, rating: rating)
+                    },
+                    onTogglePick: { id in
+                        appState.togglePick(id: id)
+                    },
+                    onRejectPhoto: { id in
+                        appState.rejectPhoto(id: id)
+                    },
+                    onUndo: {
+                        appState.undoLastAction()
+                    },
+                    onExportPicks: {
+                        exportPicks()
                     }
                 )
             }
@@ -244,7 +384,7 @@ struct MainView: View {
             switch newValue {
             case .folder(let url):
                 appState.loadPhotos(for: url)
-            case .rating, .flying, .picks, .species, .burstGroup:
+            case .rating, .flying, .picks, .species, .burstGroup, .singles:
                 appState.applyFilter()
             case nil:
                 break
@@ -273,6 +413,70 @@ struct MainView: View {
                     appState.sidebarSelection = .folder(folder)
                     appState.loadPhotos(for: folder)
                 }
+            }
+        }
+        .sheet(isPresented: $isExporting) {
+            VStack(spacing: 16) {
+                Text("Exporting Picks...")
+                    .font(.headline)
+                ProgressView(value: Double(exportProgress), total: Double(max(exportTotal, 1)))
+                    .progressViewStyle(.linear)
+                    .frame(width: 300)
+                Text("\(exportProgress) of \(exportTotal)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(40)
+            .interactiveDismissDisabled()
+        }
+        .alert("Export", isPresented: $showExportComplete) {
+            if let dest = exportDestination {
+                Button("Reveal in Finder") {
+                    NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: dest.path)
+                }
+            }
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(exportResultMessage)
+        }
+    }
+
+    private func exportPicks() {
+        guard let folder = appState.currentFolder else { return }
+        let picks = appState.pickedPhotos
+        guard !picks.isEmpty else {
+            exportResultMessage = "No picks to export"
+            showExportComplete = true
+            return
+        }
+
+        let destination = ExportService.picksDestination(for: folder)
+        exportDestination = destination
+        exportProgress = 0
+        exportTotal = picks.count
+        isExporting = true
+
+        Task {
+            do {
+                try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+                let result = try await ExportService.export(
+                    photos: picks,
+                    to: destination,
+                    onProgress: { current, total in
+                        exportProgress = current
+                        exportTotal = total
+                    }
+                )
+                isExporting = false
+                exportResultMessage = "Exported \(result.exportedCount) photos"
+                if result.skippedCount > 0 {
+                    exportResultMessage += ", \(result.skippedCount) skipped"
+                }
+                showExportComplete = true
+            } catch {
+                isExporting = false
+                exportResultMessage = "Export failed: \(error.localizedDescription)"
+                showExportComplete = true
             }
         }
     }
@@ -310,9 +514,6 @@ struct MainView: View {
         )
         let exposureEnabled = config.exposureDetectionEnabled
         let exposureThreshold = config.exposureThreshold
-        let writeKeywords = config.writeKeywords
-        let keywordFormat = config.keywordFormat
-
         // Add folder to sidebar immediately and remember it
         if !appState.folders.contains(folder) {
             appState.folders.append(folder)
@@ -328,8 +529,6 @@ struct MainView: View {
                 ratingConfig: ratingConfig,
                 exposureEnabled: exposureEnabled,
                 exposureThreshold: exposureThreshold,
-                writeKeywords: writeKeywords,
-                keywordFormat: keywordFormat,
                 onPhotoProcessed: {
                     await MainActor.run {
                         if pipeline.totalCount > 0 {
@@ -361,23 +560,43 @@ struct ContentView: View {
     @Binding var selectedPhotoID: UUID?
     let selectedPhoto: Photo?
     var onRatePhoto: ((UUID, Int) -> Void)?
+    var onTogglePick: ((UUID) -> Void)?
+    var onRejectPhoto: ((UUID) -> Void)?
+    var onUndo: (() -> Void)?
+    var onExportPicks: (() -> Void)?
+    @Environment(CullingConfig.self) private var config
+    @State private var minimumStars: Int = 0
+    @State private var topBurstOnly: Bool = false
+    @State private var pickedOnly: Bool = false
     @State private var showExifPanel = true
     @State private var showFullscreen = false
     @State private var zoomState = ZoomState()
     @State private var fullscreenZoomState = ZoomState()
     @State private var previewSize: CGSize = .zero
     @State private var mouseInPreview: CGPoint = .zero
-    @State private var isExporting = false
-    @State private var exportProgress = 0
-    @State private var exportTotal = 0
-    @State private var showExportComplete = false
-    @State private var exportResultMessage = ""
+    @State private var brightnessAdj: Double = 0
+    @State private var showCompare = false
     @State private var showNoPhotosAlert = false
+
+    private var filteredPhotos: [Photo] {
+        var result = photos
+        if minimumStars > 0 {
+            result = result.filter { $0.starRating >= minimumStars }
+        }
+        if topBurstOnly {
+            result = result.filter { $0.burstGroupID == nil || $0.isBurstBest }
+        }
+        if pickedOnly {
+            result = result.filter { $0.isPick }
+        }
+        return result
+    }
 
     var body: some View {
         VSplitView {
             ZStack(alignment: .topTrailing) {
                 PreviewView(photo: selectedPhoto, zoomState: zoomState,
+                            brightnessAdjustment: brightnessAdj,
                             mouseInView: $mouseInPreview, viewSize: $previewSize)
 
                 if showExifPanel, let photo = selectedPhoto {
@@ -387,11 +606,74 @@ struct ContentView: View {
             }
             .frame(minHeight: 300)
 
-            ThumbnailStripView(
-                photos: photos,
-                selectedPhotoID: $selectedPhotoID
-            )
-            .frame(minHeight: 60, idealHeight: 80, maxHeight: 120)
+            VStack(spacing: 0) {
+                // Star filter bar + photo counter
+                HStack(spacing: 8) {
+                    Text("≥")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(minimumStars > 0 ? .primary : .secondary)
+
+                    HStack(spacing: 2) {
+                        ForEach(1...5, id: \.self) { n in
+                            Image(systemName: n <= minimumStars ? "star.fill" : "star")
+                                .font(.system(size: 10))
+                                .foregroundStyle(n <= minimumStars ? .primary : .secondary)
+                                .onTapGesture {
+                                    minimumStars = minimumStars == n ? 0 : n
+                                }
+                        }
+                    }
+                    .accessibilityIdentifier("StarFilter")
+                    .help(minimumStars > 0 ? "Rating ≥ \(minimumStars) (⌘0 to reset)" : "Filter by minimum rating (⌘1–5)")
+
+                    Divider().frame(height: 12)
+
+                    Button {
+                        topBurstOnly.toggle()
+                    } label: {
+                        Image(systemName: topBurstOnly ? "crown.fill" : "crown")
+                            .font(.system(size: 10))
+                            .foregroundStyle(topBurstOnly ? .primary : .secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help(topBurstOnly ? "Showing burst best only — click to show all" : "Show only the best photo from each burst")
+                    .accessibilityIdentifier("TopBurstFilter")
+
+                    Button {
+                        pickedOnly.toggle()
+                    } label: {
+                        Image(systemName: pickedOnly ? "flag.fill" : "flag")
+                            .font(.system(size: 10))
+                            .foregroundStyle(pickedOnly ? .primary : .secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help(pickedOnly ? "Showing picks only — click to show all" : "Show only flagged photos (P to pick)")
+                    .accessibilityIdentifier("PickedFilter")
+
+                    Spacer()
+
+                    if brightnessAdj != 0 {
+                        Text("EV \(brightnessAdj > 0 ? "+" : "")\(String(format: "%.2f", brightnessAdj))")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+
+                    Text("\(filteredPhotos.count) of \(photos.count)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("PhotoCounter")
+                        .accessibilityValue("\(filteredPhotos.count) of \(photos.count)")
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
+                .background(.bar)
+
+                ThumbnailStripView(
+                    photos: filteredPhotos,
+                    selectedPhotoID: $selectedPhotoID
+                )
+            }
+            .frame(minHeight: 80, idealHeight: 100, maxHeight: 140)
         }
         .background(Color(nsColor: .controlBackgroundColor))
         .background(KeyboardMonitor { key in
@@ -400,24 +682,33 @@ struct ContentView: View {
         .overlay {
             if showFullscreen {
                 FullscreenViewer(
-                    photos: photos,
+                    photos: filteredPhotos,
                     selectedPhotoID: $selectedPhotoID,
                     isPresented: $showFullscreen,
                     onRatePhoto: onRatePhoto,
                     zoomState: fullscreenZoomState
                 )
             }
+            if showCompare {
+                CompareView(
+                    photos: filteredPhotos,
+                    selectedPhotoID: $selectedPhotoID,
+                    isPresented: $showCompare,
+                    onRatePhoto: onRatePhoto,
+                    onTogglePick: onTogglePick
+                )
+            }
         }
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 Button {
-                    exportPhotos()
+                    onExportPicks?()
                 } label: {
-                    Label("Export", systemImage: "square.and.arrow.up")
+                    Label("Export Picks", systemImage: "square.and.arrow.up")
                 }
-                .accessibilityIdentifier("ExportButton")
-                .help("Export filtered photos with XMP sidecars")
-                .disabled(isExporting)
+                .accessibilityIdentifier("ExportPicksButton")
+                .help("Export picked photos with XMP sidecars (⌘E)")
+                .keyboardShortcut("e", modifiers: .command)
             }
             ToolbarItem(placement: .automatic) {
                 Button {
@@ -431,29 +722,18 @@ struct ContentView: View {
                 .help("Toggle EXIF Info (I)")
             }
         }
-        .sheet(isPresented: $isExporting) {
-            VStack(spacing: 16) {
-                Text("Exporting Photos...")
-                    .font(.headline)
-                ProgressView(value: Double(exportProgress), total: Double(max(exportTotal, 1)))
-                    .progressViewStyle(.linear)
-                    .frame(width: 300)
-                Text("\(exportProgress) of \(exportTotal)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(40)
-            .interactiveDismissDisabled()
-        }
-        .alert("Export Complete", isPresented: $showExportComplete) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(exportResultMessage)
-        }
         .alert("No Photos", isPresented: $showNoPhotosAlert) {
             Button("OK", role: .cancel) {}
         } message: {
             Text("No photos match the current filter")
+        }
+        .onChange(of: photos.count) { _, _ in
+            minimumStars = 0
+            topBurstOnly = false
+            pickedOnly = false
+        }
+        .onChange(of: selectedPhotoID) { _, _ in
+            brightnessAdj = 0
         }
     }
 
@@ -465,6 +745,21 @@ struct ContentView: View {
         // Escape exits fullscreen
         if key.isEscape && showFullscreen { showFullscreen = false; return true }
 
+        // Cmd+Z: undo
+        if key.modifiers.contains(.command), key.characters == "z" {
+            onUndo?()
+            return true
+        }
+
+        // Cmd+0-5: set minimum star filter
+        if key.modifiers.contains(.command),
+           let char = key.characters.first,
+           let digit = char.wholeNumberValue,
+           (0...5).contains(digit) {
+            minimumStars = digit
+            return true
+        }
+
         switch key.characters {
         case "i":
             withAnimation(.easeInOut(duration: 0.2)) { showExifPanel.toggle() }
@@ -472,12 +767,25 @@ struct ContentView: View {
         case "f":
             showFullscreen.toggle()
             return true
-        case "0": rateSelectedPhoto(0); return true
-        case "1": rateSelectedPhoto(1); return true
-        case "2": rateSelectedPhoto(2); return true
-        case "3": rateSelectedPhoto(3); return true
-        case "4": rateSelectedPhoto(4); return true
-        case "5": rateSelectedPhoto(5); return true
+        case "c":
+            if filteredPhotos.count >= 2 { showCompare.toggle() }
+            return true
+        case "p":
+            guard let id = selectedPhoto?.id else { return false }
+            onTogglePick?(id)
+            if config.autoAdvance { navigatePhoto(direction: 1) }
+            return true
+        case "x":
+            guard let id = selectedPhoto?.id else { return false }
+            navigatePhoto(direction: 1, fallbackToPrevious: true)
+            onRejectPhoto?(id)
+            return true
+        case "0", "1", "2", "3", "4", "5":
+            if let digit = key.characters.first?.wholeNumberValue {
+                rateSelectedPhoto(digit)
+                if config.autoAdvance { navigatePhoto(direction: 1) }
+            }
+            return true
         case "z":
             guard let photo = selectedPhoto else { return false }
             let imagePixelWidth = ImageLoader.pixelWidth(path: photo.filePath) ?? previewSize.width * 2
@@ -493,16 +801,31 @@ struct ContentView: View {
                 mouseInView: mouseInPreview
             )
             return true
+        case "=", "+":
+            brightnessAdj = min(brightnessAdj + 0.05, 0.5)
+            return true
+        case "-":
+            brightnessAdj = max(brightnessAdj - 0.05, -0.5)
+            return true
         default: return false
         }
     }
 
-    private func navigatePhoto(direction: Int) {
+    /// Navigate to the next/previous photo. Returns the target ID (nil if can't navigate).
+    /// When `fallbackToPrevious` is true and can't go forward, falls back to previous photo.
+    @discardableResult
+    private func navigatePhoto(direction: Int, fallbackToPrevious: Bool = false) -> UUID? {
         guard let currentID = selectedPhotoID,
-              let currentIndex = photos.firstIndex(where: { $0.id == currentID }) else { return }
+              let currentIndex = filteredPhotos.firstIndex(where: { $0.id == currentID }) else { return nil }
         let newIndex = currentIndex + direction
-        guard photos.indices.contains(newIndex) else { return }
-        selectedPhotoID = photos[newIndex].id
+        if filteredPhotos.indices.contains(newIndex) {
+            selectedPhotoID = filteredPhotos[newIndex].id
+            return filteredPhotos[newIndex].id
+        } else if fallbackToPrevious, currentIndex > 0 {
+            selectedPhotoID = filteredPhotos[currentIndex - 1].id
+            return filteredPhotos[currentIndex - 1].id
+        }
+        return nil
     }
 
     private func rateSelectedPhoto(_ rating: Int) {
@@ -510,53 +833,6 @@ struct ContentView: View {
         onRatePhoto?(id, rating)
     }
 
-    private func exportPhotos() {
-        guard !photos.isEmpty else {
-            showNoPhotosAlert = true
-            return
-        }
-
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.canCreateDirectories = true
-        panel.message = "Choose a destination folder for exported photos"
-        panel.prompt = "Export"
-
-        guard panel.runModal() == .OK, let destination = panel.url else { return }
-
-        let photosToExport = photos
-        exportProgress = 0
-        exportTotal = photosToExport.count
-        isExporting = true
-
-        Task {
-            do {
-                let result = try await ExportService.export(
-                    photos: photosToExport,
-                    to: destination,
-                    onProgress: { current, total in
-                        exportProgress = current
-                        exportTotal = total
-                    }
-                )
-                isExporting = false
-                exportResultMessage = "Exported \(result.exportedCount) photos to \(destination.path)"
-                if result.skippedCount > 0 {
-                    exportResultMessage += "\n\(result.skippedCount) skipped (already exist)"
-                }
-                if result.failedCount > 0 {
-                    exportResultMessage += "\n\(result.failedCount) failed"
-                }
-                showExportComplete = true
-            } catch {
-                isExporting = false
-                exportResultMessage = "Export failed: \(error.localizedDescription)"
-                showExportComplete = true
-            }
-        }
-    }
 }
 
 struct EmptyStateView: View {

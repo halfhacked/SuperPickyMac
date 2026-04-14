@@ -40,9 +40,13 @@ struct FullscreenViewer: View {
         }
         .task(id: selectedPhotoID) {
             isFullRes = false
-            zoomState.reset()
             guard let photo = selectedPhoto else { image = nil; return }
-            image = await ImageLoader.load(path: photo.filePath, maxPixelSize: 2000)
+            if zoomState.scale > 1.0 {
+                isFullRes = true
+                image = await ImageLoader.load(path: photo.filePath)
+            } else {
+                image = await ImageLoader.load(path: photo.filePath, maxPixelSize: 2000)
+            }
         }
         .onChange(of: zoomState.scale) { _, newScale in
             if newScale > 1.0 && !isFullRes, let photo = selectedPhoto {

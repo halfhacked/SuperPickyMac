@@ -165,6 +165,20 @@ import Foundation
         #expect(result.failedCount == 0)
     }
 
+    // MARK: - Picks destination
+
+    @Test func picksDestinationPath() {
+        let folder = URL(fileURLWithPath: "/Users/test/Desktop/birds")
+        let dest = ExportService.picksDestination(for: folder)
+        #expect(dest.path == "/Users/test/Desktop/birds-picks")
+    }
+
+    @Test func picksDestinationPathWithTrailingSlash() {
+        let folder = URL(fileURLWithPath: "/Users/test/Desktop/my-photos/")
+        let dest = ExportService.picksDestination(for: folder)
+        #expect(dest.path == "/Users/test/Desktop/my-photos-picks")
+    }
+
     // MARK: - Progress callback is called
 
     @Test func exportCallsProgressCallback() async throws {

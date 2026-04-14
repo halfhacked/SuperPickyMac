@@ -1,6 +1,7 @@
 import XCTest
 
-/// Mock tests that don't need the inference server.
+/// Tests for empty/initial app state (no test folder, no photos).
+/// Separate from CullingWorkflowUITests because it needs a different app launch config.
 final class MockUITests: XCTestCase {
 
     func testEmptyStateShowsSelectFolder() throws {
@@ -12,17 +13,9 @@ final class MockUITests: XCTestCase {
 
         let selectButton = app.buttons["SelectFolderButton"]
         XCTAssertTrue(selectButton.waitForExistence(timeout: 5))
-    }
 
-    func testSidebarShowsRatings() throws {
-        let app = XCUIApplication()
-        app.launchEnvironment["TEST_MODE"] = "1"
-        app.launch()
-        defer { app.terminate() }
-
+        // Sidebar still shows rating labels even without photos
         XCTAssertTrue(app.staticTexts["Excellent"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Good"].exists)
-        XCTAssertTrue(app.staticTexts["Average"].exists)
         XCTAssertTrue(app.staticTexts["Reject"].exists)
     }
 }

@@ -29,6 +29,8 @@ struct Photo: Identifiable, Codable, Sendable, FetchableRecord, PersistableRecor
     var isPick: Bool
     var speciesScientificName: String?
     var speciesCommonName: String?
+    var speciesCnName: String?
+    var speciesPinyin: String?
     var speciesConfidence: Float?
     var burstGroupID: UUID?
     var isBurstBest: Bool

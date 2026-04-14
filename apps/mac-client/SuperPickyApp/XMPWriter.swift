@@ -10,7 +10,7 @@ struct XMPWriter {
 
     /// Generate XMP string for a photo
     static func generate(photo: Photo) -> String {
-        let hasKeywords = photo.speciesCommonName != nil || photo.isFlying
+        let hasKeywords = photo.speciesCommonName != nil || photo.speciesCnName != nil || photo.isFlying
 
         var xml = """
         <?xml version="1.0" encoding="UTF-8"?>
@@ -20,7 +20,8 @@ struct XMPWriter {
               xmlns:xmp="http://ns.adobe.com/xap/1.0/"
               xmlns:dc="http://purl.org/dc/elements/1.1/"
               xmlns:lr="http://ns.adobe.com/lightroom/1.0/"
-              xmp:Rating="\(photo.starRating)">\n
+              xmp:Rating="\(photo.starRating)"
+              xmp:PickStatus="\(photo.isPick ? 1 : 0)">\n
         """
 
         if hasKeywords {
@@ -31,6 +32,12 @@ struct XMPWriter {
             }
             if let scientific = photo.speciesScientificName {
                 xml += "          <rdf:li>\(xmlEscape(scientific))</rdf:li>\n"
+            }
+            if let cn = photo.speciesCnName {
+                xml += "          <rdf:li>\(xmlEscape(cn))</rdf:li>\n"
+            }
+            if let pinyin = photo.speciesPinyin {
+                xml += "          <rdf:li>\(xmlEscape(pinyin))</rdf:li>\n"
             }
             if photo.isFlying {
                 xml += "          <rdf:li>In Flight</rdf:li>\n"

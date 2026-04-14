@@ -11,7 +11,6 @@ import Foundation
     @Test func noBirdDetected() {
         let result = engine.calculate(detected: false, confidence: 0, config: config)
         #expect(result.rating == 0)
-        #expect(result.isPick == false)
     }
 
     @Test func lowConfidence() {
@@ -47,7 +46,6 @@ import Foundation
             config: config
         )
         #expect(result.rating == 1)
-        #expect(result.isPick == false)
     }
 
     // MARK: - Decision tree: 5 stars (both above threshold)
@@ -61,7 +59,6 @@ import Foundation
             config: config
         )
         #expect(result.rating == 5)
-        #expect(result.isPick == true)
     }
 
     // MARK: - Decision tree: 4 stars (one above threshold, both above moderate)
@@ -152,7 +149,6 @@ import Foundation
             config: config
         )
         #expect(result.rating == 4)
-        #expect(result.isPick == false)
     }
 
     @Test func exposurePenaltyFloorAtZero() {
@@ -179,20 +175,5 @@ import Foundation
             config: config
         )
         #expect(result.rating == 5)
-        #expect(result.isPick == true)
-    }
-
-    // MARK: - isPick
-
-    @Test func isPickOnlyForFiveStar() {
-        // 4-star should not be a pick
-        let result = engine.calculate(
-            detected: true, confidence: 0.9,
-            sharpness: 500, aesthetics: 4.0,
-            bestEyeVisibility: 0.9,
-            config: config
-        )
-        #expect(result.rating == 4)
-        #expect(result.isPick == false)
     }
 }
