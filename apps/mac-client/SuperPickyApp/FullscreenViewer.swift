@@ -41,7 +41,7 @@ struct FullscreenViewer: View {
             image = nil
             zoomState.reset()
             guard let photo = selectedPhoto else { return }
-            image = await loadFullscreenImage(path: photo.filePath)
+            image = await AsyncImageLoader.load(filePath: photo.filePath, size: .fullscreen)
         }
     }
 
@@ -61,30 +61,5 @@ struct FullscreenViewer: View {
     private func rateSelected(_ rating: Int) {
         guard let id = selectedPhotoID else { return }
         onRatePhoto?(id, rating)
-    }
-
-    private func loadFullscreenImage(path: String) async -> NSImage? {
-        let url = URL(fileURLWithPath: path)
-        guard FileManager.default.fileExists(atPath: path) else { return nil }
-        return await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
-                    continuation.resume(returning: nil)
-                    return
-                }
-                // Full resolution for fullscreen
-                let options: [CFString: Any] = [
-                    kCGImageSourceCreateThumbnailFromImageAlways: true,
-                    kCGImageSourceCreateThumbnailWithTransform: true,
-                    kCGImageSourceThumbnailMaxPixelSize: 4000,
-                ]
-                guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
-                    continuation.resume(returning: nil)
-                    return
-                }
-                let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
-                continuation.resume(returning: nsImage)
-            }
-        }
     }
 }
