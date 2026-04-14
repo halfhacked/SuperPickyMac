@@ -109,8 +109,8 @@ struct ZoomableImageView: View {
             .onChanged { value in
                 guard zoomState.scale > 1.0 else { return }
                 zoomState.offset = CGSize(
-                    width: dragStart.width + value.translation.width,
-                    height: dragStart.height + value.translation.height
+                    width: dragStart.width + value.translation.width / zoomState.scale,
+                    height: dragStart.height + value.translation.height / zoomState.scale
                 )
             }
             .onEnded { _ in
