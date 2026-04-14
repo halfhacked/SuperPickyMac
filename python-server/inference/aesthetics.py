@@ -1,5 +1,8 @@
-import sys
+"""Aesthetics scoring via TOPIQ."""
 import os
+import sys
+
+from inference._common import temp_image_file
 from inference.device import get_best_device
 
 SUPERPICKY_DIR = os.environ.get("SUPERPICKY_ORIGINAL", os.path.expanduser("~/projects/SuperPicky"))
@@ -8,18 +11,12 @@ if SUPERPICKY_DIR not in sys.path:
 
 
 class AestheticsScorer:
-    def __init__(self, model_path: str):
-        self.device = get_best_device()
+    def __init__(self, model_path: str) -> None:
+        self.device: str = get_best_device()
         from topiq_model import TOPIQScorer
         self.scorer = TOPIQScorer(device=self.device)
 
-    def score(self, image_bytes: bytes) -> dict:
-        import tempfile
-        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
-            f.write(image_bytes)
-            tmp_path = f.name
-        try:
+    def predict(self, image_bytes: bytes) -> dict:
+        with temp_image_file(image_bytes) as tmp_path:
             result = self.scorer.calculate_score(tmp_path)
             return {"score": float(result), "distribution": []}
-        finally:
-            os.unlink(tmp_path)
