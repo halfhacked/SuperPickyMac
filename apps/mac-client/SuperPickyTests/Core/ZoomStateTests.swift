@@ -3,112 +3,93 @@ import Foundation
 @testable import SuperPicky
 
 @Suite struct ZoomStateTests {
-    // MARK: - Initial state
 
-    @Test func initialStateIsFitToView() {
-        let state = ZoomState()
-        #expect(state.scale == 1.0)
-        #expect(state.offset == .zero)
+    /// Convert a view-space point to the image-space point it maps to.
+    private func imagePoint(viewPoint: CGPoint, viewSize: CGSize, scale: CGFloat, offset: CGSize) -> CGPoint {
+        let cx = viewSize.width / 2
+        let cy = viewSize.height / 2
+        return CGPoint(
+            x: (viewPoint.x - cx - offset.width) / scale,
+            y: (viewPoint.y - cy - offset.height) / scale
+        )
     }
 
-    // MARK: - Zoom
-
-    @Test func zoomInIncreasesScale() {
+    @Test func zoomAtCenter_pointStaysFixed() {
         let state = ZoomState()
-        state.zoom(by: 1.5)
-        #expect(state.scale == 1.5)
-    }
+        let viewSize = CGSize(width: 800, height: 600)
+        let mouse = CGPoint(x: 400, y: 300)
 
-    @Test func zoomOutDecreasesScale() {
-        let state = ZoomState()
-        state.zoom(by: 0.5)
-        #expect(state.scale == 0.5)
-    }
+        let before = imagePoint(viewPoint: mouse, viewSize: viewSize, scale: state.scale, offset: state.offset)
+        state.toggleFitActualPixelsAt(imagePixelWidth: 3200, viewSize: viewSize, mouseInView: mouse)
+        let after = imagePoint(viewPoint: mouse, viewSize: viewSize, scale: state.scale, offset: state.offset)
 
-    @Test func zoomClampsToMinimum() {
-        let state = ZoomState()
-        state.zoom(by: 0.1) // Would be 0.1, below 0.5 min
-        #expect(state.scale == ZoomState.minScale)
-    }
-
-    @Test func zoomClampsToMaximum() {
-        let state = ZoomState()
-        state.zoom(by: 20.0) // Would be 20.0, above 10.0 max
-        #expect(state.scale == ZoomState.maxScale)
-    }
-
-    @Test func zoomToOneOrBelowResetsOffset() {
-        let state = ZoomState()
-        state.scale = 2.0
-        state.offset = CGSize(width: 100, height: 50)
-        state.zoom(by: 0.5) // 2.0 * 0.5 = 1.0
-        #expect(state.scale == 1.0)
-        #expect(state.offset == .zero)
-    }
-
-    // MARK: - Toggle fit / actual pixels
-
-    @Test func toggleFromFitZoomsToActualPixels() {
-        let state = ZoomState()
-        // Image is 4000px wide, view is 1000px wide → actual = 4.0x
-        state.toggleFitActualPixels(imagePixelWidth: 4000, viewWidth: 1000)
+        #expect(abs(before.x - after.x) < 0.01)
+        #expect(abs(before.y - after.y) < 0.01)
         #expect(state.scale == 4.0)
     }
 
-    @Test func toggleFromZoomedReturnsFit() {
+    @Test func zoomAtTopLeft_pointStaysFixed() {
         let state = ZoomState()
-        state.scale = 4.0
-        state.offset = CGSize(width: 50, height: 30)
-        state.toggleFitActualPixels(imagePixelWidth: 4000, viewWidth: 1000)
+        let viewSize = CGSize(width: 800, height: 600)
+        let mouse = CGPoint(x: 100, y: 50)
+
+        let before = imagePoint(viewPoint: mouse, viewSize: viewSize, scale: state.scale, offset: state.offset)
+        state.toggleFitActualPixelsAt(imagePixelWidth: 2400, viewSize: viewSize, mouseInView: mouse)
+        let after = imagePoint(viewPoint: mouse, viewSize: viewSize, scale: state.scale, offset: state.offset)
+
+        #expect(abs(before.x - after.x) < 0.01)
+        #expect(abs(before.y - after.y) < 0.01)
+    }
+
+    @Test func zoomAtBottomRight_pointStaysFixed() {
+        let state = ZoomState()
+        let viewSize = CGSize(width: 800, height: 600)
+        let mouse = CGPoint(x: 750, y: 550)
+
+        let before = imagePoint(viewPoint: mouse, viewSize: viewSize, scale: state.scale, offset: state.offset)
+        state.toggleFitActualPixelsAt(imagePixelWidth: 4000, viewSize: viewSize, mouseInView: mouse)
+        let after = imagePoint(viewPoint: mouse, viewSize: viewSize, scale: state.scale, offset: state.offset)
+
+        #expect(abs(before.x - after.x) < 0.01)
+        #expect(abs(before.y - after.y) < 0.01)
+    }
+
+    @Test func zoomAtArbitraryPoint_pointStaysFixed() {
+        let state = ZoomState()
+        let viewSize = CGSize(width: 1200, height: 800)
+        let mouse = CGPoint(x: 273, y: 519)
+
+        let before = imagePoint(viewPoint: mouse, viewSize: viewSize, scale: state.scale, offset: state.offset)
+        state.toggleFitActualPixelsAt(imagePixelWidth: 6000, viewSize: viewSize, mouseInView: mouse)
+        let after = imagePoint(viewPoint: mouse, viewSize: viewSize, scale: state.scale, offset: state.offset)
+
+        #expect(abs(before.x - after.x) < 0.01)
+        #expect(abs(before.y - after.y) < 0.01)
+    }
+
+    @Test func zoomOut_resetsToFit() {
+        let state = ZoomState()
+        let viewSize = CGSize(width: 800, height: 600)
+        let mouse = CGPoint(x: 200, y: 150)
+
+        state.toggleFitActualPixelsAt(imagePixelWidth: 3200, viewSize: viewSize, mouseInView: mouse)
+        #expect(state.scale == 4.0)
+
+        state.toggleFitActualPixelsAt(imagePixelWidth: 3200, viewSize: viewSize, mouseInView: mouse)
         #expect(state.scale == 1.0)
         #expect(state.offset == .zero)
     }
 
-    @Test func toggleClampsActualPixelsToMax() {
+    @Test func doubleToggle_returnsToOriginal() {
         let state = ZoomState()
-        // Image is 20000px, view is 1000px → would be 20x, clamped to 10x
-        state.toggleFitActualPixels(imagePixelWidth: 20000, viewWidth: 1000)
-        #expect(state.scale == ZoomState.maxScale)
-    }
+        let viewSize = CGSize(width: 800, height: 600)
+        let mouse = CGPoint(x: 350, y: 420)
 
-    // MARK: - Pan
+        state.toggleFitActualPixelsAt(imagePixelWidth: 4800, viewSize: viewSize, mouseInView: mouse)
+        state.toggleFitActualPixelsAt(imagePixelWidth: 4800, viewSize: viewSize, mouseInView: mouse)
 
-    @Test func panUpdatesOffsetWhenZoomed() {
-        let state = ZoomState()
-        state.scale = 2.0
-        state.pan(by: CGSize(width: 10, height: 20))
-        #expect(state.offset == CGSize(width: 10, height: 20))
-    }
-
-    @Test func panAccumulatesOffset() {
-        let state = ZoomState()
-        state.scale = 2.0
-        state.pan(by: CGSize(width: 10, height: 20))
-        state.pan(by: CGSize(width: 5, height: -10))
-        #expect(state.offset == CGSize(width: 15, height: 10))
-    }
-
-    @Test func panIgnoredWhenAtFitScale() {
-        let state = ZoomState()
-        state.pan(by: CGSize(width: 100, height: 100))
-        #expect(state.offset == .zero)
-    }
-
-    @Test func panIgnoredWhenBelowFitScale() {
-        let state = ZoomState()
-        state.scale = 0.8
-        state.pan(by: CGSize(width: 100, height: 100))
-        #expect(state.offset == .zero)
-    }
-
-    // MARK: - Reset
-
-    @Test func resetRestoresInitialState() {
-        let state = ZoomState()
-        state.scale = 3.0
-        state.offset = CGSize(width: 200, height: -100)
-        state.reset()
         #expect(state.scale == 1.0)
-        #expect(state.offset == .zero)
+        #expect(state.offset.width == 0)
+        #expect(state.offset.height == 0)
     }
 }
