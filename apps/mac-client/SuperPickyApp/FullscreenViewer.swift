@@ -8,6 +8,7 @@ struct FullscreenViewer: View {
     @State private var showInfo = false
     @State private var zoomState = ZoomState()
     @State private var image: NSImage?
+    @State private var mouseLocation: CGPoint = .zero
     @FocusState private var isFocused: Bool
 
     var body: some View {
@@ -37,11 +38,17 @@ struct FullscreenViewer: View {
                     }
                 }
             }
+            .onContinuousHover { phase in
+                if case .active(let location) = phase {
+                    mouseLocation = location
+                }
+            }
             .onKeyPress("z") {
                 guard let img = image else { return .ignored }
-                zoomState.toggleFitActualPixels(
+                zoomState.toggleFitActualPixelsAt(
                     imagePixelWidth: img.size.width,
-                    viewWidth: geo.size.width
+                    viewSize: geo.size,
+                    mouseInView: mouseLocation
                 )
                 return .handled
             }
@@ -53,6 +60,8 @@ struct FullscreenViewer: View {
         .onKeyPress(.leftArrow) { navigatePhoto(direction: -1); return .handled }
         .onKeyPress(.rightArrow) { navigatePhoto(direction: 1); return .handled }
         .onKeyPress(.escape) { isPresented = false; return .handled }
+        .onKeyPress("f") { isPresented = false; return .handled }
+        .onKeyPress(.return) { isPresented = false; return .handled }
         .onKeyPress("i") { showInfo.toggle(); return .handled }
         .onKeyPress("0") { rateSelected(0); return .handled }
         .onKeyPress("1") { rateSelected(1); return .handled }

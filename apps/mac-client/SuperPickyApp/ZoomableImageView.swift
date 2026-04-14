@@ -26,6 +26,24 @@ final class ZoomState {
         }
     }
 
+    /// Toggle between fit and 100% zoom, centering on the given point (relative to view center).
+    func toggleFitActualPixelsAt(imagePixelWidth: CGFloat, viewSize: CGSize, mouseInView: CGPoint) {
+        if scale == 1.0 {
+            let newScale = imagePixelWidth / viewSize.width
+            let clampedScale = min(max(newScale, Self.minScale), Self.maxScale)
+            // Offset so the point under the mouse stays under the mouse
+            let centerX = viewSize.width / 2
+            let centerY = viewSize.height / 2
+            let dx = (mouseInView.x - centerX) * (1 - clampedScale)
+            let dy = (mouseInView.y - centerY) * (1 - clampedScale)
+            scale = clampedScale
+            offset = CGSize(width: dx, height: dy)
+        } else {
+            scale = 1.0
+            offset = .zero
+        }
+    }
+
     func reset() {
         scale = 1.0
         offset = .zero
