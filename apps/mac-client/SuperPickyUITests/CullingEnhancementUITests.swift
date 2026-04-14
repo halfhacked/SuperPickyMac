@@ -157,7 +157,7 @@ final class CullingEnhancementUITests: XCTestCase {
         let app = launchWithProcessedPhotos()
         defer { app.terminate() }
 
-        let exportButton = app.buttons["ExportButton"]
+        let exportButton = app.buttons.matching(identifier: "ExportButton").firstMatch
         XCTAssertTrue(exportButton.waitForExistence(timeout: 10))
         XCTAssertTrue(exportButton.isEnabled, "Export button should be enabled")
 
