@@ -138,11 +138,13 @@ class ScrollWheelMonitorView: NSView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        print("[ScrollWheelMonitor] viewDidMoveToWindow, window=\(window != nil), monitor=\(monitor != nil)")
         if window != nil && monitor == nil {
             monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
                 guard let self = self else { return event }
                 return self.handleScroll(event)
             }
+            print("[ScrollWheelMonitor] Monitor installed")
         }
     }
 
@@ -159,33 +161,54 @@ class ScrollWheelMonitorView: NSView {
         guard abs(event.scrollingDeltaY) > abs(event.scrollingDeltaX) else { return event }
 
         // Check if cursor is over our view's frame
-        guard let window = self.window else { return event }
+        guard let _ = self.window else { return event }
         let locationInWindow = event.locationInWindow
         let locationInView = self.convert(locationInWindow, from: nil)
-        guard self.bounds.contains(locationInView) else { return event }
+
+        if !self.bounds.contains(locationInView) { return event }
+        print("[ScrollWheelMonitor] Scroll intercepted! deltaY=\(event.scrollingDeltaY)")
 
         // Find the NSScrollView in our superview hierarchy
-        guard let scrollView = findScrollView() else { return event }
+        guard let scrollView = findScrollView() else {
+            print("[ScrollWheelMonitor] No NSScrollView found!")
+            return event
+        }
+        print("[ScrollWheelMonitor] Found scroll view, redirecting")
 
+        // Convert vertical delta to horizontal and let NSScrollView handle clamping
         let clip = scrollView.contentView
         var origin = clip.bounds.origin
         let mult: CGFloat = event.hasPreciseScrollingDeltas ? 1.0 : 10.0
         origin.x -= event.scrollingDeltaY * mult
-        let maxX = max(0, (scrollView.documentView?.bounds.width ?? 0) - scrollView.bounds.width)
-        origin.x = min(max(0, origin.x), maxX)
-        clip.scroll(to: origin)
+        let constrainedPoint = clip.constrainBoundsRect(NSRect(origin: origin, size: clip.bounds.size)).origin
+        clip.scroll(to: constrainedPoint)
         scrollView.reflectScrolledClipView(clip)
         return nil // Consume the event
     }
 
+    private var cachedScrollView: NSScrollView?
+
     private func findScrollView() -> NSScrollView? {
-        var view: NSView? = self.superview
-        while let v = view {
-            if let sv = v as? NSScrollView { return sv }
-            for sub in v.subviews where sub is NSScrollView {
-                return sub as? NSScrollView
+        if let cached = cachedScrollView, cached.window != nil { return cached }
+        // The background NSView is in a different branch than the ScrollView's NSScrollView.
+        // Search the entire window view hierarchy for the horizontal NSScrollView
+        // that contains our view's frame.
+        guard let window = self.window else { return nil }
+        let myFrameInWindow = self.convert(self.bounds, to: nil)
+        cachedScrollView = findHorizontalScrollView(in: window.contentView, containing: myFrameInWindow)
+        return cachedScrollView
+    }
+
+    private func findHorizontalScrollView(in view: NSView?, containing frame: NSRect) -> NSScrollView? {
+        guard let view = view else { return nil }
+        if let sv = view as? NSScrollView, sv.hasHorizontalScroller || !sv.hasVerticalScroller {
+            let svFrame = sv.convert(sv.bounds, to: nil)
+            if svFrame.intersects(frame) { return sv }
+        }
+        for sub in view.subviews {
+            if let found = findHorizontalScrollView(in: sub, containing: frame) {
+                return found
             }
-            view = v.superview
         }
         return nil
     }
