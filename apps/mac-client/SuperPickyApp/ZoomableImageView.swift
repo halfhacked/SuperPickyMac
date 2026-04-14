@@ -26,18 +26,24 @@ final class ZoomState {
         }
     }
 
-    /// Toggle between fit and 100% zoom, centering on the given point (relative to view center).
+    /// Toggle between fit and 100% zoom. The point under the mouse stays fixed on screen.
     func toggleFitActualPixelsAt(imagePixelWidth: CGFloat, viewSize: CGSize, mouseInView: CGPoint) {
-        if scale == 1.0 {
-            let newScale = imagePixelWidth / viewSize.width
-            let clampedScale = min(max(newScale, Self.minScale), Self.maxScale)
-            // Offset so the point under the mouse stays under the mouse
-            let centerX = viewSize.width / 2
-            let centerY = viewSize.height / 2
-            let dx = (mouseInView.x - centerX) * (1 - clampedScale)
-            let dy = (mouseInView.y - centerY) * (1 - clampedScale)
-            scale = clampedScale
-            offset = CGSize(width: dx, height: dy)
+        let oldScale = scale
+        let oldOffset = offset
+        let cx = viewSize.width / 2
+        let cy = viewSize.height / 2
+
+        if scale <= 1.0 {
+            let newScale = min(max(imagePixelWidth / viewSize.width, Self.minScale), Self.maxScale)
+            // Image point under cursor: (mouse - center - offset) / oldScale
+            let imgX = (mouseInView.x - cx - oldOffset.width) / oldScale
+            let imgY = (mouseInView.y - cy - oldOffset.height) / oldScale
+            // New offset so same image point stays under cursor
+            scale = newScale
+            offset = CGSize(
+                width: mouseInView.x - cx - imgX * newScale,
+                height: mouseInView.y - cy - imgY * newScale
+            )
         } else {
             scale = 1.0
             offset = .zero
