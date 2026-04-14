@@ -35,3 +35,4 @@ python-server/models/*.pth
 # Superpowers
 .superpowers/
 real-photos/
+apps/mac-client/SuperPicky.xcodeproj/
