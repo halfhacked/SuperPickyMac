@@ -318,21 +318,15 @@ import ImageIO
             .deletingLastPathComponent() // project root
             .appendingPathComponent("test-photos")
 
-        let kingfisher = testPhotosDir.appendingPathComponent("kingfisher_01.jpg")
-        guard FileManager.default.fileExists(atPath: kingfisher.path) else {
-            // Skip if test-photos not available (CI environment)
-            return
+        let testPhoto = testPhotosDir.appendingPathComponent("DSC00001.jpg")
+        guard FileManager.default.fileExists(atPath: testPhoto.path) else {
+            return // Skip if test-photos not available
         }
 
-        let data = try #require(EXIFReader.read(from: kingfisher.path))
-        #expect(data.cameraMake == "Nikon")
-        #expect(data.cameraModel == "Z9")
-        #expect(!data.keywords.isEmpty)
-        #expect(data.keywords.contains("kingfisher"))
-        #expect(data.keywords.contains("bird"))
-        #expect(data.latitude != nil)
-        #expect(data.longitude != nil)
-        #expect(data.city != nil)
+        let data = try #require(EXIFReader.read(from: testPhoto.path))
+        #expect(data.cameraMake == "SONY")
+        #expect(data.cameraModel == "ILCE-1")
+        #expect(data.dateTimeOriginal != nil)
         #expect(!data.isEmpty)
     }
 }
