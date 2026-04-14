@@ -14,13 +14,13 @@ targets:
     type: application
     platform: macOS
     sources:
-      - SuperPickyApp
+      - path: SuperPickyApp
     dependencies:
       - package: GRDB
     settings:
       base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.superpicky.SuperPicky
         GENERATE_INFOPLIST_FILE: YES
-        SWIFT_VERSION: "5.10"
         CODE_SIGN_IDENTITY: "-"
         CODE_SIGNING_REQUIRED: NO
 
@@ -28,12 +28,20 @@ targets:
     type: bundle.ui-testing
     platform: macOS
     sources:
-      - SuperPickyUITests
+      - path: SuperPickyUITests
     dependencies:
       - target: SuperPicky
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
-        SWIFT_VERSION: "5.10"
-        CODE_SIGN_IDENTITY: "-"
-        CODE_SIGNING_REQUIRED: NO
+        TEST_TARGET_NAME: SuperPicky
+
+schemes:
+  SuperPicky:
+    build:
+      targets:
+        SuperPicky: all
+        SuperPickyUITests: [test]
+    test:
+      targets:
+        - SuperPickyUITests
