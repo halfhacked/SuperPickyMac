@@ -94,11 +94,9 @@ struct ZoomableImageView: View {
                         zoomState.zoom(by: factor)
                     }
                 )
-                .onChange(of: zoomState.offset) { _, newOffset in
-                    // Sync dragStart when offset changes externally (e.g. Z key zoom)
-                    dragStart = newOffset
-                }
                 .onChange(of: zoomState.scale) { _, newScale in
+                    // Sync dragStart when zoom changes (Z key, scroll wheel)
+                    dragStart = zoomState.offset
                     if newScale <= 1.0 { dragStart = .zero }
                 }
         }
@@ -109,8 +107,8 @@ struct ZoomableImageView: View {
             .onChanged { value in
                 guard zoomState.scale > 1.0 else { return }
                 zoomState.offset = CGSize(
-                    width: dragStart.width + value.translation.width / zoomState.scale,
-                    height: dragStart.height + value.translation.height / zoomState.scale
+                    width: dragStart.width + value.translation.width,
+                    height: dragStart.height + value.translation.height
                 )
             }
             .onEnded { _ in
