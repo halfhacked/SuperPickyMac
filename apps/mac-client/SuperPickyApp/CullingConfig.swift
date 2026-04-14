@@ -55,6 +55,8 @@ enum RawFormat: String, CaseIterable, Sendable {
 
 @MainActor @Observable
 final class CullingConfig {
+    @ObservationIgnored private let storage: ConfigurationStorage
+
     var skillLevel: SkillLevel {
         didSet {
             sharpnessThreshold = skillLevel.sharpnessThreshold
@@ -73,34 +75,33 @@ final class CullingConfig {
     var keywordFormat: String { didSet { save() } }
     var appTheme: AppTheme { didSet { save() } }
 
-    init() {
-        let defaults = UserDefaults.standard
-        let level = SkillLevel(rawValue: defaults.string(forKey: "skillLevel") ?? "") ?? .intermediate
+    init(storage: ConfigurationStorage = UserDefaultsStorage()) {
+        self.storage = storage
+        let level = SkillLevel(rawValue: storage.string(forKey: "skillLevel", default: "")) ?? .intermediate
         self.skillLevel = level
-        self.sharpnessThreshold = defaults.object(forKey: "sharpnessThreshold") as? Float ?? level.sharpnessThreshold
-        self.aestheticsThreshold = defaults.object(forKey: "aestheticsThreshold") as? Float ?? level.aestheticsThreshold
-        self.exposureDetectionEnabled = defaults.object(forKey: "exposureDetectionEnabled") as? Bool ?? true
-        self.exposureThreshold = defaults.object(forKey: "exposureThreshold") as? Float ?? 0.10
-        self.burstDetectionEnabled = defaults.object(forKey: "burstDetectionEnabled") as? Bool ?? true
-        self.namingStandard = NamingStandard(rawValue: defaults.string(forKey: "namingStandard") ?? "") ?? .osea
-        self.backendPort = defaults.object(forKey: "backendPort") as? Int ?? 8420
-        self.writeKeywords = defaults.object(forKey: "writeKeywords") as? Bool ?? true
-        self.keywordFormat = defaults.string(forKey: "keywordFormat") ?? "{cn} {en} {pinyin}"
-        self.appTheme = AppTheme(rawValue: defaults.string(forKey: "appTheme") ?? "") ?? .dark
+        self.sharpnessThreshold = storage.float(forKey: "sharpnessThreshold", default: level.sharpnessThreshold)
+        self.aestheticsThreshold = storage.float(forKey: "aestheticsThreshold", default: level.aestheticsThreshold)
+        self.exposureDetectionEnabled = storage.bool(forKey: "exposureDetectionEnabled", default: true)
+        self.exposureThreshold = storage.float(forKey: "exposureThreshold", default: 0.10)
+        self.burstDetectionEnabled = storage.bool(forKey: "burstDetectionEnabled", default: true)
+        self.namingStandard = NamingStandard(rawValue: storage.string(forKey: "namingStandard", default: "")) ?? .osea
+        self.backendPort = storage.int(forKey: "backendPort", default: 8420)
+        self.writeKeywords = storage.bool(forKey: "writeKeywords", default: true)
+        self.keywordFormat = storage.string(forKey: "keywordFormat", default: "{cn} {en} {pinyin}")
+        self.appTheme = AppTheme(rawValue: storage.string(forKey: "appTheme", default: "")) ?? .dark
     }
 
     private func save() {
-        let defaults = UserDefaults.standard
-        defaults.set(skillLevel.rawValue, forKey: "skillLevel")
-        defaults.set(sharpnessThreshold, forKey: "sharpnessThreshold")
-        defaults.set(aestheticsThreshold, forKey: "aestheticsThreshold")
-        defaults.set(exposureDetectionEnabled, forKey: "exposureDetectionEnabled")
-        defaults.set(exposureThreshold, forKey: "exposureThreshold")
-        defaults.set(burstDetectionEnabled, forKey: "burstDetectionEnabled")
-        defaults.set(namingStandard.rawValue, forKey: "namingStandard")
-        defaults.set(backendPort, forKey: "backendPort")
-        defaults.set(writeKeywords, forKey: "writeKeywords")
-        defaults.set(keywordFormat, forKey: "keywordFormat")
-        defaults.set(appTheme.rawValue, forKey: "appTheme")
+        storage.set(skillLevel.rawValue, forKey: "skillLevel")
+        storage.set(sharpnessThreshold, forKey: "sharpnessThreshold")
+        storage.set(aestheticsThreshold, forKey: "aestheticsThreshold")
+        storage.set(exposureDetectionEnabled, forKey: "exposureDetectionEnabled")
+        storage.set(exposureThreshold, forKey: "exposureThreshold")
+        storage.set(burstDetectionEnabled, forKey: "burstDetectionEnabled")
+        storage.set(namingStandard.rawValue, forKey: "namingStandard")
+        storage.set(backendPort, forKey: "backendPort")
+        storage.set(writeKeywords, forKey: "writeKeywords")
+        storage.set(keywordFormat, forKey: "keywordFormat")
+        storage.set(appTheme.rawValue, forKey: "appTheme")
     }
 }
