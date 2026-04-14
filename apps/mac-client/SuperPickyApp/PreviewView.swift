@@ -3,14 +3,23 @@ import SwiftUI
 struct PreviewView: View {
     let photo: Photo?
     @Bindable var zoomState: ZoomState
+    @Binding var mouseInView: CGPoint
+    @Binding var viewSize: CGSize
     @State private var previousPhotoID: UUID?
 
     var body: some View {
         VStack(spacing: 0) {
             if let photo {
-                // Photo preview
+                // Photo preview — hover and size tracked on the image view itself
                 AsyncPreviewImage(filePath: photo.filePath, zoomState: zoomState)
                     .accessibilityIdentifier("PhotoPreview")
+                    .onContinuousHover { phase in
+                        if case .active(let loc) = phase { mouseInView = loc }
+                    }
+                    .background(GeometryReader { geo in
+                        Color.clear.onAppear { viewSize = geo.size }
+                            .onChange(of: geo.size) { _, s in viewSize = s }
+                    })
                 InfoBarView(photo: photo)
             } else {
                 VStack(spacing: 12) {
