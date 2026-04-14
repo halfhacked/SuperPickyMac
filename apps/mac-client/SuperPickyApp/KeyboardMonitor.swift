@@ -14,7 +14,6 @@ struct KeyboardMonitor: NSViewRepresentable {
         let isReturn: Bool
         let isLeftArrow: Bool
         let isRightArrow: Bool
-        let mouseLocationInWindow: CGPoint
     }
 
     func makeNSView(context: Context) -> KeyboardMonitorView {
@@ -51,8 +50,7 @@ class KeyboardMonitorView: NSView {
                     isEscape: event.keyCode == 53,
                     isReturn: event.keyCode == 36,
                     isLeftArrow: event.keyCode == 123,
-                    isRightArrow: event.keyCode == 124,
-                    mouseLocationInWindow: event.window?.mouseLocationOutsideOfEventStream ?? .zero
+                    isRightArrow: event.keyCode == 124
                 )
 
                 let handled = onKey(keyEvent)

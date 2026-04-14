@@ -480,14 +480,7 @@ struct ContentView: View {
         case "5": rateSelectedPhoto(5); return true
         case "z":
             guard let photo = selectedPhoto else { return false }
-            let imagePixelWidth: CGFloat
-            if let source = CGImageSourceCreateWithURL(URL(fileURLWithPath: photo.filePath) as CFURL, nil),
-               let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any],
-               let w = props[kCGImagePropertyPixelWidth as String] as? CGFloat {
-                imagePixelWidth = w
-            } else {
-                imagePixelWidth = previewSize.width * 2
-            }
+            let imagePixelWidth = ImageLoader.pixelWidth(path: photo.filePath) ?? previewSize.width * 2
 
             let activeZoom = showFullscreen ? fullscreenZoomState : zoomState
             let viewSize = showFullscreen

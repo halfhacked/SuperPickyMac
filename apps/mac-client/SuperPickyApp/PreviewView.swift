@@ -10,7 +10,6 @@ struct PreviewView: View {
     var body: some View {
         VStack(spacing: 0) {
             if let photo {
-                // Photo preview — hover and size tracked on the image view itself
                 AsyncPreviewImage(filePath: photo.filePath, zoomState: zoomState)
                     .accessibilityIdentifier("PhotoPreview")
                     .onContinuousHover { phase in
@@ -77,40 +76,7 @@ struct AsyncPreviewImage: View {
     }
 
     private func loadImage(maxSize: Int?) async -> NSImage? {
-        let url = URL(fileURLWithPath: filePath)
-        guard FileManager.default.fileExists(atPath: filePath) else { return nil }
-
-        return await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
-                    continuation.resume(returning: nil)
-                    return
-                }
-
-                let cgImage: CGImage?
-                if let maxSize {
-                    // Preview: fast embedded thumbnail
-                    let options: [CFString: Any] = [
-                        kCGImageSourceThumbnailMaxPixelSize: maxSize,
-                        kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
-                        kCGImageSourceCreateThumbnailWithTransform: true,
-                    ]
-                    cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
-                } else {
-                    // Full-res: decode the actual image (not just embedded preview)
-                    cgImage = CGImageSourceCreateImageAtIndex(source, 0, [
-                        kCGImageSourceCreateThumbnailWithTransform: true,
-                    ] as CFDictionary)
-                }
-
-                guard let cgImage else {
-                    continuation.resume(returning: nil)
-                    return
-                }
-                let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
-                continuation.resume(returning: nsImage)
-            }
-        }
+        await ImageLoader.load(path: filePath, maxPixelSize: maxSize)
     }
 }
 
