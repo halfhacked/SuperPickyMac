@@ -50,34 +50,8 @@ struct AsyncPreviewImage: View {
         }
         .task(id: filePath) {
             // Keep old image visible until new one loads (no white flash)
-            let newImage = await loadImage()
+            let newImage = await AsyncImageLoader.load(filePath: filePath, size: .preview)
             image = newImage
-        }
-    }
-
-    private func loadImage() async -> NSImage? {
-        let url = URL(fileURLWithPath: filePath)
-        guard FileManager.default.fileExists(atPath: filePath) else { return nil }
-
-        return await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
-                    continuation.resume(returning: nil)
-                    return
-                }
-                // Extract embedded preview (fast for RAW — no full decode)
-                let options: [CFString: Any] = [
-                    kCGImageSourceThumbnailMaxPixelSize: 2000,
-                    kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
-                    kCGImageSourceCreateThumbnailWithTransform: true,
-                ]
-                guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
-                    continuation.resume(returning: nil)
-                    return
-                }
-                let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
-                continuation.resume(returning: nsImage)
-            }
         }
     }
 }
