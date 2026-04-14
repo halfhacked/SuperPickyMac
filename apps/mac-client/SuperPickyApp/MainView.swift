@@ -363,6 +363,8 @@ struct ContentView: View {
     var onRatePhoto: ((UUID, Int) -> Void)?
     @State private var showExifPanel = true
     @State private var showFullscreen = false
+    @State private var zoomState = ZoomState()
+    @State private var previewSize: CGSize = .zero
     @State private var isExporting = false
     @State private var exportProgress = 0
     @State private var exportTotal = 0
@@ -373,7 +375,11 @@ struct ContentView: View {
     var body: some View {
         VSplitView {
             ZStack(alignment: .topTrailing) {
-                PreviewView(photo: selectedPhoto)
+                PreviewView(photo: selectedPhoto, zoomState: zoomState)
+                    .background(GeometryReader { geo in
+                        Color.clear.onAppear { previewSize = geo.size }
+                            .onChange(of: geo.size) { _, s in previewSize = s }
+                    })
 
                 if showExifPanel, let photo = selectedPhoto {
                     ExifPanelView(photo: photo)
@@ -472,6 +478,15 @@ struct ContentView: View {
         case "3": rateSelectedPhoto(3); return true
         case "4": rateSelectedPhoto(4); return true
         case "5": rateSelectedPhoto(5); return true
+        case "z":
+            let mouseInWindow = NSApp.keyWindow?.mouseLocationOutsideOfEventStream ?? .zero
+            let mouseInView = CGPoint(x: mouseInWindow.x, y: previewSize.height - mouseInWindow.y)
+            zoomState.toggleFitActualPixelsAt(
+                imagePixelWidth: previewSize.width * 2,
+                viewSize: previewSize,
+                mouseInView: mouseInView
+            )
+            return true
         default: return false
         }
     }
