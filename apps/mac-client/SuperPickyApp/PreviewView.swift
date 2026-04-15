@@ -6,6 +6,7 @@ struct PreviewView: View {
     var brightnessAdjustment: Double = 0
     @Binding var mouseInView: CGPoint
     @Binding var viewSize: CGSize
+    var onCorrectSpecies: ((UUID, String) -> Void)?
     @State private var previousPhotoID: UUID?
 
     var body: some View {
@@ -20,7 +21,9 @@ struct PreviewView: View {
                         Color.clear.onAppear { viewSize = geo.size }
                             .onChange(of: geo.size) { _, s in viewSize = s }
                     })
-                InfoBarView(photo: photo)
+                InfoBarView(photo: photo, onCorrectSpecies: { name in
+                    onCorrectSpecies?(photo.id, name)
+                })
             } else {
                 VStack(spacing: 12) {
                     Image(systemName: "bird")
@@ -116,6 +119,10 @@ struct AsyncPreviewImage: View {
 struct InfoBarView: View {
     let photo: Photo
     @Environment(CullingConfig.self) private var config
+    var onCorrectSpecies: ((String) -> Void)?
+
+    @State private var isEditingSpecies = false
+    @State private var editingSpeciesName = ""
 
     var body: some View {
         HStack(spacing: 16) {
@@ -153,7 +160,23 @@ struct InfoBarView: View {
                     .foregroundStyle(.green)
             }
 
-            if let species = photo.speciesScientificName {
+            if isEditingSpecies {
+                HStack(spacing: 4) {
+                    Image(systemName: "bird.fill")
+                        .font(.caption)
+                    TextField("Species name", text: $editingSpeciesName)
+                        .font(.caption)
+                        .textFieldStyle(.plain)
+                        .frame(width: 150)
+                        .accessibilityIdentifier("SpeciesEditField")
+                        .onSubmit {
+                            commitSpeciesEdit()
+                        }
+                        .onExitCommand {
+                            isEditingSpecies = false
+                        }
+                }
+            } else if let species = photo.speciesScientificName {
                 Label {
                     Text(config.localizedName(en: photo.speciesCommonName ?? species, cn: photo.speciesCnName))
                     if let conf = photo.speciesConfidence {
@@ -164,6 +187,11 @@ struct InfoBarView: View {
                     Image(systemName: "bird.fill")
                 }
                 .font(.caption)
+                .onTapGesture(count: 2) {
+                    editingSpeciesName = photo.speciesCommonName ?? species
+                    isEditingSpecies = true
+                }
+                .help("Double-click to correct species name")
             }
 
             Spacer()
@@ -176,5 +204,13 @@ struct InfoBarView: View {
         .padding(.vertical, 8)
         .background(.bar)
         .accessibilityIdentifier("InfoBar")
+        .onChange(of: photo.id) {
+            isEditingSpecies = false
+        }
+    }
+
+    private func commitSpeciesEdit() {
+        onCorrectSpecies?(editingSpeciesName)
+        isEditingSpecies = false
     }
 }

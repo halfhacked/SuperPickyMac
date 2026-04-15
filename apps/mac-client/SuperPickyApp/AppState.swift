@@ -273,6 +273,15 @@ final class AppState {
         logger.info("Deleted photo: \(photo.filename)")
     }
 
+    /// Override the species name for a photo. Persists to DB and XMP sidecar.
+    func correctSpecies(id: UUID, commonName: String) {
+        let trimmed = commonName.trimmingCharacters(in: .whitespaces)
+        mutatePhoto(id: id) { photo in
+            photo.speciesCommonName = trimmed.isEmpty ? nil : trimmed
+        }
+        buildSpeciesHierarchy()
+    }
+
     func rejectPhoto(id: UUID) {
         mutatePhoto(id: id, wasHidden: true, { photo in
             photo.starRating = 0

@@ -69,6 +69,9 @@ struct MainView: View {
                     },
                     onDeletePhoto: { id in
                         try? appState.deletePhoto(id: id)
+                    },
+                    onCorrectSpecies: { id, name in
+                        appState.correctSpecies(id: id, commonName: name)
                     }
                 )
             }

@@ -21,6 +21,7 @@ struct ContentView: View {
     var onExportPicks: (() -> Void)?
     var onExportAllVisible: (([Photo]) -> Void)?
     var onDeletePhoto: ((UUID) -> Void)?
+    var onCorrectSpecies: ((UUID, String) -> Void)?
     @Environment(CullingConfig.self) private var config
     @State private var minimumStars: Int = 0
     @State private var topBurstOnly: Bool = false
@@ -74,7 +75,8 @@ struct ContentView: View {
             ZStack(alignment: .topTrailing) {
                 PreviewView(photo: selectedPhoto, zoomState: zoomState,
                             brightnessAdjustment: brightnessAdj,
-                            mouseInView: $mouseInPreview, viewSize: $previewSize)
+                            mouseInView: $mouseInPreview, viewSize: $previewSize,
+                            onCorrectSpecies: onCorrectSpecies)
 
                 if showExifPanel, let photo = selectedPhoto {
                     ExifPanelView(photo: photo)
