@@ -11,6 +11,21 @@ packages:
     from: "7.0.0"
 
 targets:
+  SuperPickyInference:
+    type: framework
+    platform: macOS
+    sources:
+      - path: SuperPickyInference
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.superpicky.SuperPickyInference
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDevelopmentRegion: en
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_REQUIRED: NO
+        SKIP_INSTALL: NO
+        DEFINES_MODULE: YES
+
   SuperPicky:
     type: application
     platform: macOS
@@ -28,6 +43,7 @@ targets:
           cp "$SERVER_SRC/inference/"*.py "$SERVER_DST/inference/"
     dependencies:
       - package: GRDB
+      - target: SuperPickyInference
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.superpicky.SuperPicky
