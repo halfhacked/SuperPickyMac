@@ -24,6 +24,8 @@ struct SourceListView: View {
 
     let onAddFolder: () -> Void
     let onRemoveFolder: (URL) -> Void
+    var onCancelProcessing: (() -> Void)?
+    var onReprocessFolder: ((URL) -> Void)?
 
     var body: some View {
         List(selection: $selection) {
@@ -32,10 +34,17 @@ struct SourceListView: View {
                     FolderRow(
                         folder: folder,
                         isProcessing: processingFolder == folder,
-                        progress: processingFolder == folder ? processingProgress : 0
+                        progress: processingFolder == folder ? processingProgress : 0,
+                        onCancel: (processingFolder == folder) ? onCancelProcessing : nil
                     )
                     .tag(SidebarSelection.folder(folder))
                     .contextMenu {
+                        Button {
+                            onReprocessFolder?(folder)
+                        } label: {
+                            Label("Reprocess Folder", systemImage: "arrow.triangle.2.circlepath")
+                        }
+
                         Button(role: .destructive) {
                             removeFolder(folder)
                         } label: {
@@ -231,14 +240,27 @@ struct FolderRow: View {
     let folder: URL
     let isProcessing: Bool
     let progress: Double
+    var onCancel: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Label(folder.lastPathComponent, systemImage: "folder")
             if isProcessing {
-                ProgressView(value: progress)
-                    .progressViewStyle(.linear)
-                    .scaleEffect(y: 0.5)
+                HStack(spacing: 6) {
+                    ProgressView(value: progress)
+                        .progressViewStyle(.linear)
+                        .scaleEffect(y: 0.5)
+                    Button {
+                        onCancel?()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                            .font(.system(size: 13))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Cancel processing")
+                    .accessibilityIdentifier("CancelProcessingButton")
+                }
             }
         }
     }

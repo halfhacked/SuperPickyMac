@@ -6,6 +6,7 @@ struct PreviewView: View {
     var brightnessAdjustment: Double = 0
     @Binding var mouseInView: CGPoint
     @Binding var viewSize: CGSize
+    var onCorrectSpecies: ((UUID, String) -> Void)?
     @State private var previousPhotoID: UUID?
 
     var body: some View {
@@ -20,7 +21,9 @@ struct PreviewView: View {
                         Color.clear.onAppear { viewSize = geo.size }
                             .onChange(of: geo.size) { _, s in viewSize = s }
                     })
-                InfoBarView(photo: photo)
+                InfoBarView(photo: photo, onCorrectSpecies: { name in
+                    onCorrectSpecies?(photo.id, name)
+                })
             } else {
                 VStack(spacing: 12) {
                     Image(systemName: "bird")
@@ -36,6 +39,27 @@ struct PreviewView: View {
         .onChange(of: photo?.id) { _, newID in
             previousPhotoID = newID
         }
+    }
+}
+
+private final class PreviewCache {
+    static let shared = PreviewCache()
+    private let cache = NSCache<NSString, NSImage>()
+
+    init() {
+        cache.countLimit = 5          // preview images are large — keep very few
+        cache.totalCostLimit = 200 * 1024 * 1024  // 200MB
+    }
+
+    func get(_ key: String) -> NSImage? {
+        cache.object(forKey: key as NSString)
+    }
+
+    func set(_ key: String, image: NSImage) {
+        let pixelsWide = image.representations.first?.pixelsWide ?? Int(image.size.width)
+        let pixelsHigh = image.representations.first?.pixelsHigh ?? Int(image.size.height)
+        let cost = pixelsWide * pixelsHigh * 4
+        cache.setObject(image, forKey: key as NSString, cost: cost)
     }
 }
 
@@ -58,12 +82,20 @@ struct AsyncPreviewImage: View {
         }
         .task(id: filePath) {
             isFullRes = false
+            // Check cache first (preview resolution only — not full-res)
+            if let cached = PreviewCache.shared.get(filePath) {
+                image = cached
+                return
+            }
             if zoomState.scale > 1.0 {
-                // Already zoomed in — load full-res directly
+                // Already zoomed in — load full-res directly (don't cache)
                 isFullRes = true
                 image = await loadImage(maxSize: nil)
             } else {
-                image = await loadImage(maxSize: 2000)
+                if let loaded = await loadImage(maxSize: 2000) {
+                    PreviewCache.shared.set(filePath, image: loaded)
+                    image = loaded
+                }
             }
         }
         .onChange(of: zoomState.scale) { _, newScale in
@@ -87,6 +119,10 @@ struct AsyncPreviewImage: View {
 struct InfoBarView: View {
     let photo: Photo
     @Environment(CullingConfig.self) private var config
+    var onCorrectSpecies: ((String) -> Void)?
+
+    @State private var isEditingSpecies = false
+    @State private var editingSpeciesName = ""
 
     var body: some View {
         HStack(spacing: 16) {
@@ -124,7 +160,23 @@ struct InfoBarView: View {
                     .foregroundStyle(.green)
             }
 
-            if let species = photo.speciesScientificName {
+            if isEditingSpecies {
+                HStack(spacing: 4) {
+                    Image(systemName: "bird.fill")
+                        .font(.caption)
+                    TextField("Species name", text: $editingSpeciesName)
+                        .font(.caption)
+                        .textFieldStyle(.plain)
+                        .frame(width: 150)
+                        .accessibilityIdentifier("SpeciesEditField")
+                        .onSubmit {
+                            commitSpeciesEdit()
+                        }
+                        .onExitCommand {
+                            isEditingSpecies = false
+                        }
+                }
+            } else if let species = photo.speciesScientificName {
                 Label {
                     Text(config.localizedName(en: photo.speciesCommonName ?? species, cn: photo.speciesCnName))
                     if let conf = photo.speciesConfidence {
@@ -135,6 +187,11 @@ struct InfoBarView: View {
                     Image(systemName: "bird.fill")
                 }
                 .font(.caption)
+                .onTapGesture(count: 2) {
+                    editingSpeciesName = photo.speciesCommonName ?? species
+                    isEditingSpecies = true
+                }
+                .help("Double-click to correct species name")
             }
 
             Spacer()
@@ -147,5 +204,13 @@ struct InfoBarView: View {
         .padding(.vertical, 8)
         .background(.bar)
         .accessibilityIdentifier("InfoBar")
+        .onChange(of: photo.id) {
+            isEditingSpecies = false
+        }
+    }
+
+    private func commitSpeciesEdit() {
+        onCorrectSpecies?(editingSpeciesName)
+        isEditingSpecies = false
     }
 }
