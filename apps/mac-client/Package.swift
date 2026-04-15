@@ -16,6 +16,7 @@ let package = Package(
                 .process("Resources/manifest.json"),
                 .copy("Resources/Models/FlightDetector.mlmodelc"),
                 .copy("Resources/Models/KeypointDetector.mlmodelc"),
+                .copy("Resources/Models/YOLOBirdDetector.mlmodelc"),
             ]
         ),
         .executableTarget(

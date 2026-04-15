@@ -4,8 +4,9 @@
 //
 // Phase 1: flight() routes to native FlightModel; all other endpoints
 //          delegate to HTTPInferenceClient.
-// Phase 2: keypoints() will route to native KeypointModel.
-// Phase 3+: detect(), identify(), aesthetics() follow in later phases.
+// Phase 2: keypoints() routes to native KeypointModel.
+// Phase 3: detect() routes to native YOLOBirdDetector.
+// Phase 4+: identify(), aesthetics() follow in later phases.
 //
 // Lives in SuperPickyApp (not SuperPickyInference) because InferenceClient
 // is declared in SuperPickyApp — placing this in SuperPickyInference would
@@ -24,12 +25,16 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
 
     private let flightModel: FlightModel
     private let keypointModel: KeypointModel
+    private let yoloModel: YOLOBirdDetector?
     private let httpFallback: HTTPInferenceClient
     private let logger = Logger(subsystem: "com.superpicky.mac", category: "CoreMLInference")
 
-    init(flightModel: FlightModel, keypointModel: KeypointModel, httpFallback: HTTPInferenceClient) {
+    init(flightModel: FlightModel, keypointModel: KeypointModel,
+         yoloModel: YOLOBirdDetector? = nil,
+         httpFallback: HTTPInferenceClient) {
         self.flightModel = flightModel
         self.keypointModel = keypointModel
+        self.yoloModel = yoloModel
         self.httpFallback = httpFallback
     }
 
@@ -51,11 +56,26 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
         )
     }
 
-    // MARK: - HTTP fallback (replaced phase-by-phase in Phases 3+)
+    // MARK: - Phase 3: Native YOLO detection
 
     func detect(image: CGImage) async throws -> DetectionResult {
-        try await httpFallback.detect(image: image)
+        guard let yolo = yoloModel else {
+            return try await httpFallback.detect(image: image)
+        }
+        let dets = try yolo.predict(image: image)
+        let birds = dets.map { d in
+            BirdDetection(
+                bbox: CGRect(x: CGFloat(d.x1), y: CGFloat(d.y1),
+                             width: CGFloat(d.x2 - d.x1),
+                             height: CGFloat(d.y2 - d.y1)),
+                confidence: d.confidence,
+                mask: d.maskData
+            )
+        }
+        return DetectionResult(birds: birds)
     }
+
+    // MARK: - HTTP fallback (replaced phase-by-phase in Phases 4+)
 
     func aesthetics(image: CGImage) async throws -> AestheticsResponse {
         try await httpFallback.aesthetics(image: image)
@@ -67,17 +87,19 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
 
     func healthCheck() async throws -> ServerHealth {
         let httpHealth = try await httpFallback.healthCheck()
+        let nativeModels = ["flight-coreml", "keypoint-coreml"] +
+                           (yoloModel != nil ? ["yolo-coreml"] : [])
         return ServerHealth(
             status: httpHealth.status,
-            modelsLoaded: ["flight-coreml", "keypoint-coreml"] + httpHealth.modelsLoaded,
+            modelsLoaded: nativeModels + httpHealth.modelsLoaded,
             device: "coreml+\(httpHealth.device)",
-            version: "hybrid-phase2"
+            version: yoloModel != nil ? "hybrid-phase3" : "hybrid-phase2"
         )
     }
 
-    // MARK: - Factory
+    // MARK: - Factories
 
-    /// Build a Phase 2 client: native flight + keypoints; HTTP fallback for the rest.
+    /// Build a Phase 2 client: native flight + keypoints; HTTP fallback for detect/aesthetics/identify.
     /// Throws `CoreMLClientError.modelNotFound` if either model file is absent.
     static func makePhase2(httpFallback: HTTPInferenceClient) throws -> CoreMLInferenceClient {
         guard let flightURL = Bundle.main.url(forResource: "FlightDetector", withExtension: "mlmodelc"),
@@ -87,6 +109,23 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
         return CoreMLInferenceClient(
             flightModel:   try FlightModel(url: flightURL),
             keypointModel: try KeypointModel(url: keypointURL),
+            httpFallback:  httpFallback
+        )
+    }
+
+    /// Build a Phase 3 client: native flight + keypoints + YOLO; HTTP fallback for aesthetics/identify.
+    /// Falls back to Phase 2 if YOLOBirdDetector.mlmodelc is absent.
+    static func makePhase3(httpFallback: HTTPInferenceClient) throws -> CoreMLInferenceClient {
+        guard let flightURL = Bundle.main.url(forResource: "FlightDetector", withExtension: "mlmodelc"),
+              let keypointURL = Bundle.main.url(forResource: "KeypointDetector", withExtension: "mlmodelc") else {
+            throw CoreMLClientError.modelNotFound("FlightDetector or KeypointDetector.mlmodelc not in app bundle")
+        }
+        let yoloURL = Bundle.main.url(forResource: "YOLOBirdDetector", withExtension: "mlmodelc")
+        let yolo = yoloURL.flatMap { try? YOLOBirdDetector(url: $0) }
+        return CoreMLInferenceClient(
+            flightModel:   try FlightModel(url: flightURL),
+            keypointModel: try KeypointModel(url: keypointURL),
+            yoloModel:     yolo,
             httpFallback:  httpFallback
         )
     }
