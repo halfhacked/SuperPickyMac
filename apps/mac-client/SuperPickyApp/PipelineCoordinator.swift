@@ -29,6 +29,7 @@ final class PipelineCoordinator {
         exposureEnabled: Bool,
         exposureThreshold: Float,
         burstDetectionEnabled: Bool = true,
+        databaseName: String = ".report.db",
         onPhotoProcessed: (@Sendable () async -> Void)? = nil
     ) async {
         isProcessing = true
@@ -55,7 +56,7 @@ final class PipelineCoordinator {
 
         let db: ReportDatabase
         do {
-            db = try ReportDatabase(folderPath: folder)
+            db = try ReportDatabase(folderPath: folder, name: databaseName)
         } catch {
             logger.error("Failed to open database: \(error)")
             return
