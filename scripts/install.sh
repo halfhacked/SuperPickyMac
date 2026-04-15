@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "🐦 SuperPicky v0.0.1 Installer"
+echo "🐦 SuperPicky v0.0.2 Installer"
 echo "================================"
 
 INSTALL_DIR="$HOME/Applications/SuperPicky"
