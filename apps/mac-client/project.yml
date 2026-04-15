@@ -26,23 +26,7 @@ targets:
       - path: SuperPickyInference
         excludes:
           - "Resources/**"
-      - path: SuperPickyInference/Resources
-        buildPhase: resources
-        excludes:
-          - "Models/FlightDetector.mlpackage"
-          - "Models/KeypointDetector.mlpackage"
-          - "Models/YOLOBirdDetector.mlpackage"
-          - "Models/OSEAClassifier.mlpackage"
-          - "Models/AestheticsModel.mlpackage"
-      - path: SuperPickyInference/Resources/Models/FlightDetector.mlmodelc
-        buildPhase: resources
-      - path: SuperPickyInference/Resources/Models/KeypointDetector.mlmodelc
-        buildPhase: resources
-      - path: SuperPickyInference/Resources/Models/YOLOBirdDetector.mlmodelc
-        buildPhase: resources
-      - path: SuperPickyInference/Resources/Models/OSEAClassifier.mlmodelc
-        buildPhase: resources
-      - path: SuperPickyInference/Resources/Models/AestheticsModel.mlmodelc
+      - path: SuperPickyInference/Resources/manifest.json
         buildPhase: resources
       - path: SuperPickyInference/Resources/bird_reference.sqlite
         buildPhase: resources

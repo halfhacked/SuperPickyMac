@@ -1,4 +1,45 @@
 {
   "version": 1,
-  "models": []
+  "models": [
+    {
+      "id": "flight-detector",
+      "filename": "FlightDetector.mlmodelc.zip",
+      "url": "https://huggingface.co/superpicky/models/resolve/main/FlightDetector.mlmodelc.zip",
+      "sha256": "9999a6d38d5eb7c1db8e298d12185b741d09429dc44f6c9716de0b8bc6081fee",
+      "sizeBytes": 40018434,
+      "installPath": "FlightDetector.mlmodelc"
+    },
+    {
+      "id": "keypoint-detector",
+      "filename": "KeypointDetector.mlmodelc.zip",
+      "url": "https://huggingface.co/superpicky/models/resolve/main/KeypointDetector.mlmodelc.zip",
+      "sha256": "15515a6ac171e29ed7f663d4b5b21bd273863f5ce1f4ec51150b997c8b6c75aa",
+      "sizeBytes": 91691528,
+      "installPath": "KeypointDetector.mlmodelc"
+    },
+    {
+      "id": "yolo-bird-detector",
+      "filename": "YOLOBirdDetector.mlmodelc.zip",
+      "url": "https://huggingface.co/superpicky/models/resolve/main/YOLOBirdDetector.mlmodelc.zip",
+      "sha256": "3cabf79fa84252531b2a72ca80572213588ec8484770aefe1e5097d4ae2fd9eb",
+      "sizeBytes": 51417019,
+      "installPath": "YOLOBirdDetector.mlmodelc"
+    },
+    {
+      "id": "osea-classifier",
+      "filename": "OSEAClassifier.mlmodelc.zip",
+      "url": "https://huggingface.co/superpicky/models/resolve/main/OSEAClassifier.mlmodelc.zip",
+      "sha256": "e5fdf7329f53c00399f6b7634633658c0ca2f59a24e77a1939c217856fd1956a",
+      "sizeBytes": 99839189,
+      "installPath": "OSEAClassifier.mlmodelc"
+    },
+    {
+      "id": "aesthetics-model",
+      "filename": "AestheticsModel.mlmodelc.zip",
+      "url": "https://huggingface.co/superpicky/models/resolve/main/AestheticsModel.mlmodelc.zip",
+      "sha256": "80c0a28ba97aa5fb0cd3c7f9a842fc2dc3fc9b195a556d3f1a53ddd2eaa9f3af",
+      "sizeBytes": 256383220,
+      "installPath": "AestheticsModel.mlmodelc"
+    }
+  ]
 }

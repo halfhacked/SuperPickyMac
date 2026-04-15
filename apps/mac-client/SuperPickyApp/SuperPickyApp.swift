@@ -1,27 +1,36 @@
 import SwiftUI
+import SuperPickyInference
 
 @main
 struct SuperPickyApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var config = CullingConfig()
+    @State private var modelState = ModelDownloadState()
 
     var body: some Scene {
         WindowGroup {
-            MainView()
-                .frame(minWidth: 900, minHeight: 600)
-                .environment(config)
-                .environment(\.locale, config.appLanguage.locale)
-                .preferredColorScheme(config.appTheme.colorScheme)
-                .onAppear {
-                    LocalizationManager.localizeMenuBar(language: config.appLanguage)
+            ZStack {
+                MainView(modelState: modelState)
+                    .frame(minWidth: 900, minHeight: 600)
+
+                if modelState.isDownloading {
+                    ModelDownloadOverlay(state: modelState)
                 }
-                .onChange(of: config.appTheme) { _, theme in
-                    switch theme {
-                    case .dark: NSApp.appearance = NSAppearance(named: .darkAqua)
-                    case .light: NSApp.appearance = NSAppearance(named: .aqua)
-                    case .system: NSApp.appearance = nil
-                    }
+            }
+            .environment(config)
+            .environment(\.locale, config.appLanguage.locale)
+            .preferredColorScheme(config.appTheme.colorScheme)
+            .onAppear {
+                LocalizationManager.localizeMenuBar(language: config.appLanguage)
+                Task { await modelState.ensureReady() }
+            }
+            .onChange(of: config.appTheme) { _, theme in
+                switch theme {
+                case .dark: NSApp.appearance = NSAppearance(named: .darkAqua)
+                case .light: NSApp.appearance = NSAppearance(named: .aqua)
+                case .system: NSApp.appearance = nil
                 }
+            }
         }
         .windowStyle(.titleBar)
         .defaultSize(width: 1200, height: 800)
@@ -31,5 +40,121 @@ struct SuperPickyApp: App {
                 .environment(config)
                 .preferredColorScheme(config.appTheme.colorScheme)
         }
+    }
+}
+
+// MARK: - Model download state
+
+/// @Observable wrapper around ModelManager, driven by the app.
+@Observable
+final class ModelDownloadState {
+
+    static let cacheDir: URL = {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        return appSupport.appendingPathComponent("com.superpicky.mac/ModelCache")
+    }()
+
+    var isDownloading = true   // true until manager reaches .ready or .failed
+    var progress: Double = 0
+    var currentFile: String = ""
+    var errorMessage: String? = nil
+    var modelsDir: URL { Self.cacheDir }
+
+    private let manager: ModelManager
+
+    init() {
+        let manifest = (try? ModelManifest.loadBundled()) ?? ModelManifest(version: 1, models: [])
+        self.manager = ModelManager(manifest: manifest, rootDir: Self.cacheDir)
+    }
+
+    func ensureReady() async {
+        // Subscribe to state changes BEFORE kicking off the download so we
+        // don't miss any transitions. `observe()` yields the current state
+        // immediately as its first element.
+        let stream = await manager.observe()
+
+        // Drive the download in a separate task; this method consumes the
+        // observer stream until it terminates (on .ready or .failed).
+        Task.detached { [manager] in
+            do { try await manager.ensureReady() } catch { /* observer picks up .failed */ }
+        }
+
+        for await s in stream {
+            await MainActor.run {
+                switch s {
+                case .notStarted:
+                    isDownloading = true
+                case .downloading(let p, let file):
+                    isDownloading = true
+                    progress = p
+                    currentFile = file
+                case .verifying(let file):
+                    isDownloading = true
+                    currentFile = "Verifying \(file)…"
+                case .installing(let file):
+                    isDownloading = true
+                    currentFile = "Installing \(file)…"
+                case .ready:
+                    isDownloading = false
+                    errorMessage = nil
+                case .failed(let err):
+                    isDownloading = false
+                    errorMessage = err.localizedDescription
+                }
+            }
+        }
+    }
+
+    func retry() {
+        Task {
+            isDownloading = true
+            errorMessage = nil
+            await ensureReady()
+        }
+    }
+}
+
+// MARK: - Download progress overlay
+
+struct ModelDownloadOverlay: View {
+    @Environment(CullingConfig.self) private var config
+    let state: ModelDownloadState
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.7)
+            VStack(spacing: 16) {
+                if let error = state.errorMessage {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.largeTitle)
+                        .foregroundStyle(.yellow)
+                    Text(config.localized("Download Failed"))
+                        .font(.title2.bold())
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    HStack {
+                        Button(config.localized("Retry")) { state.retry() }
+                            .buttonStyle(.borderedProminent)
+                        Button(config.localized("Quit"), role: .destructive) { NSApp.terminate(nil) }
+                    }
+                } else {
+                    ProgressView()
+                        .controlSize(.large)
+                    Text(config.localized("Downloading models…"))
+                        .font(.title2.bold())
+                    ProgressView(value: state.progress)
+                        .progressViewStyle(.linear)
+                        .frame(width: 280)
+                    Text(state.currentFile)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(40)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        }
+        .ignoresSafeArea()
     }
 }
