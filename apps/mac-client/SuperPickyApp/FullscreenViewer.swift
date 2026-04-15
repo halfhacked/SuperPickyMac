@@ -68,7 +68,6 @@ struct FullscreenViewer: View {
         return photos.first { $0.id == id }
     }
 
-    @discardableResult
     private func handleKey(_ key: KeyboardMonitor.KeyEvent) -> Bool {
         if key.characters == "i" {
             showInfo.toggle()

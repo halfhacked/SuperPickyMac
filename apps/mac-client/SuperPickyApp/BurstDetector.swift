@@ -12,11 +12,12 @@ struct BurstDetector: Sendable {
     /// Vision feature print distance threshold — below this, images are considered similar.
     let similarityThreshold: Float
 
-    private static let exifDateFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy:MM:dd HH:mm:ss"
-        f.timeZone = TimeZone.current
-        return f
+    private nonisolated(unsafe) static let exifDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
+        formatter.locale = Locale(identifier: "en_US_POSIX")  // required for format strings
+        formatter.timeZone = TimeZone.current
+        return formatter
     }()
 
     init(timeThresholdMs: Double = 500, minBurstCount: Int = 2, similarityThreshold: Float = 15.0) {
