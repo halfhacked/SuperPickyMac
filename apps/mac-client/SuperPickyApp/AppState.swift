@@ -1,4 +1,5 @@
 import SwiftUI
+import os
 
 /// Species with its burst groups for the sidebar hierarchy.
 struct SpeciesEntry: Identifiable {
@@ -19,6 +20,8 @@ struct BurstGroupEntry: Identifiable {
 
 @Observable
 final class AppState {
+    private let logger = Logger(subsystem: "com.superpicky.mac", category: "AppState")
+
     var sidebarSelection: SidebarSelection?
     var selectedPhotoID: UUID?
     var folders: [URL] = []
@@ -40,7 +43,9 @@ final class AppState {
     var pickedPhotos: [Photo] { allPhotos.filter { $0.isPick } }
     // Filtered photos shown in the UI
     var photos: [Photo] = []
-    var lastAction: UndoAction?
+    private var undoStack: [UndoAction] = []
+    private static let maxUndoDepth = 20
+    var canUndo: Bool { !undoStack.isEmpty }
 
     private var cachedDB: ReportDatabase?
 
@@ -71,10 +76,11 @@ final class AppState {
 
     /// Load photos from the database for the selected folder.
     /// Preserves current filter and selection when possible.
-    func loadPhotos(for folder: URL) {
+    /// Pass `skipHierarchy: true` during incremental processing to avoid O(n²) rebuilds.
+    func loadPhotos(for folder: URL, skipHierarchy: Bool = false) {
         currentFolder = folder
         cachedDB = nil
-        lastAction = nil
+        undoStack = []
         let previousSelection = selectedPhotoID
         do {
             let database = try ReportDatabase(folderPath: folder)
@@ -83,7 +89,9 @@ final class AppState {
             ratingCounts = try database.ratingCounts()
             flyingCount = allPhotos.filter { $0.isFlying }.count
             picksCount = allPhotos.filter { $0.isPick }.count
-            buildSpeciesHierarchy()
+            if !skipHierarchy {
+                buildSpeciesHierarchy()
+            }
 
             // Re-apply current filter instead of resetting to all
             applyFilter()
@@ -95,6 +103,7 @@ final class AppState {
                 selectedPhotoID = photos.first?.id
             }
         } catch {
+            logger.error("loadPhotos failed: \(error)")
             allPhotos = []
             photos = []
             ratingCounts = [:]
@@ -187,6 +196,7 @@ final class AppState {
         speciesEntries = []
         selectedPhotoID = nil
         currentFolder = nil
+        undoStack = []
     }
 
     /// Mutate a photo, persist to DB + XMP, and update in-memory arrays.
@@ -200,15 +210,18 @@ final class AppState {
         do {
             let database = try db()
             guard var photo = try database.fetchPhoto(id: id) else { return }
-            lastAction = UndoAction(
+            undoStack.append(UndoAction(
                 photoID: id, previousRating: photo.starRating,
                 previousIsPick: photo.isPick, previousIsManualRating: photo.isManualRating,
                 wasHidden: wasHidden
-            )
+            ))
+            if undoStack.count > Self.maxUndoDepth {
+                undoStack.removeFirst()
+            }
             mutate(&photo)
-            try database.save(&photo)
+            try database.save(&photo)      // DB write FIRST
             try? XMPWriter.write(photo: photo)
-
+            // Only update in-memory state after successful DB write:
             if let idx = allPhotos.firstIndex(where: { $0.id == id }) {
                 allPhotos[idx] = photo
             }
@@ -221,7 +234,7 @@ final class AppState {
             ratingCounts = (try? database.ratingCounts()) ?? ratingCounts
             picksCount = allPhotos.filter { $0.isPick }.count
         } catch {
-            // Silently fail
+            logger.error("mutatePhoto failed: \(error)")
         }
     }
 
@@ -238,6 +251,37 @@ final class AppState {
         }
     }
 
+    func deletePhoto(id: UUID) throws {
+        let database = try db()
+        guard let photo = try database.fetchPhoto(id: id) else { return }
+
+        // Move to Trash
+        let fileURL = URL(fileURLWithPath: photo.filePath)
+        try FileManager.default.trashItem(at: fileURL, resultingItemURL: nil)
+
+        // Remove from DB
+        try database.delete(id: id)
+
+        // Remove from memory
+        allPhotos.removeAll { $0.id == id }
+        photos.removeAll { $0.id == id }
+        undoStack.removeAll { $0.photoID == id }
+
+        ratingCounts = (try? database.ratingCounts()) ?? ratingCounts
+        picksCount = allPhotos.filter { $0.isPick }.count
+
+        logger.info("Deleted photo: \(photo.filename)")
+    }
+
+    /// Override the species name for a photo. Persists to DB and XMP sidecar.
+    func correctSpecies(id: UUID, commonName: String) {
+        let trimmed = commonName.trimmingCharacters(in: .whitespaces)
+        mutatePhoto(id: id) { photo in
+            photo.speciesCommonName = trimmed.isEmpty ? nil : trimmed
+        }
+        buildSpeciesHierarchy()
+    }
+
     func rejectPhoto(id: UUID) {
         mutatePhoto(id: id, wasHidden: true, { photo in
             photo.starRating = 0
@@ -248,8 +292,7 @@ final class AppState {
     }
 
     func undoLastAction() {
-        guard let action = lastAction else { return }
-        lastAction = nil
+        guard let action = undoStack.popLast() else { return }
         do {
             let database = try db()
             guard var photo = try database.fetchPhoto(id: action.photoID) else { return }
@@ -273,7 +316,7 @@ final class AppState {
             ratingCounts = (try? database.ratingCounts()) ?? ratingCounts
             picksCount = allPhotos.filter { $0.isPick }.count
         } catch {
-            // Silently fail
+            logger.error("undoLastAction failed: \(error)")
         }
     }
 

@@ -28,6 +28,7 @@ final class PipelineCoordinator {
         ratingConfig: RatingEngine.Config,
         exposureEnabled: Bool,
         exposureThreshold: Float,
+        burstDetectionEnabled: Bool = true,
         onPhotoProcessed: (@Sendable () async -> Void)? = nil
     ) async {
         isProcessing = true
@@ -94,21 +95,27 @@ final class PipelineCoordinator {
             processedCount += 1
 
             // Run burst detection every 10 photos for incremental updates
-            if processedCount % 10 == 0 {
-                runBurstDetection(db: db)
+            if burstDetectionEnabled && processedCount % 10 == 0 {
+                await runBurstDetection(db: db)
             }
 
             await onPhotoProcessed?()
         }
 
         // Final burst detection (catches remaining photos)
-        runBurstDetection(db: db)
+        if burstDetectionEnabled {
+            await runBurstDetection(db: db)
+        }
     }
 
-    private func runBurstDetection(db: ReportDatabase) {
+    private func runBurstDetection(db: ReportDatabase) async {
         do {
             let allPhotos = try db.fetchAllPhotos()
-            let burstGroups = burstDetector.detect(photos: allPhotos)
+            let detector = burstDetector  // capture value, not self
+            // Move blocking Vision CPU work off the cooperative thread pool
+            let burstGroups = await Task.detached(priority: .utility) {
+                detector.detect(photos: allPhotos)
+            }.value
             for group in burstGroups {
                 for photo in group.photos {
                     var updated = photo
@@ -181,7 +188,7 @@ final class PipelineCoordinator {
         photo.isFlying = flight.isFlying
         photo.flightConfidence = flight.confidence
 
-        photo.sharpnessScore = keypoints.bestEyeVisibility * 600
+        photo.sharpnessScore = LaplacianSharpness.score(image: birdCrop)
 
         if exposureEnabled {
             let exposure = exposureDetector.detect(image: image, threshold: exposureThreshold)

@@ -11,7 +11,8 @@ struct MainView: View {
     @State private var showExportComplete = false
     @State private var exportResultMessage = ""
     @State private var exportDestination: URL?
-    @AppStorage("lastFolderPath") private var lastFolderPath: String = ""
+
+    private static let foldersKey = "savedFolderPaths"
 
     private var isTestMode: Bool {
         ProcessInfo.processInfo.environment["TEST_MODE"] == "1"
@@ -33,7 +34,10 @@ struct MainView: View {
                     if appState.currentFolder == folder {
                         appState.clearPhotos()
                     }
-                }
+                    saveFolders()
+                },
+                onCancelProcessing: { cancelProcessing() },
+                onReprocessFolder: { folder in reprocessFolder(folder) }
             )
             .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 300)
         } detail: {
@@ -56,8 +60,18 @@ struct MainView: View {
                     onUndo: {
                         appState.undoLastAction()
                     },
+                    canUndo: appState.canUndo,
                     onExportPicks: {
                         exportPicks()
+                    },
+                    onExportAllVisible: { photos in
+                        exportAllVisible(photos)
+                    },
+                    onDeletePhoto: { id in
+                        try? appState.deletePhoto(id: id)
+                    },
+                    onCorrectSpecies: { id, name in
+                        appState.correctSpecies(id: id, commonName: name)
                     }
                 )
             }
@@ -87,14 +101,11 @@ struct MainView: View {
                         startProcessing(folder: folder)
                     }
                 }
-            } else if !lastFolderPath.isEmpty {
-                let folder = URL(fileURLWithPath: lastFolderPath)
-                // Only restore if .report.db exists (folder was previously processed)
-                let dbPath = folder.appendingPathComponent(".report.db").path
-                if FileManager.default.fileExists(atPath: dbPath) {
-                    appState.folders.append(folder)
-                    appState.sidebarSelection = .folder(folder)
-                    appState.loadPhotos(for: folder)
+            } else {
+                loadSavedFolders()
+                if let last = appState.folders.last {
+                    appState.sidebarSelection = .folder(last)
+                    appState.loadPhotos(for: last)
                 }
             }
         }
@@ -124,11 +135,95 @@ struct MainView: View {
         }
     }
 
+    private func saveFolders() {
+        let paths = appState.folders.map { $0.path }
+        UserDefaults.standard.set(paths, forKey: Self.foldersKey)
+    }
+
+    private func loadSavedFolders() {
+        guard let paths = UserDefaults.standard.stringArray(forKey: Self.foldersKey) else {
+            // Migrate from legacy single-folder key
+            if let legacy = UserDefaults.standard.string(forKey: "lastFolderPath"), !legacy.isEmpty {
+                restoreFolder(URL(fileURLWithPath: legacy))
+            }
+            return
+        }
+        for path in paths {
+            restoreFolder(URL(fileURLWithPath: path))
+        }
+    }
+
+    private func restoreFolder(_ folder: URL) {
+        let dbPath = folder.appendingPathComponent(".report.db").path
+        guard FileManager.default.fileExists(atPath: dbPath) else { return }
+        if !appState.folders.contains(folder) {
+            appState.folders.append(folder)
+        }
+    }
+
+    private func cancelProcessing() {
+        processingTask?.cancel()
+        processingTask = nil
+    }
+
+    private func exportAllVisible(_ photos: [Photo]) {
+        guard let folder = appState.currentFolder else { return }
+        let visible = photos
+        guard !visible.isEmpty else {
+            exportResultMessage = "No photos in the current view"
+            showExportComplete = true
+            return
+        }
+
+        let destination = ExportService.picksDestination(for: folder)
+        exportDestination = destination
+        exportProgress = 0
+        exportTotal = visible.count
+        isExporting = true
+
+        Task {
+            do {
+                try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+                let result = try await ExportService.export(
+                    photos: visible,
+                    to: destination,
+                    onProgress: { current, total in
+                        exportProgress = current
+                        exportTotal = total
+                    }
+                )
+                isExporting = false
+                exportResultMessage = "Exported \(result.exportedCount) photos"
+                if result.skippedCount > 0 {
+                    exportResultMessage += ", \(result.skippedCount) skipped"
+                }
+                showExportComplete = true
+            } catch {
+                isExporting = false
+                exportResultMessage = "Export failed: \(error.localizedDescription)"
+                showExportComplete = true
+            }
+        }
+    }
+
+    private func reprocessFolder(_ folder: URL) {
+        guard !appState.isProcessing else { return }
+        guard isTestMode || processManager.isReady else { return }
+
+        // Clear non-manual photos so pipeline reprocesses them
+        if let db = try? ReportDatabase(folderPath: folder) {
+            try? db.deleteNonManualPhotos()
+        }
+
+        startProcessing(folder: folder)
+    }
+
     private func exportPicks() {
         guard let folder = appState.currentFolder else { return }
-        let picks = appState.pickedPhotos
+        // Export picks that are also visible in current filter
+        let picks = appState.photos.filter { $0.isPick }
         guard !picks.isEmpty else {
-            exportResultMessage = "No picks to export"
+            exportResultMessage = "No picks in the current view"
             showExportComplete = true
             return
         }
@@ -201,7 +296,7 @@ struct MainView: View {
         if !appState.folders.contains(folder) {
             appState.folders.append(folder)
         }
-        lastFolderPath = folder.path
+        saveFolders()
         appState.sidebarSelection = .folder(folder)
         appState.processingFolder = folder
         appState.processingProgress = 0
@@ -212,6 +307,7 @@ struct MainView: View {
                 ratingConfig: ratingConfig,
                 exposureEnabled: exposureEnabled,
                 exposureThreshold: exposureThreshold,
+                burstDetectionEnabled: config.burstDetectionEnabled,
                 onPhotoProcessed: {
                     await MainActor.run {
                         if pipeline.totalCount > 0 {
@@ -219,8 +315,9 @@ struct MainView: View {
                         }
                         appState.processingFilename = pipeline.currentFilename
                         // Reload UI every 5 photos to avoid jarring per-photo re-renders
+                        // Skip hierarchy rebuild during incremental updates (perf: avoids O(n²))
                         if pipeline.processedCount % 5 == 0 {
-                            appState.loadPhotos(for: folder)
+                            appState.loadPhotos(for: folder, skipHierarchy: true)
                         }
                     }
                 }

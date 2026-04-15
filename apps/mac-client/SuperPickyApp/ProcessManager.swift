@@ -18,16 +18,26 @@ final class ProcessManager {
     /// Server script path — bundled inside the app, or dev fallback
     private var serverDir: String {
         let bundled = ServerSetup.bundledServerDir.path
+        if FileManager.default.fileExists(atPath: bundled + "/superpicky_server.py") {
+            return bundled
+        }
+        #if DEBUG
         let dev = NSString("~/projects/SuperPickyMac/python-server").expandingTildeInPath
-        return FileManager.default.fileExists(atPath: bundled + "/superpicky_server.py") ? bundled : dev
+        if FileManager.default.fileExists(atPath: dev + "/superpicky_server.py") {
+            return dev
+        }
+        #endif
+        return bundled // fallback
     }
 
     /// Python executable — managed venv, or dev venv fallback
     private var pythonPath: String {
         let managed = ServerSetup.pythonPath
-        let dev = NSString("~/projects/SuperPickyMac/python-server/.venv/bin/python").expandingTildeInPath
         if FileManager.default.fileExists(atPath: managed) { return managed }
+        #if DEBUG
+        let dev = NSString("~/projects/SuperPickyMac/python-server/.venv/bin/python").expandingTildeInPath
         if FileManager.default.fileExists(atPath: dev) { return dev }
+        #endif
         return "/usr/bin/env python3"
     }
 
@@ -67,10 +77,12 @@ final class ProcessManager {
         proc.arguments = [script, "--port", "\(port)"]
 
         var env = ProcessInfo.processInfo.environment
+        #if DEBUG
         let modelsDir = NSString("~/projects/SuperPicky/models").expandingTildeInPath
         if FileManager.default.fileExists(atPath: modelsDir) {
             env["MODELS_DIR"] = modelsDir
         }
+        #endif
         proc.environment = env
 
         let errPipe = Pipe()

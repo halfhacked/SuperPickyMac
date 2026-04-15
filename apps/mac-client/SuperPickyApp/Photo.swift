@@ -8,8 +8,6 @@ struct Photo: Identifiable, Codable, Sendable, FetchableRecord, PersistableRecor
     var folderPath: String
     var dateCreated: Date
     var birdConfidence: Float?
-    var birdBbox: Data?
-    var birdMask: Data?
     var aestheticsScore: Float?
     var leftEyeX: Float?
     var leftEyeY: Float?
@@ -24,7 +22,6 @@ struct Photo: Identifiable, Codable, Sendable, FetchableRecord, PersistableRecor
     var flightConfidence: Float?
     var sharpnessScore: Float?
     var exposureStatus: String?
-    var focusPointStatus: String?
     var starRating: Int
     var isPick: Bool
     var speciesScientificName: String?

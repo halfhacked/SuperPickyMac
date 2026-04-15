@@ -2,6 +2,14 @@ import SwiftUI
 
 /// Main content area: preview on top, thumbnail strip at bottom.
 struct ContentView: View {
+    private enum SortOrder: String, CaseIterable {
+        case filename = "Filename"
+        case captureDate = "Date"
+        case rating = "Rating"
+        case sharpness = "Sharpness"
+        case aesthetics = "Aesthetics"
+    }
+
     let photos: [Photo]
     @Binding var selectedPhotoID: UUID?
     let selectedPhoto: Photo?
@@ -9,11 +17,17 @@ struct ContentView: View {
     var onTogglePick: ((UUID) -> Void)?
     var onRejectPhoto: ((UUID) -> Void)?
     var onUndo: (() -> Void)?
+    var canUndo: Bool = false
     var onExportPicks: (() -> Void)?
+    var onExportAllVisible: (([Photo]) -> Void)?
+    var onDeletePhoto: ((UUID) -> Void)?
+    var onCorrectSpecies: ((UUID, String) -> Void)?
     @Environment(CullingConfig.self) private var config
     @State private var minimumStars: Int = 0
     @State private var topBurstOnly: Bool = false
     @State private var pickedOnly: Bool = false
+    @State private var sortOrder: SortOrder = .filename
+    @State private var sortAscending: Bool = true
     @State private var showExifPanel = true
     @State private var showFullscreen = false
     @State private var zoomState = ZoomState()
@@ -23,6 +37,9 @@ struct ContentView: View {
     @State private var brightnessAdj: Double = 0
     @State private var showCompare = false
     @State private var showNoPhotosAlert = false
+    @State private var showDeleteConfirm = false
+    @State private var pendingDeleteID: UUID?
+    @State private var showKeyboardHelp = false
 
     private var filteredPhotos: [Photo] {
         var result = photos
@@ -35,6 +52,21 @@ struct ContentView: View {
         if pickedOnly {
             result = result.filter { $0.isPick }
         }
+
+        switch sortOrder {
+        case .filename:
+            result.sort { sortAscending ? $0.filename < $1.filename : $0.filename > $1.filename }
+        case .captureDate:
+            result.sort { sortAscending ? $0.dateCreated < $1.dateCreated : $0.dateCreated > $1.dateCreated }
+        case .rating:
+            result.sort { sortAscending ? $0.starRating < $1.starRating : $0.starRating > $1.starRating }
+        case .sharpness:
+            let s: (Photo) -> Float = { $0.sharpnessScore ?? 0 }
+            result.sort { sortAscending ? s($0) < s($1) : s($0) > s($1) }
+        case .aesthetics:
+            let a: (Photo) -> Float = { $0.aestheticsScore ?? 0 }
+            result.sort { sortAscending ? a($0) < a($1) : a($0) > a($1) }
+        }
         return result
     }
 
@@ -43,7 +75,8 @@ struct ContentView: View {
             ZStack(alignment: .topTrailing) {
                 PreviewView(photo: selectedPhoto, zoomState: zoomState,
                             brightnessAdjustment: brightnessAdj,
-                            mouseInView: $mouseInPreview, viewSize: $previewSize)
+                            mouseInView: $mouseInPreview, viewSize: $previewSize,
+                            onCorrectSpecies: onCorrectSpecies)
 
                 if showExifPanel, let photo = selectedPhoto {
                     ExifPanelView(photo: photo)
@@ -96,6 +129,36 @@ struct ContentView: View {
                     .help(pickedOnly ? "Showing picks only — click to show all" : "Show only flagged photos (P to pick)")
                     .accessibilityIdentifier("PickedFilter")
 
+                    Divider().frame(height: 12)
+
+                    Menu {
+                        ForEach(SortOrder.allCases, id: \.self) { order in
+                            Button {
+                                if sortOrder == order {
+                                    sortAscending.toggle()
+                                } else {
+                                    sortOrder = order
+                                    sortAscending = (order == .filename || order == .captureDate)
+                                }
+                            } label: {
+                                HStack {
+                                    Text(order.rawValue)
+                                    if sortOrder == order {
+                                        Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up.arrow.down")
+                            .font(.system(size: 10))
+                            .foregroundStyle(sortOrder == .filename && sortAscending ? .secondary : .primary)
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                    .help("Sort photos")
+                    .accessibilityIdentifier("SortMenu")
+
                     Spacer()
 
                     if brightnessAdj != 0 {
@@ -144,17 +207,51 @@ struct ContentView: View {
                     onTogglePick: onTogglePick
                 )
             }
+            if showKeyboardHelp {
+                KeyboardHelpView(isPresented: $showKeyboardHelp)
+            }
+        }
+        .alert("Delete Photo?", isPresented: $showDeleteConfirm) {
+            Button("Delete", role: .destructive) {
+                if let id = pendingDeleteID {
+                    navigatePhoto(direction: 1, fallbackToPrevious: true)
+                    onDeletePhoto?(id)
+                }
+                pendingDeleteID = nil
+            }
+            Button("Cancel", role: .cancel) { pendingDeleteID = nil }
+        } message: {
+            if let id = pendingDeleteID, let photo = photos.first(where: { $0.id == id }) {
+                Text("Move \"\(photo.filename)\" to Trash?")
+            } else {
+                Text("Move this photo to Trash?")
+            }
         }
         .toolbar {
             ToolbarItem(placement: .automatic) {
-                Button {
-                    onExportPicks?()
+                Menu {
+                    Button {
+                        onExportPicks?()
+                    } label: {
+                        Label("Export Picks", systemImage: "flag.fill")
+                    }
+                    Button {
+                        onExportAllVisible?(filteredPhotos)
+                    } label: {
+                        Label("Export All Visible", systemImage: "square.and.arrow.up")
+                    }
                 } label: {
-                    Label("Export Picks", systemImage: "square.and.arrow.up")
+                    Label("Export", systemImage: "square.and.arrow.up")
                 }
-                .accessibilityIdentifier("ExportPicksButton")
-                .help("Export picked photos with XMP sidecars (⌘E)")
-                .keyboardShortcut("e", modifiers: .command)
+                .accessibilityIdentifier("ExportMenu")
+                .help("Export photos (⌘E for picks)")
+            }
+            // Keep ⌘E for picks shortcut
+            ToolbarItem(placement: .automatic) {
+                Button("") { onExportPicks?() }
+                    .keyboardShortcut("e", modifiers: .command)
+                    .frame(width: 0, height: 0)
+                    .opacity(0)
             }
             ToolbarItem(placement: .automatic) {
                 Button {
@@ -173,17 +270,18 @@ struct ContentView: View {
         } message: {
             Text("No photos match the current filter")
         }
-        .onChange(of: photos.count) { _, _ in
-            minimumStars = 0
-            topBurstOnly = false
-            pickedOnly = false
-        }
         .onChange(of: selectedPhotoID) { _, _ in
             brightnessAdj = 0
         }
     }
 
     private func handleKey(_ key: KeyboardMonitor.KeyEvent) -> Bool {
+        // Dismiss keyboard help on any key
+        if showKeyboardHelp {
+            showKeyboardHelp = false
+            return true
+        }
+
         // Arrow keys navigate photos
         if key.isLeftArrow { navigatePhoto(direction: -1); return true }
         if key.isRightArrow { navigatePhoto(direction: 1); return true }
@@ -193,8 +291,8 @@ struct ContentView: View {
 
         // Cmd+Z: undo
         if key.modifiers.contains(.command), key.characters == "z" {
-            onUndo?()
-            return true
+            if canUndo { onUndo?() }
+            return canUndo  // only consume the key event if we actually undid something
         }
 
         // Cmd+0-5: set minimum star filter
@@ -253,8 +351,21 @@ struct ContentView: View {
         case "-":
             brightnessAdj = max(brightnessAdj - 0.05, -0.5)
             return true
-        default: return false
+        case "?":
+            showKeyboardHelp = true
+            return true
+        default: break
         }
+
+        // Delete/Backspace key (keyCode 51)
+        if key.keyCode == 51 {
+            guard let id = selectedPhoto?.id else { return false }
+            pendingDeleteID = id
+            showDeleteConfirm = true
+            return true
+        }
+
+        return false
     }
 
     /// Navigate to the next/previous photo. Returns the target ID (nil if can't navigate).
