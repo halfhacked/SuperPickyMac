@@ -120,3 +120,7 @@
 "%lld of %lld" = "%lld of %lld";
 "%lld%%" = "%lld%%";
 "Processing %@" = "Processing %@";
+"Inference Backend" = "Inference Backend";
+"HTTP (Python server)" = "HTTP (Python server)";
+"Native Core ML" = "Native Core ML";
+"Native Core ML backend will be available in a future release." = "Native Core ML backend will be available in a future release.";
