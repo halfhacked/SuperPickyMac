@@ -28,6 +28,7 @@ final class PipelineCoordinator {
         ratingConfig: RatingEngine.Config,
         exposureEnabled: Bool,
         exposureThreshold: Float,
+        burstDetectionEnabled: Bool = true,
         onPhotoProcessed: (@Sendable () async -> Void)? = nil
     ) async {
         isProcessing = true
@@ -94,7 +95,7 @@ final class PipelineCoordinator {
             processedCount += 1
 
             // Run burst detection every 10 photos for incremental updates
-            if processedCount % 10 == 0 {
+            if burstDetectionEnabled && processedCount % 10 == 0 {
                 runBurstDetection(db: db)
             }
 
@@ -102,7 +103,9 @@ final class PipelineCoordinator {
         }
 
         // Final burst detection (catches remaining photos)
-        runBurstDetection(db: db)
+        if burstDetectionEnabled {
+            runBurstDetection(db: db)
+        }
     }
 
     private func runBurstDetection(db: ReportDatabase) {

@@ -212,6 +212,7 @@ struct MainView: View {
                 ratingConfig: ratingConfig,
                 exposureEnabled: exposureEnabled,
                 exposureThreshold: exposureThreshold,
+                burstDetectionEnabled: config.burstDetectionEnabled,
                 onPhotoProcessed: {
                     await MainActor.run {
                         if pipeline.totalCount > 0 {

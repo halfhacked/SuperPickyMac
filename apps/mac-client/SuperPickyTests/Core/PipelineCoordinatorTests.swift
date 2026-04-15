@@ -103,4 +103,54 @@ struct MockInferenceClient: InferenceClient {
         #expect(pipeline.totalCount == 3)
         #expect(pipeline.isProcessing == false)
     }
+
+    @Test func burstDetectionDisabled_skipsGroupAssignment() async throws {
+        let tempDir = try makeTempDir()
+        // Create two photos with EXIF timestamps close together to trigger burst detection if enabled
+        for i in 0..<3 {
+            let url = tempDir.appendingPathComponent("IMG_\(i).jpg")
+            createTestJPEGWithEXIF(at: url, secondsOffset: i)
+        }
+
+        var mockClient = MockInferenceClient()
+        mockClient.identifyBirds = [
+            BirdDetection(bbox: CGRect(x: 0.1, y: 0.1, width: 0.5, height: 0.5), confidence: 0.95, mask: Data())
+        ]
+        let config = RatingEngine.Config(sharpnessThreshold: 100, aestheticsThreshold: 2.0)
+        let pipeline = PipelineCoordinator(inferenceClient: mockClient)
+
+        await pipeline.process(
+            folder: tempDir,
+            ratingConfig: config,
+            exposureEnabled: false,
+            exposureThreshold: 0.10,
+            burstDetectionEnabled: false
+        )
+
+        let db = try ReportDatabase(folderPath: tempDir)
+        let photos = try db.fetchAllPhotos()
+        #expect(photos.count == 3)
+        // With burst detection disabled, no photo should be assigned a burst group
+        let groupedPhotos = photos.filter { $0.burstGroupID != nil }
+        #expect(groupedPhotos.isEmpty)
+    }
+
+    // Helper that creates a JPEG with EXIF timestamp
+    func createTestJPEGWithEXIF(at url: URL, secondsOffset: Int) {
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let context = CGContext(data: nil, width: 100, height: 100, bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+        let image = context.makeImage()!
+
+        // Format: yyyy:MM:dd HH:mm:ss — within same second burst window
+        let baseTime = "2024:01:15 10:30:00"
+        let dest = CGImageDestinationCreateWithURL(url as CFURL, "public.jpeg" as CFString, 1, nil)!
+        let metadata: [String: Any] = [
+            kCGImagePropertyExifDictionary as String: [
+                kCGImagePropertyExifDateTimeOriginal as String: baseTime,
+                kCGImagePropertyExifSubsecTimeOriginal as String: "\(secondsOffset * 100)"
+            ] as [String: Any]
+        ]
+        CGImageDestinationAddImage(dest, image, metadata as CFDictionary)
+        CGImageDestinationFinalize(dest)
+    }
 }
