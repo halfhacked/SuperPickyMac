@@ -36,7 +36,8 @@ struct MainView: View {
                     }
                     saveFolders()
                 },
-                onCancelProcessing: { cancelProcessing() }
+                onCancelProcessing: { cancelProcessing() },
+                onReprocessFolder: { folder in reprocessFolder(folder) }
             )
             .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 300)
         } detail: {
@@ -62,6 +63,12 @@ struct MainView: View {
                     canUndo: appState.canUndo,
                     onExportPicks: {
                         exportPicks()
+                    },
+                    onExportAllVisible: {
+                        exportAllVisible()
+                    },
+                    onDeletePhoto: { id in
+                        try? appState.deletePhoto(id: id)
                     }
                 )
             }
@@ -154,6 +161,58 @@ struct MainView: View {
     private func cancelProcessing() {
         processingTask?.cancel()
         processingTask = nil
+    }
+
+    private func exportAllVisible() {
+        guard let folder = appState.currentFolder else { return }
+        let visible = appState.photos
+        guard !visible.isEmpty else {
+            exportResultMessage = "No photos in the current view"
+            showExportComplete = true
+            return
+        }
+
+        let destination = ExportService.picksDestination(for: folder)
+        exportDestination = destination
+        exportProgress = 0
+        exportTotal = visible.count
+        isExporting = true
+
+        Task {
+            do {
+                try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+                let result = try await ExportService.export(
+                    photos: visible,
+                    to: destination,
+                    onProgress: { current, total in
+                        exportProgress = current
+                        exportTotal = total
+                    }
+                )
+                isExporting = false
+                exportResultMessage = "Exported \(result.exportedCount) photos"
+                if result.skippedCount > 0 {
+                    exportResultMessage += ", \(result.skippedCount) skipped"
+                }
+                showExportComplete = true
+            } catch {
+                isExporting = false
+                exportResultMessage = "Export failed: \(error.localizedDescription)"
+                showExportComplete = true
+            }
+        }
+    }
+
+    private func reprocessFolder(_ folder: URL) {
+        guard !appState.isProcessing else { return }
+        guard isTestMode || processManager.isReady else { return }
+
+        // Clear non-manual photos so pipeline reprocesses them
+        if let db = try? ReportDatabase(folderPath: folder) {
+            try? db.deleteNonManualPhotos()
+        }
+
+        startProcessing(folder: folder)
     }
 
     private func exportPicks() {
