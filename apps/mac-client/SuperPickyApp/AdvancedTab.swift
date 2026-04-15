@@ -32,12 +32,22 @@ struct AdvancedTab: View {
             Section("Burst Detection") {
                 Toggle("Enable burst detection", isOn: $config.burstDetectionEnabled)
             }
-            Section("Backend") {
+            Section(config.localized("Backend")) {
                 HStack {
-                    Text("Python server port")
+                    Text(config.localized("Python server port"))
                     TextField("Port", value: $config.backendPort, format: .number)
                         .frame(width: 80)
                 }
+            }
+            Section(config.localized("Inference Backend")) {
+                Picker(config.localized("Inference Backend"), selection: $config.inferenceBackend) {
+                    Text(config.localized("HTTP (Python server)")).tag(InferenceBackend.http)
+                    // Phase 1 adds: Text(config.localized("Native Core ML")).tag(InferenceBackend.native)
+                }
+                .labelsHidden()
+                Text(config.localized("Native Core ML backend will be available in a future release."))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
         }
         .formStyle(.grouped)

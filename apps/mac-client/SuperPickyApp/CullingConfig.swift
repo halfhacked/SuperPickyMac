@@ -59,6 +59,7 @@ final class CullingConfig {
     var autoAdvance: Bool { didSet { save() } }
     var appLanguage: AppLanguage { didSet { save() } }
     var appTheme: AppTheme { didSet { save() } }
+    var inferenceBackend: InferenceBackend { didSet { save() } }
 
     init() {
         let defaults = UserDefaults.standard
@@ -73,6 +74,7 @@ final class CullingConfig {
         self.autoAdvance = defaults.object(forKey: "autoAdvance") as? Bool ?? false
         self.appLanguage = AppLanguage(rawValue: defaults.string(forKey: "appLanguage") ?? "") ?? .en
         self.appTheme = AppTheme(rawValue: defaults.string(forKey: "appTheme") ?? "") ?? .dark
+        self.inferenceBackend = InferenceBackend(rawValue: defaults.string(forKey: "inferenceBackend") ?? "") ?? .http
     }
 
     private func save() {
@@ -88,6 +90,7 @@ final class CullingConfig {
         defaults.set(autoAdvance, forKey: "autoAdvance")
         defaults.set(appLanguage.rawValue, forKey: "appLanguage")
         defaults.set(appTheme.rawValue, forKey: "appTheme")
+        defaults.set(inferenceBackend.rawValue, forKey: "inferenceBackend")
     }
 
     /// Look up a localized string. Reading `appLanguage` makes SwiftUI

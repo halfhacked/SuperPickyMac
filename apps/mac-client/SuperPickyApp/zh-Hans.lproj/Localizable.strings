@@ -120,3 +120,7 @@
 "%lld of %lld" = "%lld / %lld";
 "%lld%%" = "%lld%%";
 "Processing %@" = "正在处理 %@";
+"Inference Backend" = "推理后端";
+"HTTP (Python server)" = "HTTP (Python 服务器)";
+"Native Core ML" = "原生 Core ML";
+"Native Core ML backend will be available in a future release." = "原生 Core ML 后端将在未来版本中提供。";
