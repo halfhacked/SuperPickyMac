@@ -26,6 +26,8 @@ dist/
 # Models (large files)
 python-server/models/*.pt
 python-server/models/*.pth
+# CoreML source packages — large; only compiled .mlmodelc is committed
+apps/mac-client/SuperPickyInference/Resources/Models/*.mlpackage/
 
 # macOS
 .DS_Store
