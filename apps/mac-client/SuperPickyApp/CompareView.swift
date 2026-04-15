@@ -10,6 +10,9 @@ struct CompareView: View {
     @State private var activeSide: Side = .left
     @State private var leftImage: NSImage?
     @State private var rightImage: NSImage?
+    @State private var leftZoomState = ZoomState()
+    @State private var rightZoomState = ZoomState()
+    @State private var zoomLocked = false
 
     enum Side { case left, right }
 
@@ -19,20 +22,50 @@ struct CompareView: View {
                 Color.black.ignoresSafeArea()
                     .accessibilityIdentifier("CompareView")
 
-                HStack(spacing: 2) {
-                    // Left side (selected photo)
-                    comparePanel(photo: leftPhoto, image: leftImage, side: .left)
-                    // Right side (comparison photo)
-                    comparePanel(photo: rightPhoto, image: rightImage, side: .right)
+                VStack(spacing: 0) {
+                    HStack(spacing: 2) {
+                        // Left side (selected photo)
+                        comparePanel(photo: leftPhoto, image: leftImage, side: .left)
+                        // Right side (comparison photo)
+                        comparePanel(photo: rightPhoto, image: rightImage, side: .right)
+                    }
+
+                    // Lock zoom toolbar
+                    HStack {
+                        Spacer()
+                        Button {
+                            zoomLocked.toggle()
+                            if zoomLocked {
+                                rightZoomState.scale = leftZoomState.scale
+                                rightZoomState.offset = leftZoomState.offset
+                            }
+                        } label: {
+                            Image(systemName: zoomLocked ? "lock.fill" : "lock.open")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.plain)
+                        .help(zoomLocked ? "Zoom locked (click to unlock)" : "Lock zoom (sync both panels)")
+                        Spacer()
+                    }
+                    .padding(.vertical, 4)
+                    .background(.black)
                 }
             }
         }
         .task(id: selectedPhotoID) {
             updateIndices()
+            leftZoomState.reset()
+            rightZoomState.reset()
             await loadImages()
         }
         .onChange(of: rightIndex) { _, _ in
             Task { await loadRightImage() }
+        }
+        .onChange(of: leftZoomState.scale) { _, newScale in
+            if zoomLocked { rightZoomState.scale = newScale }
+        }
+        .onChange(of: leftZoomState.offset) { _, newOffset in
+            if zoomLocked { rightZoomState.offset = newOffset }
         }
         .background(KeyboardMonitor { key in
             return handleKey(key)
@@ -45,9 +78,9 @@ struct CompareView: View {
             ZStack {
                 Color.black
                 if let image {
-                    Image(nsImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
+                    ZoomableImageView(image: image, zoomState: side == .left ? leftZoomState : rightZoomState)
+                } else {
+                    Rectangle().fill(.black)
                 }
             }
             .border(activeSide == side ? Color.accentColor : Color.clear, width: 2)
@@ -113,11 +146,27 @@ struct CompareView: View {
         }
 
         if key.isRightArrow {
-            if rightIndex + 1 < photos.count { rightIndex += 1 }
+            if activeSide == .right {
+                if rightIndex + 1 < photos.count { rightIndex += 1 }
+            } else {
+                if let currentID = selectedPhotoID,
+                   let idx = photos.firstIndex(where: { $0.id == currentID }),
+                   idx + 1 < photos.count {
+                    selectedPhotoID = photos[idx + 1].id
+                }
+            }
             return true
         }
         if key.isLeftArrow {
-            if rightIndex > 0 { rightIndex -= 1 }
+            if activeSide == .right {
+                if rightIndex > 0 { rightIndex -= 1 }
+            } else {
+                if let currentID = selectedPhotoID,
+                   let idx = photos.firstIndex(where: { $0.id == currentID }),
+                   idx > 0 {
+                    selectedPhotoID = photos[idx - 1].id
+                }
+            }
             return true
         }
 
