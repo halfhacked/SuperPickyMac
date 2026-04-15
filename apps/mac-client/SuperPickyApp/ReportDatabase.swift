@@ -62,6 +62,11 @@ final class ReportDatabase: Sendable {
             }
             try db.execute(sql: "UPDATE photos SET starRating = 0 WHERE starRating = -1")
         }
+        migrator.registerMigration("v3_remove_dead_columns") { db in
+            try db.execute(sql: "ALTER TABLE photos DROP COLUMN birdBbox")
+            try db.execute(sql: "ALTER TABLE photos DROP COLUMN birdMask")
+            try db.execute(sql: "ALTER TABLE photos DROP COLUMN focusPointStatus")
+        }
         try migrator.migrate(dbQueue)
     }
 
