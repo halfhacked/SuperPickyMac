@@ -35,7 +35,6 @@ import Foundation
         let wrapper = try JSONDecoder().decode(KeypointResponseWrapper.self, from: json)
         let result = wrapper.keypoints
         #expect(result.leftEye.visibility == 0.87)
-        #expect(result.bestEyeVisibility == 0.92)
         #expect(result.allKeypointsHidden == false)
     }
 

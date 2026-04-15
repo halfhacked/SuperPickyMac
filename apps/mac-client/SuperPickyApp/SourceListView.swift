@@ -1,15 +1,5 @@
 import SwiftUI
 
-enum SidebarSelection: Hashable {
-    case folder(URL)
-    case rating(Int)
-    case flying
-    case picks
-    case species(String)
-    case burstGroup(UUID)
-    case singles(String) // species name
-}
-
 struct SourceListView: View {
     @Environment(CullingConfig.self) private var config
     @Binding var selection: SidebarSelection?
