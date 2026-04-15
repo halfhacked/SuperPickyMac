@@ -25,6 +25,7 @@ targets:
           - "Models/KeypointDetector.mlpackage"
           - "Models/YOLOBirdDetector.mlpackage"
           - "Models/OSEAClassifier.mlpackage"
+          - "Models/AestheticsModel.mlpackage"
       - path: SuperPickyInference/Resources/Models/FlightDetector.mlmodelc
         buildPhase: resources
       - path: SuperPickyInference/Resources/Models/KeypointDetector.mlmodelc
@@ -32,6 +33,8 @@ targets:
       - path: SuperPickyInference/Resources/Models/YOLOBirdDetector.mlmodelc
         buildPhase: resources
       - path: SuperPickyInference/Resources/Models/OSEAClassifier.mlmodelc
+        buildPhase: resources
+      - path: SuperPickyInference/Resources/Models/AestheticsModel.mlmodelc
         buildPhase: resources
       - path: SuperPickyInference/Resources/bird_reference.sqlite
         buildPhase: resources
