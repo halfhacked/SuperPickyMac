@@ -52,10 +52,6 @@ struct KeypointResult: Codable, Sendable {
         case beak
     }
 
-    var bestEyeVisibility: Float {
-        max(leftEye.visibility, rightEye.visibility)
-    }
-
     var allKeypointsHidden: Bool {
         leftEye.visibility < 0.3 && rightEye.visibility < 0.3 && beak.visibility < 0.3
     }
