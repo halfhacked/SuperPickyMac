@@ -96,7 +96,7 @@ final class PipelineCoordinator {
 
             // Run burst detection every 10 photos for incremental updates
             if burstDetectionEnabled && processedCount % 10 == 0 {
-                runBurstDetection(db: db)
+                await runBurstDetection(db: db)
             }
 
             await onPhotoProcessed?()
@@ -104,14 +104,17 @@ final class PipelineCoordinator {
 
         // Final burst detection (catches remaining photos)
         if burstDetectionEnabled {
-            runBurstDetection(db: db)
+            await runBurstDetection(db: db)
         }
     }
 
-    private func runBurstDetection(db: ReportDatabase) {
+    private func runBurstDetection(db: ReportDatabase) async {
         do {
             let allPhotos = try db.fetchAllPhotos()
-            let burstGroups = burstDetector.detect(photos: allPhotos)
+            // Move blocking Vision CPU work off the cooperative thread pool
+            let burstGroups = await Task.detached(priority: .utility) {
+                self.burstDetector.detect(photos: allPhotos)
+            }.value
             for group in burstGroups {
                 for photo in group.photos {
                     var updated = photo

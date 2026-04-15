@@ -74,7 +74,8 @@ final class AppState {
 
     /// Load photos from the database for the selected folder.
     /// Preserves current filter and selection when possible.
-    func loadPhotos(for folder: URL) {
+    /// Pass `skipHierarchy: true` during incremental processing to avoid O(n²) rebuilds.
+    func loadPhotos(for folder: URL, skipHierarchy: Bool = false) {
         currentFolder = folder
         cachedDB = nil
         lastAction = nil
@@ -86,7 +87,9 @@ final class AppState {
             ratingCounts = try database.ratingCounts()
             flyingCount = allPhotos.filter { $0.isFlying }.count
             picksCount = allPhotos.filter { $0.isPick }.count
-            buildSpeciesHierarchy()
+            if !skipHierarchy {
+                buildSpeciesHierarchy()
+            }
 
             // Re-apply current filter instead of resetting to all
             applyFilter()

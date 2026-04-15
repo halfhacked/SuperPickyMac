@@ -39,6 +39,25 @@ struct PreviewView: View {
     }
 }
 
+private final class PreviewCache {
+    static let shared = PreviewCache()
+    private let cache = NSCache<NSString, NSImage>()
+
+    init() {
+        cache.countLimit = 5          // preview images are large — keep very few
+        cache.totalCostLimit = 200 * 1024 * 1024  // 200MB
+    }
+
+    func get(_ key: String) -> NSImage? {
+        cache.object(forKey: key as NSString)
+    }
+
+    func set(_ key: String, image: NSImage) {
+        let cost = Int(image.size.width * image.size.height * 4)
+        cache.setObject(image, forKey: key as NSString, cost: cost)
+    }
+}
+
 /// Loads a full-size preview image asynchronously.
 struct AsyncPreviewImage: View {
     let filePath: String
@@ -58,12 +77,20 @@ struct AsyncPreviewImage: View {
         }
         .task(id: filePath) {
             isFullRes = false
+            // Check cache first (preview resolution only — not full-res)
+            if let cached = PreviewCache.shared.get(filePath) {
+                image = cached
+                return
+            }
             if zoomState.scale > 1.0 {
-                // Already zoomed in — load full-res directly
+                // Already zoomed in — load full-res directly (don't cache)
                 isFullRes = true
                 image = await loadImage(maxSize: nil)
             } else {
-                image = await loadImage(maxSize: 2000)
+                if let loaded = await loadImage(maxSize: 2000) {
+                    PreviewCache.shared.set(filePath, image: loaded)
+                    image = loaded
+                }
             }
         }
         .onChange(of: zoomState.scale) { _, newScale in

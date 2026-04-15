@@ -220,8 +220,9 @@ struct MainView: View {
                         }
                         appState.processingFilename = pipeline.currentFilename
                         // Reload UI every 5 photos to avoid jarring per-photo re-renders
+                        // Skip hierarchy rebuild during incremental updates (perf: avoids O(n²))
                         if pipeline.processedCount % 5 == 0 {
-                            appState.loadPhotos(for: folder)
+                            appState.loadPhotos(for: folder, skipHierarchy: true)
                         }
                     }
                 }
