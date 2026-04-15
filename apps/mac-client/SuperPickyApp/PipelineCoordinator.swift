@@ -44,6 +44,15 @@ final class PipelineCoordinator {
         totalCount = files.count
         processedCount = 0
 
+        // Memory budget note: Phase 2+ model wrappers add synchronous
+        // `autoreleasepool { ... }` blocks inside their predict() methods to
+        // release MLMultiArray/MLFeatureProvider temporaries at each photo
+        // boundary. Here in Phase 0 we cycle the runtime loop once per
+        // iteration via Task.yield() below so ARC gets a scheduled chance
+        // to release temporaries between photos even before the model
+        // wrappers exist. See docs/superpowers/specs/2026-04-15-native-inference-rewrite-design.md
+        // Section 5 "Memory budget".
+
         let db: ReportDatabase
         do {
             db = try ReportDatabase(folderPath: folder)
@@ -100,6 +109,11 @@ final class PipelineCoordinator {
             }
 
             await onPhotoProcessed?()
+
+            // Yield once per iteration so ARC can release any temporaries
+            // allocated by processOnePhoto before the next photo starts.
+            // See memory-budget note above.
+            await Task.yield()
         }
 
         // Final burst detection (catches remaining photos)
