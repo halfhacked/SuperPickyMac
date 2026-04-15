@@ -27,7 +27,6 @@ struct RatingEngine: Sendable {
         sharpness: Float = 0,
         aesthetics: Float? = nil,
         allKeypointsHidden: Bool = false,
-        bestEyeVisibility: Float = 1.0,
         isOverexposed: Bool = false,
         isUnderexposed: Bool = false,
         isFlying: Bool = false,

@@ -55,7 +55,7 @@ import Foundation
         let result = engine.calculate(
             detected: true, confidence: 0.9,
             sharpness: 500, aesthetics: 6.0,
-            bestEyeVisibility: 0.9,
+
             config: config
         )
         #expect(result.rating == 5)
@@ -69,7 +69,7 @@ import Foundation
         let result = engine.calculate(
             detected: true, confidence: 0.9,
             sharpness: 500, aesthetics: 4.0,
-            bestEyeVisibility: 0.9,
+
             config: config
         )
         #expect(result.rating == 4)
@@ -80,7 +80,7 @@ import Foundation
         let result = engine.calculate(
             detected: true, confidence: 0.9,
             sharpness: 300, aesthetics: 5.0,
-            bestEyeVisibility: 0.9,
+
             config: config
         )
         #expect(result.rating == 4)
@@ -94,7 +94,7 @@ import Foundation
         let result = engine.calculate(
             detected: true, confidence: 0.9,
             sharpness: 300, aesthetics: 4.0,
-            bestEyeVisibility: 0.9,
+
             config: config
         )
         #expect(result.rating == 3)
@@ -107,7 +107,7 @@ import Foundation
         let result = engine.calculate(
             detected: true, confidence: 0.9,
             sharpness: 500, aesthetics: 3.0,
-            bestEyeVisibility: 0.9,
+
             config: config
         )
         #expect(result.rating == 2)
@@ -118,7 +118,7 @@ import Foundation
         let result = engine.calculate(
             detected: true, confidence: 0.9,
             sharpness: 200, aesthetics: 6.0,
-            bestEyeVisibility: 0.9,
+
             config: config
         )
         #expect(result.rating == 2)
@@ -131,7 +131,7 @@ import Foundation
         let result = engine.calculate(
             detected: true, confidence: 0.9,
             sharpness: 200, aesthetics: 3.0,
-            bestEyeVisibility: 0.9,
+
             config: config
         )
         #expect(result.rating == 1)
@@ -144,7 +144,7 @@ import Foundation
         let result = engine.calculate(
             detected: true, confidence: 0.9,
             sharpness: 500, aesthetics: 6.0,
-            bestEyeVisibility: 0.9,
+
             isOverexposed: true,
             config: config
         )
@@ -156,7 +156,7 @@ import Foundation
         let result = engine.calculate(
             detected: true, confidence: 0.9,
             sharpness: 200, aesthetics: 3.0,
-            bestEyeVisibility: 0.9,
+
             isUnderexposed: true,
             config: config
         )
@@ -208,7 +208,7 @@ import Foundation
         let result = engine.calculate(
             detected: true, confidence: 0.9,
             sharpness: 350, aesthetics: 4.5,
-            bestEyeVisibility: 0.9,
+
             isFlying: true,
             config: config
         )
