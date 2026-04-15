@@ -84,6 +84,9 @@ final class ModelDownloadState {
                 switch s {
                 case .notStarted:
                     isDownloading = true
+                case .copyingScaffolds:
+                    isDownloading = true
+                    currentFile = "Preparing…"
                 case .downloading(let p, let file):
                     isDownloading = true
                     progress = p
@@ -91,9 +94,6 @@ final class ModelDownloadState {
                 case .verifying(let file):
                     isDownloading = true
                     currentFile = "Verifying \(file)…"
-                case .installing(let file):
-                    isDownloading = true
-                    currentFile = "Installing \(file)…"
                 case .ready:
                     isDownloading = false
                     errorMessage = nil

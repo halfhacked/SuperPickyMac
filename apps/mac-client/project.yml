@@ -30,6 +30,16 @@ targets:
         buildPhase: resources
       - path: SuperPickyInference/Resources/bird_reference.sqlite
         buildPhase: resources
+      - path: SuperPickyInference/Resources/Models/FlightDetector.mlmodelc
+        buildPhase: resources
+      - path: SuperPickyInference/Resources/Models/KeypointDetector.mlmodelc
+        buildPhase: resources
+      - path: SuperPickyInference/Resources/Models/YOLOBirdDetector.mlmodelc
+        buildPhase: resources
+      - path: SuperPickyInference/Resources/Models/OSEAClassifier.mlmodelc
+        buildPhase: resources
+      - path: SuperPickyInference/Resources/Models/AestheticsModel.mlmodelc
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.superpicky.SuperPickyInference

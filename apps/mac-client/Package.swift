@@ -13,17 +13,29 @@ let package = Package(
             name: "SuperPickyInference",
             path: "SuperPickyInference",
             exclude: [
-                // Models/ is not bundled — downloaded on first launch via ModelManager
-                // into ~/Library/Application Support/…/ModelCache/
-                "Resources/Models",
+                // .mlpackage directories are converter source artifacts that
+                // may exist locally; they are never shipped.
+                "Resources/Models/FlightDetector.mlpackage",
+                "Resources/Models/KeypointDetector.mlpackage",
+                "Resources/Models/YOLOBirdDetector.mlpackage",
+                "Resources/Models/OSEAClassifier.mlpackage",
+                "Resources/Models/AestheticsModel.mlpackage",
             ],
             resources: [
-                // manifest.json lists downloadable CoreML models with SHA-256;
-                // ModelManager fetches them on first launch.
+                // manifest.json lists the weight.bin files to download on
+                // first launch along with SHA-256 for verification.
                 .process("Resources/manifest.json"),
-                // bird_reference.sqlite is small (~9 MB zipped) and always needed,
-                // so it ships bundled rather than via the download manager.
+                // bird_reference.sqlite is small and always needed, so it
+                // ships bundled rather than via the download manager.
                 .copy("Resources/bird_reference.sqlite"),
+                // CoreML model scaffolds (~1 MB total) ship in the bundle;
+                // only the weights/weight.bin file inside each is missing
+                // and gets fetched by ModelManager on first launch.
+                .copy("Resources/Models/FlightDetector.mlmodelc"),
+                .copy("Resources/Models/KeypointDetector.mlmodelc"),
+                .copy("Resources/Models/YOLOBirdDetector.mlmodelc"),
+                .copy("Resources/Models/OSEAClassifier.mlmodelc"),
+                .copy("Resources/Models/AestheticsModel.mlmodelc"),
             ]
         ),
         .executableTarget(
