@@ -254,9 +254,16 @@ struct MainView: View {
         guard isTestMode || processManager.isReady else { return }
         guard !appState.isProcessing else { return }
 
-        let client: InferenceClient = isTestMode
-            ? MockInferenceClientForUI()
-            : HTTPInferenceClient(port: processManager.port)
+        let httpClient = HTTPInferenceClient(port: processManager.port)
+        let client: InferenceClient
+        if isTestMode {
+            client = MockInferenceClientForUI()
+        } else if config.inferenceBackend == .native,
+                  let coreml = try? CoreMLInferenceClient.makePhase1(httpFallback: httpClient) {
+            client = coreml
+        } else {
+            client = httpClient
+        }
 
         let pipeline = PipelineCoordinator(inferenceClient: client)
 

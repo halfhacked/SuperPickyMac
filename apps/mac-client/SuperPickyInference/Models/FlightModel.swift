@@ -1,0 +1,113 @@
+// FlightModel.swift
+//
+// CoreML wrapper for the EfficientNet-B3 binary flight classifier.
+//
+// Architecture: EfficientNet-B3 backbone + Dropout(0.2) + Linear(1536, 1) + Sigmoid
+// Input:  [1, 3, 384, 384] float32, ImageNet-normalized NCHW
+// Output: [1, 1] float32 — sigmoid probability; > 0.5 → is_flying
+//
+// Source model: ~/projects/SuperPicky/models/superFlier_efficientnet.pth
+// Converted via: scripts/convert_flight.py (coremltools 9.0, fp32 precision)
+//
+// Thread safety: @unchecked Sendable. MLModel is thread-safe per Apple docs.
+// preprocess() allocates a fresh MLMultiArray on every call — no shared state.
+
+import CoreML
+import CoreGraphics
+
+public final class FlightModel: @unchecked Sendable {
+
+    private let model: MLModel
+    public static let imageSize = 384
+
+    // ImageNet normalization constants (torchvision defaults — must match convert_flight.py)
+    private static let mean: [Float] = [0.485, 0.456, 0.406]
+    private static let std:  [Float] = [0.229, 0.224, 0.225]
+
+    // MARK: - Init
+
+    /// Load a compiled FlightDetector.mlmodelc from a given URL.
+    public init(url: URL, configuration: MLModelConfiguration = .init()) throws {
+        configuration.computeUnits = .all
+        self.model = try MLModel(contentsOf: url, configuration: configuration)
+    }
+
+    // MARK: - Inference
+
+    /// Returns (isFlying, confidence) for a bird-crop CGImage.
+    /// Thread-safe: allocates a fresh MLMultiArray per call.
+    public func predict(image: CGImage) throws -> (isFlying: Bool, confidence: Float) {
+        return try autoreleasepool {
+            let inputArray = try Self.preprocess(image: image)
+            let inputFeatures = try MLDictionaryFeatureProvider(dictionary: ["input": inputArray])
+            let output = try model.prediction(from: inputFeatures)
+            guard let outputValue = output.featureValue(for: "output"),
+                  let multiArray = outputValue.multiArrayValue else {
+                throw FlightModelError.outputDecodeFailed
+            }
+            let probability = Float(truncating: multiArray[0])
+            return (isFlying: probability > InferenceConstants.flightThreshold,
+                    confidence: probability)
+        }
+    }
+
+    // MARK: - Preprocessing (internal for testing)
+
+    /// Resize → extract RGB → ImageNet normalize → NCHW MLMultiArray.
+    /// Allocates a fresh buffer on every call (no shared mutable state).
+    static func preprocess(image: CGImage) throws -> MLMultiArray {
+        let size = imageSize
+        guard let resized = image.resized(to: CGSize(width: size, height: size)) else {
+            throw FlightModelError.preprocessFailed
+        }
+
+        // Render into RGBA byte buffer
+        let bytesPerPixel = 4
+        var rgba = [UInt8](repeating: 0, count: size * size * bytesPerPixel)
+        guard let ctx = CGContext(
+            data: &rgba,
+            width: size, height: size,
+            bitsPerComponent: 8,
+            bytesPerRow: size * bytesPerPixel,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            throw FlightModelError.preprocessFailed
+        }
+        ctx.draw(resized, in: CGRect(x: 0, y: 0, width: size, height: size))
+
+        // NCHW layout: [1, 3, H, W]
+        let inputArray = try MLMultiArray(
+            shape: [1, 3, size as NSNumber, size as NSNumber],
+            dataType: .float32
+        )
+        let ptr = inputArray.dataPointer.assumingMemoryBound(to: Float.self)
+
+        let rOffset = 0 * size * size
+        let gOffset = 1 * size * size
+        let bOffset = 2 * size * size
+
+        for i in 0..<(size * size) {
+            let r = Float(rgba[i * bytesPerPixel + 0]) / 255.0
+            let g = Float(rgba[i * bytesPerPixel + 1]) / 255.0
+            let b = Float(rgba[i * bytesPerPixel + 2]) / 255.0
+            ptr[rOffset + i] = (r - mean[0]) / std[0]
+            ptr[gOffset + i] = (g - mean[1]) / std[1]
+            ptr[bOffset + i] = (b - mean[2]) / std[2]
+        }
+
+        return inputArray
+    }
+}
+
+public enum FlightModelError: Error, LocalizedError {
+    case preprocessFailed
+    case outputDecodeFailed
+
+    public var errorDescription: String? {
+        switch self {
+        case .preprocessFailed:  return "FlightModel: image preprocessing failed"
+        case .outputDecodeFailed: return "FlightModel: failed to decode CoreML output"
+        }
+    }
+}
