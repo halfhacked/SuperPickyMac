@@ -64,8 +64,8 @@ struct MainView: View {
                     onExportPicks: {
                         exportPicks()
                     },
-                    onExportAllVisible: {
-                        exportAllVisible()
+                    onExportAllVisible: { photos in
+                        exportAllVisible(photos)
                     },
                     onDeletePhoto: { id in
                         try? appState.deletePhoto(id: id)
@@ -163,9 +163,9 @@ struct MainView: View {
         processingTask = nil
     }
 
-    private func exportAllVisible() {
+    private func exportAllVisible(_ photos: [Photo]) {
         guard let folder = appState.currentFolder else { return }
-        let visible = appState.photos
+        let visible = photos
         guard !visible.isEmpty else {
             exportResultMessage = "No photos in the current view"
             showExportComplete = true

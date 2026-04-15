@@ -19,7 +19,7 @@ struct ContentView: View {
     var onUndo: (() -> Void)?
     var canUndo: Bool = false
     var onExportPicks: (() -> Void)?
-    var onExportAllVisible: (() -> Void)?
+    var onExportAllVisible: (([Photo]) -> Void)?
     var onDeletePhoto: ((UUID) -> Void)?
     @Environment(CullingConfig.self) private var config
     @State private var minimumStars: Int = 0
@@ -234,7 +234,7 @@ struct ContentView: View {
                         Label("Export Picks", systemImage: "flag.fill")
                     }
                     Button {
-                        onExportAllVisible?()
+                        onExportAllVisible?(filteredPhotos)
                     } label: {
                         Label("Export All Visible", systemImage: "square.and.arrow.up")
                     }
