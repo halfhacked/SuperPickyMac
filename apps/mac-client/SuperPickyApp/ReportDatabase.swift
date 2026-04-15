@@ -116,4 +116,11 @@ final class ReportDatabase: Sendable {
             _ = try Photo.deleteOne(db, key: id)
         }
     }
+
+    /// Delete all photos that were NOT manually rated (keep manual overrides).
+    func deleteNonManualPhotos() throws {
+        try dbQueue.write { db in
+            try db.execute(sql: "DELETE FROM photos WHERE isManualRating = 0")
+        }
+    }
 }

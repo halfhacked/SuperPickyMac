@@ -25,6 +25,7 @@ struct SourceListView: View {
     let onAddFolder: () -> Void
     let onRemoveFolder: (URL) -> Void
     var onCancelProcessing: (() -> Void)?
+    var onReprocessFolder: ((URL) -> Void)?
 
     var body: some View {
         List(selection: $selection) {
@@ -38,6 +39,12 @@ struct SourceListView: View {
                     )
                     .tag(SidebarSelection.folder(folder))
                     .contextMenu {
+                        Button {
+                            onReprocessFolder?(folder)
+                        } label: {
+                            Label("Reprocess Folder", systemImage: "arrow.triangle.2.circlepath")
+                        }
+
                         Button(role: .destructive) {
                             removeFolder(folder)
                         } label: {
