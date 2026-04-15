@@ -11,7 +11,8 @@ struct MainView: View {
     @State private var showExportComplete = false
     @State private var exportResultMessage = ""
     @State private var exportDestination: URL?
-    @AppStorage("lastFolderPath") private var lastFolderPath: String = ""
+
+    private static let foldersKey = "savedFolderPaths"
 
     private var isTestMode: Bool {
         ProcessInfo.processInfo.environment["TEST_MODE"] == "1"
@@ -33,7 +34,9 @@ struct MainView: View {
                     if appState.currentFolder == folder {
                         appState.clearPhotos()
                     }
-                }
+                    saveFolders()
+                },
+                onCancelProcessing: { cancelProcessing() }
             )
             .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 300)
         } detail: {
@@ -87,14 +90,11 @@ struct MainView: View {
                         startProcessing(folder: folder)
                     }
                 }
-            } else if !lastFolderPath.isEmpty {
-                let folder = URL(fileURLWithPath: lastFolderPath)
-                // Only restore if .report.db exists (folder was previously processed)
-                let dbPath = folder.appendingPathComponent(".report.db").path
-                if FileManager.default.fileExists(atPath: dbPath) {
-                    appState.folders.append(folder)
-                    appState.sidebarSelection = .folder(folder)
-                    appState.loadPhotos(for: folder)
+            } else {
+                loadSavedFolders()
+                if let last = appState.folders.last {
+                    appState.sidebarSelection = .folder(last)
+                    appState.loadPhotos(for: last)
                 }
             }
         }
@@ -124,11 +124,43 @@ struct MainView: View {
         }
     }
 
+    private func saveFolders() {
+        let paths = appState.folders.map { $0.path }
+        UserDefaults.standard.set(paths, forKey: Self.foldersKey)
+    }
+
+    private func loadSavedFolders() {
+        guard let paths = UserDefaults.standard.stringArray(forKey: Self.foldersKey) else {
+            // Migrate from legacy single-folder key
+            if let legacy = UserDefaults.standard.string(forKey: "lastFolderPath"), !legacy.isEmpty {
+                restoreFolder(URL(fileURLWithPath: legacy))
+            }
+            return
+        }
+        for path in paths {
+            restoreFolder(URL(fileURLWithPath: path))
+        }
+    }
+
+    private func restoreFolder(_ folder: URL) {
+        let dbPath = folder.appendingPathComponent(".report.db").path
+        guard FileManager.default.fileExists(atPath: dbPath) else { return }
+        if !appState.folders.contains(folder) {
+            appState.folders.append(folder)
+        }
+    }
+
+    private func cancelProcessing() {
+        processingTask?.cancel()
+        processingTask = nil
+    }
+
     private func exportPicks() {
         guard let folder = appState.currentFolder else { return }
-        let picks = appState.pickedPhotos
+        // Export picks that are also visible in current filter
+        let picks = appState.photos.filter { $0.isPick }
         guard !picks.isEmpty else {
-            exportResultMessage = "No picks to export"
+            exportResultMessage = "No picks in the current view"
             showExportComplete = true
             return
         }
@@ -201,7 +233,7 @@ struct MainView: View {
         if !appState.folders.contains(folder) {
             appState.folders.append(folder)
         }
-        lastFolderPath = folder.path
+        saveFolders()
         appState.sidebarSelection = .folder(folder)
         appState.processingFolder = folder
         appState.processingProgress = 0
