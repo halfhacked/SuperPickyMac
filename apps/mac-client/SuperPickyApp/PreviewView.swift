@@ -53,7 +53,9 @@ private final class PreviewCache {
     }
 
     func set(_ key: String, image: NSImage) {
-        let cost = Int(image.size.width * image.size.height * 4)
+        let pixelsWide = image.representations.first?.pixelsWide ?? Int(image.size.width)
+        let pixelsHigh = image.representations.first?.pixelsHigh ?? Int(image.size.height)
+        let cost = pixelsWide * pixelsHigh * 4
         cache.setObject(image, forKey: key as NSString, cost: cost)
     }
 }
