@@ -4,8 +4,8 @@ import GRDB
 final class ReportDatabase: Sendable {
     private let dbQueue: DatabaseQueue
 
-    init(folderPath: URL) throws {
-        let dbPath = folderPath.appendingPathComponent(".report.db").path
+    init(folderPath: URL, name: String = ".report.db") throws {
+        let dbPath = folderPath.appendingPathComponent(name).path
         dbQueue = try DatabaseQueue(path: dbPath)
         try migrate()
     }

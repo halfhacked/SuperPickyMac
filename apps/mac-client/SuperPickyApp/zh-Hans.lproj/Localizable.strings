@@ -179,3 +179,7 @@
 "Zoom locked (click to unlock)" = "缩放已锁定（点击解锁）";
 "Lock zoom (sync both panels)" = "锁定缩放（同步两个面板）";
 "Unknown" = "未知";
+"Inference Backend" = "推理后端";
+"HTTP (Python server)" = "HTTP (Python 服务器)";
+"Native Core ML" = "原生 Core ML";
+"Native Core ML backend will be available in a future release." = "原生 Core ML 后端将在未来版本中提供。";
