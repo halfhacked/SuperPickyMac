@@ -4,7 +4,7 @@
     {
       "id": "flight-detector-weight",
       "filename": "FlightDetector.weight.bin",
-      "url": "https://huggingface.co/jamesphotography/SuperPicky-models/resolve/main/FlightDetector.weight.bin",
+      "url": "https://huggingface.co/Airdreamer/SuperPicky-models/resolve/main/FlightDetector.weight.bin",
       "sha256": "0105ee79ff06f4f40edace40daa275f71126d8d1fb0737f0fff029c611379610",
       "sizeBytes": 42634112,
       "installPath": "FlightDetector.mlmodelc/weights/weight.bin"
@@ -12,7 +12,7 @@
     {
       "id": "keypoint-detector-weight",
       "filename": "KeypointDetector.weight.bin",
-      "url": "https://huggingface.co/jamesphotography/SuperPicky-models/resolve/main/KeypointDetector.weight.bin",
+      "url": "https://huggingface.co/Airdreamer/SuperPicky-models/resolve/main/KeypointDetector.weight.bin",
       "sha256": "0ce77aefef957af92ffbc58e23897f7b6127ac79ab1d23f8a0395db9f296d82c",
       "sizeBytes": 98676800,
       "installPath": "KeypointDetector.mlmodelc/weights/weight.bin"
@@ -20,7 +20,7 @@
     {
       "id": "yolo-bird-detector-weight",
       "filename": "YOLOBirdDetector.weight.bin",
-      "url": "https://huggingface.co/jamesphotography/SuperPicky-models/resolve/main/YOLOBirdDetector.weight.bin",
+      "url": "https://huggingface.co/Airdreamer/SuperPicky-models/resolve/main/YOLOBirdDetector.weight.bin",
       "sha256": "387b5e33feb8fdaac86e6792ba11cf40d91aaed851bb4ccb0ce04501cbc760ca",
       "sizeBytes": 55367168,
       "installPath": "YOLOBirdDetector.mlmodelc/weights/weight.bin"
@@ -28,7 +28,7 @@
     {
       "id": "osea-classifier-weight",
       "filename": "OSEAClassifier.weight.bin",
-      "url": "https://huggingface.co/jamesphotography/SuperPicky-models/resolve/main/OSEAClassifier.weight.bin",
+      "url": "https://huggingface.co/Airdreamer/SuperPicky-models/resolve/main/OSEAClassifier.weight.bin",
       "sha256": "cd2ca17e7858e3b49647a01e7830d38405e5b605f6c49c5b8f2490c73bd67bf2",
       "sizeBytes": 107681472,
       "installPath": "OSEAClassifier.mlmodelc/weights/weight.bin"
@@ -36,7 +36,7 @@
     {
       "id": "aesthetics-model-weight",
       "filename": "AestheticsModel.weight.bin",
-      "url": "https://huggingface.co/jamesphotography/SuperPicky-models/resolve/main/AestheticsModel.weight.bin",
+      "url": "https://huggingface.co/Airdreamer/SuperPicky-models/resolve/main/AestheticsModel.weight.bin",
       "sha256": "9e3612f51c95331d69cf5aecfff5185f4f7316436f00186713f9656fb211f1b9",
       "sizeBytes": 278668800,
       "installPath": "AestheticsModel.mlmodelc/weights/weight.bin"
