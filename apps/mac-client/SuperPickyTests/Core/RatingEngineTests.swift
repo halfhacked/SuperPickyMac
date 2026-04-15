@@ -163,6 +163,44 @@ import Foundation
         #expect(result.rating == 0)
     }
 
+    // MARK: - Eye sharpness gate
+
+    @Test func fiveStarWithGoodEyeSharpness() {
+        // eyeSharpness=150 >= threshold=120 → 5★
+        let eyeConfig = RatingEngine.Config(sharpnessThreshold: 380, aestheticsThreshold: 4.8, eyeSharpnessThreshold: 120)
+        let result = engine.calculate(
+            detected: true, confidence: 0.9,
+            sharpness: 500, aesthetics: 6.0,
+            eyeSharpness: 150,
+            config: eyeConfig
+        )
+        #expect(result.rating == 5)
+    }
+
+    @Test func fiveStarDemotedByBlurryEye() {
+        // eyeSharpness=80 < threshold=120 → demoted to 4★
+        let eyeConfig = RatingEngine.Config(sharpnessThreshold: 380, aestheticsThreshold: 4.8, eyeSharpnessThreshold: 120)
+        let result = engine.calculate(
+            detected: true, confidence: 0.9,
+            sharpness: 500, aesthetics: 6.0,
+            eyeSharpness: 80,
+            config: eyeConfig
+        )
+        #expect(result.rating == 4)
+    }
+
+    @Test func fiveStarWithNoEyeMeasurementNotPenalized() {
+        // eyeSharpness=nil (no eye detected) → 5★ regardless of threshold
+        let eyeConfig = RatingEngine.Config(sharpnessThreshold: 380, aestheticsThreshold: 4.8, eyeSharpnessThreshold: 120)
+        let result = engine.calculate(
+            detected: true, confidence: 0.9,
+            sharpness: 500, aesthetics: 6.0,
+            eyeSharpness: nil,
+            config: eyeConfig
+        )
+        #expect(result.rating == 5)
+    }
+
     // MARK: - Flying bonus
 
     @Test func flyingBonus() {
