@@ -9,10 +9,6 @@ enum ExposureStatus: String, Codable, Sendable {
     case normal, overexposed, underexposed
 }
 
-enum FocusPointStatus: String, Codable, Sendable {
-    case onBird, offBird, notAvailable
-}
-
 enum AppLanguage: String, CaseIterable, Codable, Sendable {
     case en
     case zhHans = "zh-Hans"

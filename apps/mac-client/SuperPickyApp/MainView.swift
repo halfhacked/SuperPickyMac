@@ -111,7 +111,7 @@ struct MainView: View {
         }
         .sheet(isPresented: $isExporting) {
             VStack(spacing: 16) {
-                Text("Exporting Picks...")
+                Text("Exporting...")
                     .font(.headline)
                 ProgressView(value: Double(exportProgress), total: Double(max(exportTotal, 1)))
                     .progressViewStyle(.linear)
@@ -167,43 +167,12 @@ struct MainView: View {
     }
 
     private func exportAllVisible(_ photos: [Photo]) {
-        guard let folder = appState.currentFolder else { return }
-        let visible = photos
-        guard !visible.isEmpty else {
+        guard !photos.isEmpty else {
             exportResultMessage = "No photos in the current view"
             showExportComplete = true
             return
         }
-
-        let destination = ExportService.picksDestination(for: folder)
-        exportDestination = destination
-        exportProgress = 0
-        exportTotal = visible.count
-        isExporting = true
-
-        Task {
-            do {
-                try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
-                let result = try await ExportService.export(
-                    photos: visible,
-                    to: destination,
-                    onProgress: { current, total in
-                        exportProgress = current
-                        exportTotal = total
-                    }
-                )
-                isExporting = false
-                exportResultMessage = "Exported \(result.exportedCount) photos"
-                if result.skippedCount > 0 {
-                    exportResultMessage += ", \(result.skippedCount) skipped"
-                }
-                showExportComplete = true
-            } catch {
-                isExporting = false
-                exportResultMessage = "Export failed: \(error.localizedDescription)"
-                showExportComplete = true
-            }
-        }
+        performExport(photos: photos)
     }
 
     private func reprocessFolder(_ folder: URL) {
@@ -219,7 +188,6 @@ struct MainView: View {
     }
 
     private func exportPicks() {
-        guard let folder = appState.currentFolder else { return }
         // Export picks that are also visible in current filter
         let picks = appState.photos.filter { $0.isPick }
         guard !picks.isEmpty else {
@@ -227,18 +195,24 @@ struct MainView: View {
             showExportComplete = true
             return
         }
+        performExport(photos: picks)
+    }
+
+    @MainActor
+    private func performExport(photos: [Photo]) {
+        guard let folder = appState.currentFolder else { return }
 
         let destination = ExportService.picksDestination(for: folder)
         exportDestination = destination
         exportProgress = 0
-        exportTotal = picks.count
+        exportTotal = photos.count
         isExporting = true
 
         Task {
             do {
                 try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
                 let result = try await ExportService.export(
-                    photos: picks,
+                    photos: photos,
                     to: destination,
                     onProgress: { current, total in
                         exportProgress = current
@@ -314,7 +288,6 @@ struct MainView: View {
                         if pipeline.totalCount > 0 {
                             appState.processingProgress = Double(pipeline.processedCount) / Double(pipeline.totalCount)
                         }
-                        appState.processingFilename = pipeline.currentFilename
                         // Reload UI every 5 photos to avoid jarring per-photo re-renders
                         // Skip hierarchy rebuild during incremental updates (perf: avoids O(n²))
                         if pipeline.processedCount % 5 == 0 {
