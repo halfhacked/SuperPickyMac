@@ -111,7 +111,7 @@ struct MainView: View {
         }
         .sheet(isPresented: $isExporting) {
             VStack(spacing: 16) {
-                Text("Exporting...")
+                Text(config.localized("Exporting..."))
                     .font(.headline)
                 ProgressView(value: Double(exportProgress), total: Double(max(exportTotal, 1)))
                     .progressViewStyle(.linear)
@@ -123,13 +123,13 @@ struct MainView: View {
             .padding(40)
             .interactiveDismissDisabled()
         }
-        .alert("Export", isPresented: $showExportComplete) {
+        .alert(config.localized("Export"), isPresented: $showExportComplete) {
             if let dest = exportDestination {
-                Button("Reveal in Finder") {
+                Button(config.localized("Reveal in Finder")) {
                     NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: dest.path)
                 }
             }
-            Button("OK", role: .cancel) {}
+            Button(config.localized("OK"), role: .cancel) {}
         } message: {
             Text(exportResultMessage)
         }
@@ -168,7 +168,7 @@ struct MainView: View {
 
     private func exportAllVisible(_ photos: [Photo]) {
         guard !photos.isEmpty else {
-            exportResultMessage = "No photos in the current view"
+            exportResultMessage = config.localized("No photos in the current view")
             showExportComplete = true
             return
         }
@@ -191,7 +191,7 @@ struct MainView: View {
         // Export picks that are also visible in current filter
         let picks = appState.photos.filter { $0.isPick }
         guard !picks.isEmpty else {
-            exportResultMessage = "No picks in the current view"
+            exportResultMessage = config.localized("No picks in the current view")
             showExportComplete = true
             return
         }
@@ -220,14 +220,14 @@ struct MainView: View {
                     }
                 )
                 isExporting = false
-                exportResultMessage = "Exported \(result.exportedCount) photos"
+                exportResultMessage = String(format: config.localized("Exported %lld photos"), result.exportedCount)
                 if result.skippedCount > 0 {
-                    exportResultMessage += ", \(result.skippedCount) skipped"
+                    exportResultMessage += String(format: config.localized(", %lld skipped"), result.skippedCount)
                 }
                 showExportComplete = true
             } catch {
                 isExporting = false
-                exportResultMessage = "Export failed: \(error.localizedDescription)"
+                exportResultMessage = String(format: config.localized("Export failed: %@"), error.localizedDescription)
                 showExportComplete = true
             }
         }
@@ -243,8 +243,8 @@ struct MainView: View {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
-        panel.message = "Select a folder with bird photos to process"
-        panel.prompt = "Process"
+        panel.message = config.localized("Select a folder with bird photos to process")
+        panel.prompt = config.localized("Process")
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
         startProcessing(folder: url)

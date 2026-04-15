@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct KeyboardHelpView: View {
+    @Environment(CullingConfig.self) private var config
     @Binding var isPresented: Bool
 
     private let shortcuts: [(key: String, action: String)] = [
@@ -27,7 +28,7 @@ struct KeyboardHelpView: View {
                 .onTapGesture { isPresented = false }
 
             VStack(alignment: .leading, spacing: 0) {
-                Text("Keyboard Shortcuts")
+                Text(config.localized("Keyboard Shortcuts"))
                     .font(.headline)
                     .padding(.horizontal, 20)
                     .padding(.top, 16)
@@ -43,7 +44,7 @@ struct KeyboardHelpView: View {
                                     .font(.system(.body, design: .monospaced))
                                     .frame(width: 80, alignment: .trailing)
                                     .foregroundStyle(.secondary)
-                                Text(shortcut.action)
+                                Text(config.localized(shortcut.action))
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
                             .padding(.horizontal, 20)
@@ -54,7 +55,7 @@ struct KeyboardHelpView: View {
                 .padding(.vertical, 4)
 
                 Divider()
-                Text("Press any key to dismiss")
+                Text(config.localized("Press any key to dismiss"))
                     .font(.caption)
                     .foregroundStyle(.tertiary)
                     .frame(maxWidth: .infinity, alignment: .center)

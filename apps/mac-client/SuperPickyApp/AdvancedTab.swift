@@ -74,7 +74,7 @@ struct AdvancedTab: View {
             Section(config.localized("Backend")) {
                 HStack {
                     Text(config.localized("Python server port"))
-                    TextField("Port", value: $config.backendPort, format: .number)
+                    TextField(config.localized("Port"), value: $config.backendPort, format: .number)
                         .frame(width: 80)
                 }
             }

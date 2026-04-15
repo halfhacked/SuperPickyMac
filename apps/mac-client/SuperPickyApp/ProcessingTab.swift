@@ -1,9 +1,11 @@
 import SwiftUI
 
 struct ProcessingTab: View {
+    @Environment(CullingConfig.self) private var config
+
     var body: some View {
         Form {
-            Text("Processing settings will appear here.")
+            Text(config.localized("Processing settings will appear here."))
                 .foregroundStyle(.secondary)
         }
         .formStyle(.grouped)

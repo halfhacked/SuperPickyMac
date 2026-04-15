@@ -32,19 +32,19 @@ struct SourceListView: View {
                         Button {
                             onReprocessFolder?(folder)
                         } label: {
-                            Label("Reprocess Folder", systemImage: "arrow.triangle.2.circlepath")
+                            Label(config.localized("Reprocess Folder"), systemImage: "arrow.triangle.2.circlepath")
                         }
 
                         Button(role: .destructive) {
                             removeFolder(folder)
                         } label: {
-                            Label("Remove", systemImage: "trash")
+                            Label(config.localized("Remove"), systemImage: "trash")
                         }
                     }
                 }
             } header: {
                 HStack {
-                    Text("Folders")
+                    Text(config.localized("Folders"))
                     Spacer()
                     Button {
                         onAddFolder()
@@ -54,13 +54,13 @@ struct SourceListView: View {
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
-                    .help("Process new folder")
+                    .help(config.localized("Process new folder"))
                     .accessibilityIdentifier("AddFolderButton")
                     .padding(.trailing, 12)
                 }
             }
 
-            Section("Ratings") {
+            Section(config.localized("Ratings")) {
                 ForEach([5, 4, 3, 2, 1, 0], id: \.self) { rating in
                     let count = ratingCounts[rating] ?? 0
                     Label {
@@ -78,10 +78,10 @@ struct SourceListView: View {
                 }
             }
 
-            Section("Tags") {
+            Section(config.localized("Tags")) {
                 Label {
                     HStack {
-                        Text("In Flight")
+                        Text(config.localized("In Flight"))
                         Spacer()
                         Text("\(flyingCount)")
                             .foregroundStyle(.secondary)
@@ -94,7 +94,7 @@ struct SourceListView: View {
 
                 Label {
                     HStack {
-                        Text("Picks")
+                        Text(config.localized("Picks"))
                         Spacer()
                         Text("\(picksCount)")
                             .foregroundStyle(.secondary)
@@ -107,7 +107,7 @@ struct SourceListView: View {
             }
 
             if !speciesEntries.isEmpty {
-                Section("Species") {
+                Section(config.localized("Species")) {
                     ForEach(speciesEntries) { species in
                         if species.burstGroups.isEmpty {
                             // No bursts — flat selectable row
@@ -129,7 +129,7 @@ struct SourceListView: View {
                                 ForEach(species.burstGroups) { burst in
                                     Label {
                                         HStack {
-                                            Text("Burst")
+                                            Text(config.localized("Burst"))
                                             Spacer()
                                             Text("\(burst.count)")
                                                 .foregroundStyle(.secondary)
@@ -143,7 +143,7 @@ struct SourceListView: View {
                                 if species.singlePhotos > 0 {
                                     Label {
                                         HStack {
-                                            Text("Singles")
+                                            Text(config.localized("Singles"))
                                             Spacer()
                                             Text("\(species.singlePhotos)")
                                                 .foregroundStyle(.secondary)
@@ -189,15 +189,15 @@ struct SourceListView: View {
         onRemoveFolder(folder)
     }
 
-    private func ratingLabel(_ rating: Int) -> LocalizedStringKey {
+    private func ratingLabel(_ rating: Int) -> String {
         switch rating {
-        case 5: "Excellent"
-        case 4: "Good"
-        case 3: "Average"
-        case 2: "Below Average"
-        case 1: "Poor"
-        case 0: "Reject"
-        default: "Unknown"
+        case 5: config.localized("Excellent")
+        case 4: config.localized("Good")
+        case 3: config.localized("Average")
+        case 2: config.localized("Below Average")
+        case 1: config.localized("Poor")
+        case 0: config.localized("Reject")
+        default: config.localized("Unknown")
         }
     }
 
@@ -227,6 +227,7 @@ struct SourceListView: View {
 }
 
 struct FolderRow: View {
+    @Environment(CullingConfig.self) private var config
     let folder: URL
     let isProcessing: Bool
     let progress: Double
@@ -248,7 +249,7 @@ struct FolderRow: View {
                             .font(.system(size: 13))
                     }
                     .buttonStyle(.plain)
-                    .help("Cancel processing")
+                    .help(config.localized("Cancel processing"))
                     .accessibilityIdentifier("CancelProcessingButton")
                 }
             }

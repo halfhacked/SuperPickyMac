@@ -7,11 +7,11 @@ struct BirdIDTab: View {
         @Bindable var config = config
         Form {
             Picker(config.localized("Naming Standard"), selection: $config.namingStandard) {
-                Text("OSEA (Original)").tag(NamingStandard.osea)
-                Text("AviList v2025").tag(NamingStandard.avilist)
-                Text("Clements/eBird 2024").tag(NamingStandard.clements)
-                Text("BirdLife International v9").tag(NamingStandard.birdlife)
-                Text("Scientific Names Only").tag(NamingStandard.scientific)
+                Text(config.localized("OSEA (Original)")).tag(NamingStandard.osea)
+                Text(config.localized("AviList v2025")).tag(NamingStandard.avilist)
+                Text(config.localized("Clements/eBird 2024")).tag(NamingStandard.clements)
+                Text(config.localized("BirdLife International v9")).tag(NamingStandard.birdlife)
+                Text(config.localized("Scientific Names Only")).tag(NamingStandard.scientific)
             }
 
             Section(config.localized("Confidence")) {
