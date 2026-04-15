@@ -77,7 +77,7 @@ public actor ModelManager {
             try await downloadWeights()
             setState(.ready)
         } catch {
-            logger.error("Model setup failed: \(error.localizedDescription)")
+            logger.error("Model setup failed: \(error.localizedDescription, privacy: .public)")
             setState(.failed(error))
             throw error
         }
@@ -103,11 +103,17 @@ public actor ModelManager {
     /// directly at the resource root rather than under a Models/ subdir.
     private func copyScaffolds() throws {
         let fm = FileManager.default
-        guard let resourceRoot = bundle.resourceURL,
-              fm.fileExists(atPath: resourceRoot.path) else {
+        guard let rawResourceRoot = bundle.resourceURL,
+              fm.fileExists(atPath: rawResourceRoot.path) else {
             logger.warning("Inference bundle has no resourceURL; skipping scaffold copy")
             return
         }
+        // For framework bundles, resourceURL points at the top-level "Resources"
+        // symlink (→ Versions/Current/Resources → Versions/A/Resources). Swift's
+        // FileManager.contentsOfDirectory chokes on that symlink, so resolve it
+        // to the real path first.
+        let resourceRoot = rawResourceRoot.resolvingSymlinksInPath()
+        logger.info("Copying scaffolds from \(resourceRoot.path, privacy: .public) to \(self.rootDir.path, privacy: .public)")
 
         let entries = try fm.contentsOfDirectory(at: resourceRoot,
                                                   includingPropertiesForKeys: nil)
@@ -144,46 +150,66 @@ public actor ModelManager {
             let dest = rootDir.appendingPathComponent(entry.installPath)
 
             if FileManager.default.fileExists(atPath: dest.path) {
-                logger.info("[\(index+1)/\(total)] \(entry.id) already present")
+                logger.info("[\(index+1)/\(total)] \(entry.id, privacy: .public) already present")
                 continue
             }
+            logger.info("[\(index+1)/\(total)] Downloading \(entry.id, privacy: .public) (\(entry.sizeBytes) bytes)")
 
             let baseProgress = Double(index) / Double(total)
             let sliceSize = 1.0 / Double(total)
             setState(.downloading(progress: baseProgress, currentFile: entry.filename))
 
-            let tmpFile = try await download(entry: entry) { [weak self] fraction in
-                let p = baseProgress + fraction * sliceSize
-                Task { await self?.setState(.downloading(progress: p,
-                                                          currentFile: entry.filename)) }
-            }
-            defer { try? FileManager.default.removeItem(at: tmpFile) }
-
-            setState(.verifying(file: entry.filename))
-            try verify(fileURL: tmpFile, expectedSHA256: entry.sha256)
-
+            // Stage next to the final destination so (a) we never use /tmp and
+            // (b) the move into place is a cheap same-volume rename.
             let parent = dest.deletingLastPathComponent()
             try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
-            try FileManager.default.moveItem(at: tmpFile, to: dest)
+            let stagingFile = parent.appendingPathComponent(dest.lastPathComponent + ".downloading")
+            if FileManager.default.fileExists(atPath: stagingFile.path) {
+                try FileManager.default.removeItem(at: stagingFile)
+            }
 
-            logger.info("[\(index+1)/\(total)] \(entry.id) installed")
+            try await downloadToFile(
+                entry: entry,
+                destination: stagingFile,
+                progressHandler: { [weak self] fraction in
+                    let p = baseProgress + fraction * sliceSize
+                    Task { await self?.setState(.downloading(progress: p,
+                                                              currentFile: entry.filename)) }
+                })
+
+            // Verify SHA-256 of the staged file, then atomically rename into place.
+            setState(.verifying(file: entry.filename))
+            do {
+                try verify(fileURL: stagingFile, expectedSHA256: entry.sha256)
+            } catch {
+                try? FileManager.default.removeItem(at: stagingFile)
+                throw error
+            }
+            try FileManager.default.moveItem(at: stagingFile, to: dest)
+
+            logger.info("[\(index+1)/\(total)] \(entry.id, privacy: .public) installed")
         }
     }
 
-    private func download(entry: ModelEntry,
-                          progress: @escaping (Double) -> Void) async throws -> URL {
-        let tmpDir = FileManager.default.temporaryDirectory
-        let tmpFile = tmpDir.appendingPathComponent(UUID().uuidString + "_" + entry.filename)
-
-        let (location, response) = try await URLSession.shared.downloadWithProgress(
-            from: entry.url, progress: progress)
+    /// Downloads entry.url into `destination` using a delegate-based progress
+    /// observer. Uses the modern async `download(for:delegate:)` API so the
+    /// result file stays valid until we explicitly move it — no race with
+    /// URLSession reclaiming a temp file after the completion handler returns.
+    private func downloadToFile(entry: ModelEntry,
+                                 destination: URL,
+                                 progressHandler: @escaping (Double) -> Void) async throws {
+        let delegate = DownloadProgressDelegate(handler: progressHandler)
+        let request = URLRequest(url: entry.url)
+        let (tempURL, response) = try await URLSession.shared.download(for: request, delegate: delegate)
 
         if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+            try? FileManager.default.removeItem(at: tempURL)
             throw ModelManagerError.downloadFailed(entry.id, http.statusCode)
         }
-
-        try FileManager.default.moveItem(at: location, to: tmpFile)
-        return tmpFile
+        if FileManager.default.fileExists(atPath: destination.path) {
+            try FileManager.default.removeItem(at: destination)
+        }
+        try FileManager.default.moveItem(at: tempURL, to: destination)
     }
 
     private func verify(fileURL: URL, expectedSHA256: String) throws {
@@ -239,30 +265,30 @@ public extension Bundle {
 /// when built via xcodebuild. SPM uses `Bundle.module` instead.
 private final class InferenceBundleAnchor {}
 
-// MARK: - URLSession download with progress
+// MARK: - Download progress delegate
 
-private extension URLSession {
-    func downloadWithProgress(from url: URL,
-                               progress: @escaping (Double) -> Void) async throws -> (URL, URLResponse) {
-        return try await withCheckedThrowingContinuation { continuation in
-            let task = self.downloadTask(with: url) { location, response, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-                guard let location, let response else {
-                    continuation.resume(throwing: URLError(.badServerResponse))
-                    return
-                }
-                continuation.resume(returning: (location, response))
-            }
-            let observation = task.progress.observe(\.fractionCompleted) { p, _ in
-                progress(p.fractionCompleted)
-            }
-            task.resume()
-            _ = observation
-        }
+/// A minimal URLSessionDownloadDelegate that only exists to emit fraction
+/// complete updates. The async `URLSession.download(for:delegate:)` API
+/// handles the actual file management.
+private final class DownloadProgressDelegate: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
+    private let handler: (Double) -> Void
+    init(handler: @escaping (Double) -> Void) { self.handler = handler }
+
+    func urlSession(_ session: URLSession,
+                    downloadTask: URLSessionDownloadTask,
+                    didWriteData bytesWritten: Int64,
+                    totalBytesWritten: Int64,
+                    totalBytesExpectedToWrite: Int64) {
+        guard totalBytesExpectedToWrite > 0 else { return }
+        handler(Double(totalBytesWritten) / Double(totalBytesExpectedToWrite))
     }
+
+    // The async download(for:delegate:) API moves the completed file into a
+    // location the caller can take ownership of, so we don't need to handle
+    // didFinishDownloadingTo here.
+    func urlSession(_ session: URLSession,
+                    downloadTask: URLSessionDownloadTask,
+                    didFinishDownloadingTo location: URL) { /* no-op */ }
 }
 
 // MARK: - Errors

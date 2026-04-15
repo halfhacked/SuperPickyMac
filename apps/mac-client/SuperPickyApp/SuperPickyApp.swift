@@ -13,7 +13,7 @@ struct SuperPickyApp: App {
                 MainView(modelState: modelState)
                     .frame(minWidth: 900, minHeight: 600)
 
-                if modelState.isDownloading {
+                if modelState.isDownloading || modelState.errorMessage != nil {
                     ModelDownloadOverlay(state: modelState)
                 }
             }
