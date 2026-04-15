@@ -21,6 +21,7 @@ struct Photo: Identifiable, Codable, Sendable, FetchableRecord, PersistableRecor
     var isFlying: Bool
     var flightConfidence: Float?
     var sharpnessScore: Float?
+    var eyeSharpnessScore: Float?
     var exposureStatus: String?
     var starRating: Int
     var isPick: Bool

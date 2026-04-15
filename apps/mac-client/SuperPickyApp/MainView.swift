@@ -288,7 +288,8 @@ struct MainView: View {
 
         let ratingConfig = RatingEngine.Config(
             sharpnessThreshold: config.sharpnessThreshold,
-            aestheticsThreshold: config.aestheticsThreshold
+            aestheticsThreshold: config.aestheticsThreshold,
+            eyeSharpnessThreshold: config.eyeSharpnessThreshold
         )
         let exposureEnabled = config.exposureDetectionEnabled
         let exposureThreshold = config.exposureThreshold

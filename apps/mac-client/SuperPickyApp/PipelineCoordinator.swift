@@ -189,6 +189,15 @@ final class PipelineCoordinator {
         photo.flightConfidence = flight.confidence
 
         photo.sharpnessScore = LaplacianSharpness.score(image: birdCrop)
+        photo.eyeSharpnessScore = EyeCropSharpness.score(
+            birdCrop: birdCrop,
+            leftEyeX: keypoints.leftEye.x,
+            leftEyeY: keypoints.leftEye.y,
+            leftEyeVis: keypoints.leftEye.visibility,
+            rightEyeX: keypoints.rightEye.x,
+            rightEyeY: keypoints.rightEye.y,
+            rightEyeVis: keypoints.rightEye.visibility
+        )
 
         if exposureEnabled {
             let exposure = exposureDetector.detect(image: image, threshold: exposureThreshold)
@@ -211,6 +220,7 @@ final class PipelineCoordinator {
             isOverexposed: photo.exposureStatus == ExposureStatus.overexposed.rawValue,
             isUnderexposed: photo.exposureStatus == ExposureStatus.underexposed.rawValue,
             isFlying: flight.isFlying,
+            eyeSharpness: photo.eyeSharpnessScore,
             config: ratingConfig
         )
         photo.starRating = ratingResult.rating

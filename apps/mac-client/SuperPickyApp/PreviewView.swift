@@ -146,6 +146,12 @@ struct InfoBarView: View {
                 } icon: { Image(systemName: "scope") }
                     .font(.caption)
             }
+            if let eyeSharpness = photo.eyeSharpnessScore {
+                Label {
+                    Text("\(config.localized("Eye")): \(Int(eyeSharpness))")
+                } icon: { Image(systemName: "eye") }
+                    .font(.caption)
+            }
 
             if let aesthetics = photo.aestheticsScore {
                 Label {

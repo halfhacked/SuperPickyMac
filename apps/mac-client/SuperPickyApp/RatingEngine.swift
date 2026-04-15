@@ -12,6 +12,13 @@ struct RatingEngine: Sendable {
     struct Config: Sendable {
         let sharpnessThreshold: Float
         let aestheticsThreshold: Float
+        let eyeSharpnessThreshold: Float
+
+        init(sharpnessThreshold: Float, aestheticsThreshold: Float, eyeSharpnessThreshold: Float = 0) {
+            self.sharpnessThreshold = sharpnessThreshold
+            self.aestheticsThreshold = aestheticsThreshold
+            self.eyeSharpnessThreshold = eyeSharpnessThreshold
+        }
     }
 
     func calculate(
@@ -24,6 +31,7 @@ struct RatingEngine: Sendable {
         isOverexposed: Bool = false,
         isUnderexposed: Bool = false,
         isFlying: Bool = false,
+        eyeSharpness: Float? = nil,
         config: Config
     ) -> RatingResult {
         guard detected else {
@@ -64,7 +72,11 @@ struct RatingEngine: Sendable {
         var rating: Int
 
         if sharpAboveThreshold && aestheticsAboveThreshold {
-            rating = 5
+            if let eyeSharp = eyeSharpness, eyeSharp < config.eyeSharpnessThreshold {
+                rating = 4
+            } else {
+                rating = 5
+            }
         } else if (sharpAboveThreshold || aestheticsAboveThreshold) && (sharpAboveModerate && aestheticsAboveModerate) {
             rating = 4
         } else if sharpAboveModerate && aestheticsAboveModerate {
