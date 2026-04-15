@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ServerStatusView: View {
     @Environment(ProcessManager.self) private var processManager
+    @Environment(CullingConfig.self) private var config
 
     var body: some View {
         HStack(spacing: 6) {
@@ -18,13 +19,13 @@ struct ServerStatusView: View {
         .accessibilityIdentifier("ServerStatus")
     }
 
-    private var statusText: LocalizedStringKey {
+    private var statusText: String {
         if processManager.isReady {
-            return "Models ready"
+            return config.localized("Models ready")
         } else if processManager.isRunning {
-            return "Loading models..."
+            return config.localized("Loading models...")
         } else {
-            return "Server offline"
+            return config.localized("Server offline")
         }
     }
 }

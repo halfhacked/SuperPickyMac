@@ -6,18 +6,18 @@ struct GeneralTab: View {
     var body: some View {
         @Bindable var config = config
         Form {
-            Toggle("Auto-advance after rating", isOn: $config.autoAdvance)
+            Toggle(config.localized("Auto-advance after rating"), isOn: $config.autoAdvance)
 
-            Picker("Language", selection: $config.appLanguage) {
+            Picker(config.localized("Language"), selection: $config.appLanguage) {
                 ForEach(AppLanguage.allCases, id: \.self) { lang in
                     Text(lang.displayName).tag(lang)
                 }
             }
 
-            Picker("Appearance", selection: $config.appTheme) {
-                Text("System").tag(AppTheme.system)
-                Text("Dark").tag(AppTheme.dark)
-                Text("Light").tag(AppTheme.light)
+            Picker(config.localized("Appearance"), selection: $config.appTheme) {
+                Text(config.localized("System")).tag(AppTheme.system)
+                Text(config.localized("Dark")).tag(AppTheme.dark)
+                Text(config.localized("Light")).tag(AppTheme.light)
             }
             .pickerStyle(.segmented)
         }

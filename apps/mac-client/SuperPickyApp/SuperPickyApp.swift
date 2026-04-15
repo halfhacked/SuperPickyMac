@@ -39,14 +39,14 @@ struct SuperPickyApp: App {
                 case .system: NSApp.appearance = nil
                 }
             }
-            .alert("Setup Failed", isPresented: $serverSetup.setupFailed) {
-                Button("Retry") {
+            .alert(config.localized("Setup Failed"), isPresented: $serverSetup.setupFailed) {
+                Button(config.localized("Retry")) {
                     Task {
                         let ready = await serverSetup.ensureSetup()
                         if ready { processManager.start() }
                     }
                 }
-                Button("Quit", role: .destructive) { NSApp.terminate(nil) }
+                Button(config.localized("Quit"), role: .destructive) { NSApp.terminate(nil) }
             } message: {
                 Text(serverSetup.setupError)
             }
@@ -64,6 +64,7 @@ struct SuperPickyApp: App {
 
 /// Overlay shown during first-launch Python environment setup
 struct SetupOverlay: View {
+    @Environment(CullingConfig.self) private var config
     let progress: String
 
     var body: some View {
@@ -72,7 +73,7 @@ struct SetupOverlay: View {
             VStack(spacing: 16) {
                 ProgressView()
                     .controlSize(.large)
-                Text("Setting up SuperPicky")
+                Text(config.localized("Setting up SuperPicky"))
                     .font(.title2.bold())
                 Text(progress)
                     .font(.caption)

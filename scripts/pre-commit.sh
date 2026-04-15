@@ -6,6 +6,15 @@ echo "=== G1: Static Analysis ==="
 (cd apps/mac-client && swift build 2>&1 | tail -5) &
 PID_SWIFT=$!
 
+# SwiftLint: catch unlocalized strings
+if command -v swiftlint &>/dev/null; then
+    (cd apps/mac-client && swiftlint lint --strict 2>&1 | tail -20) &
+    PID_SWIFTLINT=$!
+else
+    echo "SKIP: swiftlint not installed (brew install swiftlint)"
+    PID_SWIFTLINT=""
+fi
+
 # Python: flake8 via venv
 if [ -f "python-server/.venv/bin/flake8" ]; then
     (cd python-server && .venv/bin/flake8 --max-line-length=120 --ignore=E501,W503 superpicky_server.py inference/ 2>&1) &
@@ -19,6 +28,7 @@ else
 fi
 
 wait $PID_SWIFT || { echo "FAIL: Swift build failed"; exit 1; }
+[ -n "$PID_SWIFTLINT" ] && { wait $PID_SWIFTLINT || { echo "FAIL: SwiftLint found unlocalized strings"; exit 1; }; }
 [ -n "$PID_PYTHON" ] && { wait $PID_PYTHON || { echo "FAIL: Python lint failed"; exit 1; }; }
 
 echo "=== L1: Unit Tests ==="

@@ -29,12 +29,12 @@ struct ThresholdCalibratorView: View {
     var body: some View {
         @Bindable var config = config
         VStack(alignment: .leading, spacing: 0) {
-            Text("Calibrate Thresholds")
+            Text(config.localized("Calibrate Thresholds"))
                 .font(.headline)
                 .padding(.bottom, 12)
 
             ThresholdScoreRow(
-                label: "Sharpness",
+                label: config.localized("Sharpness"),
                 threshold: $config.sharpnessThreshold,
                 range: 100...800,
                 step: 10,
@@ -42,7 +42,7 @@ struct ThresholdCalibratorView: View {
                 format: { "\(Int($0))" }
             )
             ThresholdScoreRow(
-                label: "Aesthetics",
+                label: config.localized("Aesthetics"),
                 threshold: $config.aestheticsThreshold,
                 range: 2.0...8.0,
                 step: 0.1,
@@ -53,17 +53,17 @@ struct ThresholdCalibratorView: View {
 
             if let rating = predictedRating {
                 HStack(spacing: 6) {
-                    Text("Predicted:")
+                    Text(config.localized("Predicted:"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     StarRatingView(rating: rating)
                 }
             } else if photo != nil {
-                Text("No bird detected")
+                Text(config.localized("No bird detected"))
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             } else {
-                Text("Select a processed photo")
+                Text(config.localized("Select a processed photo"))
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
@@ -74,6 +74,7 @@ struct ThresholdCalibratorView: View {
 }
 
 private struct ThresholdScoreRow: View {
+    @Environment(CullingConfig.self) private var config
     let label: String
     @Binding var threshold: Float
     let range: ClosedRange<Float>
@@ -100,11 +101,11 @@ private struct ThresholdScoreRow: View {
                     Image(systemName: passes ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
                         .font(.caption2)
                         .foregroundStyle(passes ? Color.green : Color.orange)
-                    Text("This photo: \(format(photoValue))")
+                    Text("\(config.localized("This photo:")) \(format(photoValue))")
                         .font(.caption2)
                         .foregroundStyle(passes ? Color.green : Color.orange)
                 } else {
-                    Text("Not measured")
+                    Text(config.localized("Not measured"))
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }

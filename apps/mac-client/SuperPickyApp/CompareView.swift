@@ -6,6 +6,7 @@ struct CompareView: View {
     @Binding var isPresented: Bool
     var onRatePhoto: ((UUID, Int) -> Void)?
     var onTogglePick: ((UUID) -> Void)?
+    @Environment(CullingConfig.self) private var config
     @State private var rightIndex: Int = 0
     @State private var activeSide: Side = .left
     @State private var leftImage: NSImage?
@@ -44,7 +45,7 @@ struct CompareView: View {
                                 .font(.caption)
                         }
                         .buttonStyle(.plain)
-                        .help(zoomLocked ? "Zoom locked (click to unlock)" : "Lock zoom (sync both panels)")
+                        .help(zoomLocked ? config.localized("Zoom locked (click to unlock)") : config.localized("Lock zoom (sync both panels)"))
                         Spacer()
                     }
                     .padding(.vertical, 4)

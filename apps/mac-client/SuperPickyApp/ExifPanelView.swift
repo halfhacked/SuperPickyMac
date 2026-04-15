@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Floating panel that displays EXIF metadata for the selected photo.
 struct ExifPanelView: View {
+    @Environment(CullingConfig.self) private var config
     let photo: Photo
     @State private var exifData: EXIFData?
     @State private var loaded = false
@@ -14,59 +15,59 @@ struct ExifPanelView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     // Camera section
                     if data.cameraMake != nil || data.cameraModel != nil || data.lensModel != nil {
-                        sectionHeader("Camera", showDivider: false)
+                        sectionHeader(config.localized("Camera"), showDivider: false)
                         if let make = data.cameraMake, let model = data.cameraModel {
-                            exifRow(label: "Camera", value: "\(make) \(model)")
+                            exifRow(label: config.localized("Camera"), value: "\(make) \(model)")
                         } else if let model = data.cameraModel {
-                            exifRow(label: "Camera", value: model)
+                            exifRow(label: config.localized("Camera"), value: model)
                         } else if let make = data.cameraMake {
-                            exifRow(label: "Camera", value: make)
+                            exifRow(label: config.localized("Camera"), value: make)
                         }
                         if let lens = data.lensModel {
-                            exifRow(label: "Lens", value: lens)
+                            exifRow(label: config.localized("Lens"), value: lens)
                         }
                     }
 
                     // Exposure section
                     if data.focalLength != nil || data.aperture != nil || data.shutterSpeed != nil || data.iso != nil {
-                        sectionHeader("Exposure")
+                        sectionHeader(config.localized("Exposure"))
                         if let focal = data.focalLength {
-                            exifRow(label: "Focal Length", value: "\(formatNumber(focal)) mm")
+                            exifRow(label: config.localized("Focal Length"), value: "\(formatNumber(focal)) mm")
                         }
                         // Combine exposure like Lightroom: "1/2000 at f/6.3, ISO 1600"
-                        exifRow(label: "Exposure", value: formatExposure(data))
+                        exifRow(label: config.localized("Exposure"), value: formatExposure(data))
                         if let bias = data.exposureBias, bias != 0 {
                             let sign = bias >= 0 ? "+" : ""
-                            exifRow(label: "Exp Comp", value: "\(sign)\(formatNumber(bias)) EV")
+                            exifRow(label: config.localized("Exp Comp"), value: "\(sign)\(formatNumber(bias)) EV")
                         }
                         if let metering = data.meteringMode {
-                            exifRow(label: "Metering", value: metering)
+                            exifRow(label: config.localized("Metering"), value: metering)
                         }
                         if let wb = data.whiteBalance {
-                            exifRow(label: "White Balance", value: wb)
+                            exifRow(label: config.localized("White Balance"), value: wb)
                         }
                     }
 
                     // Image section
                     if data.imageWidth != nil || data.dateTimeOriginal != nil {
-                        sectionHeader("Image")
+                        sectionHeader(config.localized("Image"))
                         if let date = data.dateTimeOriginal {
-                            exifRow(label: "Capture Date", value: formatDate(date))
+                            exifRow(label: config.localized("Capture Date"), value: formatDate(date))
                         }
                         if let w = data.imageWidth, let h = data.imageHeight {
-                            exifRow(label: "Dimensions", value: "\(w) \u{00D7} \(h)")
+                            exifRow(label: config.localized("Dimensions"), value: "\(w) \u{00D7} \(h)")
                         }
                     }
 
                     // Location section
                     if data.latitude != nil || data.city != nil {
-                        sectionHeader("Location")
+                        sectionHeader(config.localized("Location"))
                         if let location = formatLocation(data) {
-                            exifRow(label: "Place", value: location)
+                            exifRow(label: config.localized("Place"), value: location)
                         }
                         if let lat = data.latitude, let lon = data.longitude {
                             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                Text("GPS")
+                                Text(config.localized("GPS"))
                                     .font(.system(size: 11))
                                     .foregroundStyle(.secondary)
                                     .frame(width: labelWidth, alignment: .trailing)
@@ -76,7 +77,7 @@ struct ExifPanelView: View {
                                     .foregroundStyle(.primary)
                                     .accessibilityIdentifier("Exif_GPS")
                                 Button {
-                                    let label = formatLocation(data) ?? "Photo Location"
+                                    let label = formatLocation(data) ?? config.localized("Photo Location")
                                     let url = URL(string: "https://maps.apple.com/?ll=\(lat),\(lon)&q=\(label.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "Photo")&z=14")!
                                     NSWorkspace.shared.open(url)
                                 } label: {
@@ -85,7 +86,7 @@ struct ExifPanelView: View {
                                         .foregroundStyle(.secondary)
                                 }
                                 .buttonStyle(.plain)
-                                .help("Open in Maps")
+                                .help(config.localized("Open in Maps"))
                                 .onHover { hovering in
                                     if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
                                 }
@@ -94,13 +95,13 @@ struct ExifPanelView: View {
                             .padding(.vertical, 3)
                         }
                         if let alt = data.altitude {
-                            exifRow(label: "Altitude", value: "\(Int(alt)) m")
+                            exifRow(label: config.localized("Altitude"), value: "\(Int(alt)) m")
                         }
                     }
 
                     // Keywords section
                     if !data.keywords.isEmpty {
-                        sectionHeader("Keywords")
+                        sectionHeader(config.localized("Keywords"))
                         FlowLayout(spacing: 4) {
                             ForEach(data.keywords, id: \.self) { keyword in
                                 Text(keyword)
@@ -122,7 +123,7 @@ struct ExifPanelView: View {
                     Image(systemName: "camera.metering.unknown")
                         .font(.system(size: 24))
                         .foregroundStyle(.tertiary)
-                    Text("No EXIF data")
+                    Text(config.localized("No EXIF data"))
                         .foregroundStyle(.secondary)
                         .font(.callout)
                         .accessibilityIdentifier("ExifNoData")
@@ -148,7 +149,7 @@ struct ExifPanelView: View {
 
     // MARK: - Components
 
-    private func sectionHeader(_ title: LocalizedStringKey, showDivider: Bool = true) -> some View {
+    private func sectionHeader(_ title: String, showDivider: Bool = true) -> some View {
         VStack(spacing: 0) {
             if showDivider {
                 Divider()
@@ -166,7 +167,7 @@ struct ExifPanelView: View {
         }
     }
 
-    private func exifRow(label: LocalizedStringKey, value: String) -> some View {
+    private func exifRow(label: String, value: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(label)
                 .font(.system(size: 11))

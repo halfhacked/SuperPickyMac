@@ -104,7 +104,7 @@ struct ContentView: View {
                         }
                     }
                     .accessibilityIdentifier("StarFilter")
-                    .help(minimumStars > 0 ? "Rating ≥ \(minimumStars) (⌘0 to reset)" : "Filter by minimum rating (⌘1–5)")
+                    .help(minimumStars > 0 ? config.localized("Rating ≥ %lld (⌘0 to reset)").replacingOccurrences(of: "%lld", with: "\(minimumStars)") : config.localized("Filter by minimum rating (⌘1–5)"))
 
                     Divider().frame(height: 12)
 
@@ -116,7 +116,7 @@ struct ContentView: View {
                             .foregroundStyle(topBurstOnly ? .primary : .secondary)
                     }
                     .buttonStyle(.plain)
-                    .help(topBurstOnly ? "Showing burst best only — click to show all" : "Show only the best photo from each burst")
+                    .help(topBurstOnly ? config.localized("Showing burst best only — click to show all") : config.localized("Show only the best photo from each burst"))
                     .accessibilityIdentifier("TopBurstFilter")
 
                     Button {
@@ -127,7 +127,7 @@ struct ContentView: View {
                             .foregroundStyle(pickedOnly ? .primary : .secondary)
                     }
                     .buttonStyle(.plain)
-                    .help(pickedOnly ? "Showing picks only — click to show all" : "Show only flagged photos (P to pick)")
+                    .help(pickedOnly ? config.localized("Showing picks only — click to show all") : config.localized("Show only flagged photos (P to pick)"))
                     .accessibilityIdentifier("PickedFilter")
 
                     Divider().frame(height: 12)
@@ -157,7 +157,7 @@ struct ContentView: View {
                     }
                     .menuStyle(.borderlessButton)
                     .fixedSize()
-                    .help("Sort photos")
+                    .help(config.localized("Sort photos"))
                     .accessibilityIdentifier("SortMenu")
 
                     Spacer()
@@ -212,20 +212,20 @@ struct ContentView: View {
                 KeyboardHelpView(isPresented: $showKeyboardHelp)
             }
         }
-        .alert("Delete Photo?", isPresented: $showDeleteConfirm) {
-            Button("Delete", role: .destructive) {
+        .alert(config.localized("Delete Photo?"), isPresented: $showDeleteConfirm) {
+            Button(config.localized("Delete"), role: .destructive) {
                 if let id = pendingDeleteID {
                     navigatePhoto(direction: 1, fallbackToPrevious: true)
                     onDeletePhoto?(id)
                 }
                 pendingDeleteID = nil
             }
-            Button("Cancel", role: .cancel) { pendingDeleteID = nil }
+            Button(config.localized("Cancel"), role: .cancel) { pendingDeleteID = nil }
         } message: {
             if let id = pendingDeleteID, let photo = photos.first(where: { $0.id == id }) {
-                Text("Move \"\(photo.filename)\" to Trash?")
+                Text(config.localized("Move to Trash?"))
             } else {
-                Text("Move this photo to Trash?")
+                Text(config.localized("Move to Trash?"))
             }
         }
         .toolbar {
@@ -234,18 +234,18 @@ struct ContentView: View {
                     Button {
                         onExportPicks?()
                     } label: {
-                        Label("Export Picks", systemImage: "flag.fill")
+                        Label(config.localized("Export Picks"), systemImage: "flag.fill")
                     }
                     Button {
                         onExportAllVisible?(filteredPhotos)
                     } label: {
-                        Label("Export All Visible", systemImage: "square.and.arrow.up")
+                        Label(config.localized("Export All Visible"), systemImage: "square.and.arrow.up")
                     }
                 } label: {
-                    Label("Export", systemImage: "square.and.arrow.up")
+                    Label(config.localized("Export"), systemImage: "square.and.arrow.up")
                 }
                 .accessibilityIdentifier("ExportMenu")
-                .help("Export photos (⌘E for picks)")
+                .help(config.localized("Export photos (⌘E for picks)"))
             }
             // Keep ⌘E for picks shortcut
             ToolbarItem(placement: .automatic) {
@@ -265,7 +265,7 @@ struct ContentView: View {
                         .environment(config)
                 }
                 .accessibilityIdentifier("ThresholdCalibratorButton")
-                .help("Calibrate thresholds against this photo")
+                .help(config.localized("Calibrate thresholds against this photo"))
             }
             ToolbarItem(placement: .automatic) {
                 Button {
@@ -276,13 +276,13 @@ struct ContentView: View {
                     Image(systemName: showExifPanel ? "info.circle.fill" : "info.circle")
                 }
                 .accessibilityIdentifier("ExifToggle")
-                .help("Toggle EXIF Info (I)")
+                .help(config.localized("Toggle EXIF Info (I)"))
             }
         }
-        .alert("No Photos", isPresented: $showNoPhotosAlert) {
-            Button("OK", role: .cancel) {}
+        .alert(config.localized("No Photos"), isPresented: $showNoPhotosAlert) {
+            Button(config.localized("OK"), role: .cancel) {}
         } message: {
-            Text("No photos match the current filter")
+            Text(config.localized("No photos match the current filter"))
         }
         .onChange(of: selectedPhotoID) { _, _ in
             brightnessAdj = 0
@@ -408,6 +408,7 @@ struct ContentView: View {
 
 struct EmptyStateView: View {
     let onSelectFolder: () -> Void
+    @Environment(CullingConfig.self) private var config
 
     var body: some View {
         VStack(spacing: 16) {
@@ -415,11 +416,11 @@ struct EmptyStateView: View {
                 .font(.system(size: 56, weight: .ultraLight))
                 .foregroundStyle(.secondary)
 
-            Text("Add a folder to get started")
+            Text(config.localized("Add a folder to get started"))
                 .font(.title3)
                 .foregroundStyle(.secondary)
 
-            Text("Process bird photos with AI to rate and organize them")
+            Text(config.localized("Process bird photos with AI to rate and organize them"))
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
@@ -427,7 +428,7 @@ struct EmptyStateView: View {
             Button {
                 onSelectFolder()
             } label: {
-                Label("Select Folder", systemImage: "folder")
+                Label(config.localized("Select Folder"), systemImage: "folder")
                     .padding(.horizontal, 8)
             }
             .buttonStyle(.borderedProminent)

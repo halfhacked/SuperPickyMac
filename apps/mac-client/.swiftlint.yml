@@ -1,0 +1,63 @@
+# SwiftLint configuration for SuperPicky
+# Focus: catch unlocalized strings. This project uses config.localized("key") for runtime language switching.
+
+included:
+  - SuperPickyApp
+
+excluded:
+  - .build
+  - SuperPickyTests
+
+# Only enable our custom localization rules
+only_rules:
+  - custom_rules
+
+# Catch hardcoded UI strings that should use config.localized()
+custom_rules:
+  unlocalized_text:
+    name: "Unlocalized Text"
+    regex: 'Text\("[A-Za-z][^"]*"\)'
+    message: "Use Text(config.localized(\"key\")) instead of hardcoded string"
+    severity: warning
+
+  unlocalized_label:
+    name: "Unlocalized Label"
+    regex: 'Label\("[A-Za-z][^"]*"'
+    message: "Use Label(config.localized(\"key\"), systemImage:) instead of hardcoded string"
+    severity: warning
+
+  unlocalized_section:
+    name: "Unlocalized Section"
+    regex: 'Section\("[A-Za-z][^"]*"\)'
+    message: "Use Section(config.localized(\"key\")) instead of hardcoded string"
+    severity: warning
+
+  unlocalized_button:
+    name: "Unlocalized Button"
+    regex: 'Button\("[A-Za-z][^"]*"'
+    message: "Use Button(config.localized(\"key\")) instead of hardcoded string"
+    severity: warning
+
+  unlocalized_toggle:
+    name: "Unlocalized Toggle"
+    regex: 'Toggle\("[A-Za-z][^"]*"'
+    message: "Use Toggle(config.localized(\"key\"), isOn:) instead of hardcoded string"
+    severity: warning
+
+  unlocalized_picker:
+    name: "Unlocalized Picker"
+    regex: 'Picker\("[A-Za-z][^"]*"'
+    message: "Use Picker(config.localized(\"key\"), selection:) instead of hardcoded string"
+    severity: warning
+
+  unlocalized_help:
+    name: "Unlocalized Help"
+    regex: '\.help\("[A-Za-z][^"]*"\)'
+    message: "Use .help(config.localized(\"key\")) instead of hardcoded string"
+    severity: warning
+
+  unlocalized_textfield:
+    name: "Unlocalized TextField"
+    regex: 'TextField\("[A-Za-z][^"]*"'
+    message: "Use TextField(config.localized(\"key\"), ...) instead of hardcoded string"
+    severity: warning

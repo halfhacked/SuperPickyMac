@@ -7,6 +7,7 @@ struct PreviewView: View {
     @Binding var mouseInView: CGPoint
     @Binding var viewSize: CGSize
     var onCorrectSpecies: ((UUID, String) -> Void)?
+    @Environment(CullingConfig.self) private var config
     @State private var previousPhotoID: UUID?
 
     var body: some View {
@@ -29,7 +30,7 @@ struct PreviewView: View {
                     Image(systemName: "bird")
                         .font(.system(size: 48, weight: .ultraLight))
                         .foregroundStyle(.quaternary)
-                    Text("Select a photo to preview")
+                    Text(config.localized("Select a photo to preview"))
                         .font(.title3)
                         .foregroundStyle(.tertiary)
                 }
@@ -130,7 +131,7 @@ struct InfoBarView: View {
                 StarRatingView(rating: photo.starRating)
                     .accessibilityElement(children: .ignore)
                     .accessibilityIdentifier("InfoBarRating")
-                    .accessibilityLabel("Star rating")
+                    .accessibilityLabel(config.localized("Star rating"))
                     .accessibilityValue("\(photo.starRating)")
                 if photo.isManualRating {
                     Image(systemName: "pencil")
@@ -164,7 +165,7 @@ struct InfoBarView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "bird.fill")
                         .font(.caption)
-                    TextField("Species name", text: $editingSpeciesName)
+                    TextField(config.localized("Species name"), text: $editingSpeciesName)
                         .font(.caption)
                         .textFieldStyle(.plain)
                         .frame(width: 150)
@@ -191,7 +192,7 @@ struct InfoBarView: View {
                     editingSpeciesName = photo.speciesCommonName ?? species
                     isEditingSpecies = true
                 }
-                .help("Double-click to correct species name")
+                .help(config.localized("Double-click to correct species name"))
             }
 
             Spacer()
