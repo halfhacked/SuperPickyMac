@@ -67,6 +67,11 @@ final class ReportDatabase: Sendable {
             try db.execute(sql: "ALTER TABLE photos DROP COLUMN birdMask")
             try db.execute(sql: "ALTER TABLE photos DROP COLUMN focusPointStatus")
         }
+        migrator.registerMigration("v4_eye_sharpness") { db in
+            try db.alter(table: "photos") { t in
+                t.add(column: "eyeSharpnessScore", .double)
+            }
+        }
         try migrator.migrate(dbQueue)
     }
 
