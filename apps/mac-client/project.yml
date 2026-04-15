@@ -23,9 +23,12 @@ targets:
         excludes:
           - "Models/FlightDetector.mlpackage"
           - "Models/KeypointDetector.mlpackage"
+          - "Models/YOLOBirdDetector.mlpackage"
       - path: SuperPickyInference/Resources/Models/FlightDetector.mlmodelc
         buildPhase: resources
       - path: SuperPickyInference/Resources/Models/KeypointDetector.mlmodelc
+        buildPhase: resources
+      - path: SuperPickyInference/Resources/Models/YOLOBirdDetector.mlmodelc
         buildPhase: resources
     settings:
       base:
