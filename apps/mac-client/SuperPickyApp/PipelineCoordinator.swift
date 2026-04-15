@@ -188,7 +188,7 @@ final class PipelineCoordinator {
         photo.isFlying = flight.isFlying
         photo.flightConfidence = flight.confidence
 
-        photo.sharpnessScore = keypoints.bestEyeVisibility * 600
+        photo.sharpnessScore = LaplacianSharpness.score(image: birdCrop)
 
         if exposureEnabled {
             let exposure = exposureDetector.detect(image: image, threshold: exposureThreshold)
