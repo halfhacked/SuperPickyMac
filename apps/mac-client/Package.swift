@@ -18,6 +18,7 @@ let package = Package(
                 .copy("Resources/Models/KeypointDetector.mlmodelc"),
                 .copy("Resources/Models/YOLOBirdDetector.mlmodelc"),
                 .copy("Resources/Models/OSEAClassifier.mlmodelc"),
+                .copy("Resources/Models/AestheticsModel.mlmodelc"),
                 .copy("Resources/bird_reference.sqlite"),
             ]
         ),
