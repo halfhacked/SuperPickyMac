@@ -17,11 +17,11 @@ struct InferenceBackendSettingTests {
         #expect(InferenceBackend.native.rawValue == "native")
     }
 
-    @Test("CullingConfig defaults inferenceBackend to .http")
-    func defaultsToHttp() {
+    @Test("CullingConfig defaults inferenceBackend to .native")
+    func defaultsToNative() {
         UserDefaults.standard.removeObject(forKey: "inferenceBackend")
         let config = CullingConfig()
-        #expect(config.inferenceBackend == .http)
+        #expect(config.inferenceBackend == .native)
     }
 
     @Test("CullingConfig.inferenceBackend persists to UserDefaults")
