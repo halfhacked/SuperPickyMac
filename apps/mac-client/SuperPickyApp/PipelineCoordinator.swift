@@ -111,9 +111,10 @@ final class PipelineCoordinator {
     private func runBurstDetection(db: ReportDatabase) async {
         do {
             let allPhotos = try db.fetchAllPhotos()
+            let detector = burstDetector  // capture value, not self
             // Move blocking Vision CPU work off the cooperative thread pool
             let burstGroups = await Task.detached(priority: .utility) {
-                self.burstDetector.detect(photos: allPhotos)
+                detector.detect(photos: allPhotos)
             }.value
             for group in burstGroups {
                 for photo in group.photos {
