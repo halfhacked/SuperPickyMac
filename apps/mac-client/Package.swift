@@ -9,17 +9,28 @@ let package = Package(
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.0.0"),
     ],
     targets: [
+        .target(
+            name: "SuperPickyInference",
+            path: "SuperPickyInference",
+            resources: [
+                .process("Resources/manifest.json"),
+            ]
+        ),
         .executableTarget(
             name: "SuperPicky",
             dependencies: [
                 .product(name: "GRDB", package: "GRDB.swift"),
+                "SuperPickyInference",
             ],
             path: "SuperPickyApp",
             exclude: ["en.lproj", "zh-Hans.lproj"]
         ),
         .testTarget(
             name: "SuperPickyTests",
-            dependencies: ["SuperPicky"],
+            dependencies: [
+                "SuperPicky",
+                "SuperPickyInference",
+            ],
             path: "SuperPickyTests"
         ),
     ]

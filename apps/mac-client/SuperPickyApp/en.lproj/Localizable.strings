@@ -179,3 +179,7 @@
 "Zoom locked (click to unlock)" = "Zoom locked (click to unlock)";
 "Lock zoom (sync both panels)" = "Lock zoom (sync both panels)";
 "Unknown" = "Unknown";
+"Inference Backend" = "Inference Backend";
+"HTTP (Python server)" = "HTTP (Python server)";
+"Native Core ML" = "Native Core ML";
+"Native Core ML backend will be available in a future release." = "Native Core ML backend will be available in a future release.";
