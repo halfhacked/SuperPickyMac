@@ -43,7 +43,9 @@ final class AppState {
     var pickedPhotos: [Photo] { allPhotos.filter { $0.isPick } }
     // Filtered photos shown in the UI
     var photos: [Photo] = []
-    var lastAction: UndoAction?
+    private var undoStack: [UndoAction] = []
+    private static let maxUndoDepth = 20
+    var canUndo: Bool { !undoStack.isEmpty }
 
     private var cachedDB: ReportDatabase?
 
@@ -78,7 +80,7 @@ final class AppState {
     func loadPhotos(for folder: URL, skipHierarchy: Bool = false) {
         currentFolder = folder
         cachedDB = nil
-        lastAction = nil
+        undoStack = []
         let previousSelection = selectedPhotoID
         do {
             let database = try ReportDatabase(folderPath: folder)
@@ -194,6 +196,7 @@ final class AppState {
         speciesEntries = []
         selectedPhotoID = nil
         currentFolder = nil
+        undoStack = []
     }
 
     /// Mutate a photo, persist to DB + XMP, and update in-memory arrays.
@@ -207,11 +210,14 @@ final class AppState {
         do {
             let database = try db()
             guard var photo = try database.fetchPhoto(id: id) else { return }
-            lastAction = UndoAction(
+            undoStack.append(UndoAction(
                 photoID: id, previousRating: photo.starRating,
                 previousIsPick: photo.isPick, previousIsManualRating: photo.isManualRating,
                 wasHidden: wasHidden
-            )
+            ))
+            if undoStack.count > Self.maxUndoDepth {
+                undoStack.removeFirst()
+            }
             mutate(&photo)
             try database.save(&photo)      // DB write FIRST
             try? XMPWriter.write(photo: photo)
@@ -255,8 +261,7 @@ final class AppState {
     }
 
     func undoLastAction() {
-        guard let action = lastAction else { return }
-        lastAction = nil
+        guard let action = undoStack.popLast() else { return }
         do {
             let database = try db()
             guard var photo = try database.fetchPhoto(id: action.photoID) else { return }
