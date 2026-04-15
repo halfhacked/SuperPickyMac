@@ -6,18 +6,21 @@ struct RatingResult: Sendable {
 }
 
 struct RatingEngine: Sendable {
-    static let minimumSharpness: Float = 100
-    static let minimumAesthetics: Float = 2.0
 
     struct Config: Sendable {
         let sharpnessThreshold: Float
         let aestheticsThreshold: Float
-        let eyeSharpnessThreshold: Float
+        let minConfidence: Float
+        let minSharpness: Float
+        let minAesthetics: Float
 
-        init(sharpnessThreshold: Float, aestheticsThreshold: Float, eyeSharpnessThreshold: Float = 0) {
+        init(sharpnessThreshold: Float, aestheticsThreshold: Float,
+             minConfidence: Float = 0.5, minSharpness: Float = 100, minAesthetics: Float = 3.5) {
             self.sharpnessThreshold = sharpnessThreshold
             self.aestheticsThreshold = aestheticsThreshold
-            self.eyeSharpnessThreshold = eyeSharpnessThreshold
+            self.minConfidence = minConfidence
+            self.minSharpness = minSharpness
+            self.minAesthetics = minAesthetics
         }
     }
 
@@ -27,41 +30,44 @@ struct RatingEngine: Sendable {
         sharpness: Float = 0,
         aesthetics: Float? = nil,
         allKeypointsHidden: Bool = false,
+        bestEyeVisibility: Float = 1.0,
         isOverexposed: Bool = false,
         isUnderexposed: Bool = false,
+        focusSharpnessWeight: Float = 1.0,
+        focusAestheticsWeight: Float = 1.0,
         isFlying: Bool = false,
-        eyeSharpness: Float? = nil,
         config: Config
     ) -> RatingResult {
         guard detected else {
             return RatingResult(rating: 0, reason: "No bird detected")
         }
 
-        guard confidence >= 0.5 else {
+        guard confidence >= config.minConfidence else {
             return RatingResult(rating: 0, reason: "Low confidence: \(confidence)")
-        }
-
-        guard sharpness >= Self.minimumSharpness else {
-            return RatingResult(rating: 0, reason: "Very low sharpness: \(sharpness)")
-        }
-
-        if let aesthetics, aesthetics < Self.minimumAesthetics {
-            return RatingResult(rating: 0, reason: "Very low aesthetics: \(aesthetics)")
         }
 
         if allKeypointsHidden {
             return RatingResult(rating: 1, reason: "All keypoints hidden")
         }
 
-        var adjSharpness = sharpness
-        var adjAesthetics = aesthetics ?? 0
+        guard sharpness >= config.minSharpness else {
+            return RatingResult(rating: 0, reason: "Very low sharpness: \(sharpness)")
+        }
+
+        if let aesthetics, aesthetics < config.minAesthetics {
+            return RatingResult(rating: 0, reason: "Very low aesthetics: \(aesthetics)")
+        }
+
+        // Apply focus weights first, then flying bonus (matches superpicky order)
+        var adjSharpness = sharpness * focusSharpnessWeight
+        var adjAesthetics = (aesthetics ?? 0) * focusAestheticsWeight
         if isFlying {
             adjSharpness *= 1.2
             adjAesthetics *= 1.1
         }
 
-        let moderateSharpness = (Self.minimumSharpness + config.sharpnessThreshold) / 2
-        let moderateAesthetics = (Self.minimumAesthetics + config.aestheticsThreshold) / 2
+        let moderateSharpness = (config.minSharpness + config.sharpnessThreshold) / 2
+        let moderateAesthetics = (config.minAesthetics + config.aestheticsThreshold) / 2
 
         let sharpAboveThreshold = adjSharpness >= config.sharpnessThreshold
         let aestheticsAboveThreshold = adjAesthetics >= config.aestheticsThreshold
@@ -71,11 +77,7 @@ struct RatingEngine: Sendable {
         var rating: Int
 
         if sharpAboveThreshold && aestheticsAboveThreshold {
-            if let eyeSharp = eyeSharpness, eyeSharp < config.eyeSharpnessThreshold {
-                rating = 4
-            } else {
-                rating = 5
-            }
+            rating = 5
         } else if (sharpAboveThreshold || aestheticsAboveThreshold) && (sharpAboveModerate && aestheticsAboveModerate) {
             rating = 4
         } else if sharpAboveModerate && aestheticsAboveModerate {
@@ -86,10 +88,35 @@ struct RatingEngine: Sendable {
             rating = 1
         }
 
+        // Eye visibility degradation: max(0.5, min(1.0, bestEyeVisibility * 2))
+        // visibility 0.5+ → weight 1.0, visibility 0.25 → weight 0.5
+        let visibilityWeight = max(0.5, min(1.0, bestEyeVisibility * 2))
+        if visibilityWeight < 1.0 {
+            rating = Int((Float(rating) * visibilityWeight).rounded())
+        }
+
         if isOverexposed || isUnderexposed {
             rating = max(0, rating - 1)
         }
 
-        return RatingResult(rating: rating, reason: "Rating: \(rating)")
+        // Build reason
+        var parts: [String] = []
+        if focusSharpnessWeight > 1.0 {
+            parts.append("focus:best")
+        } else if focusSharpnessWeight >= 0.9 {
+            parts.append("focus:good")
+        } else if focusSharpnessWeight >= 0.7 {
+            parts.append("focus:fair")
+        } else {
+            parts.append("focus:miss")
+        }
+        if visibilityWeight < 1.0 {
+            parts.append("vis:\(String(format: "%.2f", bestEyeVisibility))")
+        }
+        if isOverexposed { parts.append("overexposed") }
+        if isUnderexposed { parts.append("underexposed") }
+        if isFlying { parts.append("flying") }
+
+        return RatingResult(rating: rating, reason: parts.joined(separator: " "))
     }
 }

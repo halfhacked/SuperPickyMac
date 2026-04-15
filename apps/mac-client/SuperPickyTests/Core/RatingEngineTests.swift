@@ -30,15 +30,13 @@ import Foundation
     @Test func veryLowAesthetics() {
         let result = engine.calculate(
             detected: true, confidence: 0.9,
-            sharpness: 500, aesthetics: 1.5,
+            sharpness: 500, aesthetics: 1.0,
             config: config
         )
         #expect(result.rating == 0)
     }
 
-    // MARK: - Special case
-
-    @Test func allKeypointsHidden() {
+    @Test func allKeypointsHiddenReturnsOne() {
         let result = engine.calculate(
             detected: true, confidence: 0.9,
             sharpness: 500, aesthetics: 6.0,
@@ -55,7 +53,6 @@ import Foundation
         let result = engine.calculate(
             detected: true, confidence: 0.9,
             sharpness: 500, aesthetics: 6.0,
-
             config: config
         )
         #expect(result.rating == 5)
@@ -64,12 +61,11 @@ import Foundation
     // MARK: - Decision tree: 4 stars (one above threshold, both above moderate)
 
     @Test func fourStarSharpAboveThresholdBothAboveModerate() {
-        // sharpness=500 >= 380 (threshold), aesthetics=4.0 < 4.8 but >= 3.4 (moderate)
-        // adjSharp=500 >= 240 (moderate) ✓
+        // sharpness=500 >= 380 (threshold), aesthetics=4.5 < 4.8 but >= 4.15 (moderate)
+        // moderate = (3.5 + 4.8) / 2 = 4.15
         let result = engine.calculate(
             detected: true, confidence: 0.9,
-            sharpness: 500, aesthetics: 4.0,
-
+            sharpness: 500, aesthetics: 4.5,
             config: config
         )
         #expect(result.rating == 4)
@@ -80,7 +76,6 @@ import Foundation
         let result = engine.calculate(
             detected: true, confidence: 0.9,
             sharpness: 300, aesthetics: 5.0,
-
             config: config
         )
         #expect(result.rating == 4)
@@ -89,12 +84,11 @@ import Foundation
     // MARK: - Decision tree: 3 stars (both above moderate)
 
     @Test func threeStarBothAboveModerate() {
-        // sharpness=300 >= 240 (moderate), aesthetics=4.0 >= 3.4 (moderate)
-        // Neither above threshold (300 < 380, 4.0 < 4.8)
+        // sharpness=300 >= 240 (moderate), aesthetics=4.5 >= 4.15 (moderate)
+        // Neither above threshold (300 < 380, 4.5 < 4.8)
         let result = engine.calculate(
             detected: true, confidence: 0.9,
-            sharpness: 300, aesthetics: 4.0,
-
+            sharpness: 300, aesthetics: 4.5,
             config: config
         )
         #expect(result.rating == 3)
@@ -103,22 +97,20 @@ import Foundation
     // MARK: - Decision tree: 2 stars (one above moderate)
 
     @Test func twoStarSharpAboveModerateOnly() {
-        // sharpness=500 >= 240 (moderate), aesthetics=3.0 < 3.4 (moderate)
+        // sharpness=500 >= 240 (moderate), aesthetics=4.0 < 4.15 (moderate) but >= 3.5 (min)
         let result = engine.calculate(
             detected: true, confidence: 0.9,
-            sharpness: 500, aesthetics: 3.0,
-
+            sharpness: 500, aesthetics: 4.0,
             config: config
         )
         #expect(result.rating == 2)
     }
 
     @Test func twoStarAestheticsAboveModerateOnly() {
-        // sharpness=200 < 240 (moderate), aesthetics=6.0 >= 3.4 (moderate)
+        // sharpness=200 < 240 (moderate), aesthetics=6.0 >= 4.15 (moderate)
         let result = engine.calculate(
             detected: true, confidence: 0.9,
             sharpness: 200, aesthetics: 6.0,
-
             config: config
         )
         #expect(result.rating == 2)
@@ -127,11 +119,10 @@ import Foundation
     // MARK: - Decision tree: 1 star (both below moderate)
 
     @Test func oneStarBothBelowModerate() {
-        // sharpness=200 < 240, aesthetics=3.0 < 3.4
+        // sharpness=200 < 240, aesthetics=4.0 < 4.15 but >= 3.5 (min)
         let result = engine.calculate(
             detected: true, confidence: 0.9,
-            sharpness: 200, aesthetics: 3.0,
-
+            sharpness: 200, aesthetics: 4.0,
             config: config
         )
         #expect(result.rating == 1)
@@ -144,7 +135,6 @@ import Foundation
         let result = engine.calculate(
             detected: true, confidence: 0.9,
             sharpness: 500, aesthetics: 6.0,
-
             isOverexposed: true,
             config: config
         )
@@ -155,50 +145,11 @@ import Foundation
         // Would be 1 (both below moderate), penalty -1 → 0
         let result = engine.calculate(
             detected: true, confidence: 0.9,
-            sharpness: 200, aesthetics: 3.0,
-
+            sharpness: 200, aesthetics: 3.6,
             isUnderexposed: true,
             config: config
         )
         #expect(result.rating == 0)
-    }
-
-    // MARK: - Eye sharpness gate
-
-    @Test func fiveStarWithGoodEyeSharpness() {
-        // eyeSharpness=150 >= threshold=120 → 5★
-        let eyeConfig = RatingEngine.Config(sharpnessThreshold: 380, aestheticsThreshold: 4.8, eyeSharpnessThreshold: 120)
-        let result = engine.calculate(
-            detected: true, confidence: 0.9,
-            sharpness: 500, aesthetics: 6.0,
-            eyeSharpness: 150,
-            config: eyeConfig
-        )
-        #expect(result.rating == 5)
-    }
-
-    @Test func fiveStarDemotedByBlurryEye() {
-        // eyeSharpness=80 < threshold=120 → demoted to 4★
-        let eyeConfig = RatingEngine.Config(sharpnessThreshold: 380, aestheticsThreshold: 4.8, eyeSharpnessThreshold: 120)
-        let result = engine.calculate(
-            detected: true, confidence: 0.9,
-            sharpness: 500, aesthetics: 6.0,
-            eyeSharpness: 80,
-            config: eyeConfig
-        )
-        #expect(result.rating == 4)
-    }
-
-    @Test func fiveStarWithNoEyeMeasurementNotPenalized() {
-        // eyeSharpness=nil (no eye detected) → 5★ regardless of threshold
-        let eyeConfig = RatingEngine.Config(sharpnessThreshold: 380, aestheticsThreshold: 4.8, eyeSharpnessThreshold: 120)
-        let result = engine.calculate(
-            detected: true, confidence: 0.9,
-            sharpness: 500, aesthetics: 6.0,
-            eyeSharpness: nil,
-            config: eyeConfig
-        )
-        #expect(result.rating == 5)
     }
 
     // MARK: - Flying bonus
@@ -208,7 +159,6 @@ import Foundation
         let result = engine.calculate(
             detected: true, confidence: 0.9,
             sharpness: 350, aesthetics: 4.5,
-
             isFlying: true,
             config: config
         )

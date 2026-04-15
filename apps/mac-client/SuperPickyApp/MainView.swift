@@ -263,7 +263,9 @@ struct MainView: View {
         let ratingConfig = RatingEngine.Config(
             sharpnessThreshold: config.sharpnessThreshold,
             aestheticsThreshold: config.aestheticsThreshold,
-            eyeSharpnessThreshold: config.eyeSharpnessThreshold
+            minConfidence: config.minConfidence,
+            minSharpness: 100,
+            minAesthetics: config.minAesthetics
         )
         let exposureEnabled = config.exposureDetectionEnabled
         let exposureThreshold = config.exposureThreshold
@@ -282,7 +284,9 @@ struct MainView: View {
                 ratingConfig: ratingConfig,
                 exposureEnabled: exposureEnabled,
                 exposureThreshold: exposureThreshold,
+                flightDetectionEnabled: config.flightDetectionEnabled,
                 burstDetectionEnabled: config.burstDetectionEnabled,
+                pickedTopPercentage: config.pickedTopPercentage,
                 onPhotoProcessed: {
                     await MainActor.run {
                         if pipeline.totalCount > 0 {

@@ -1,54 +1,82 @@
 import Foundation
 import CoreGraphics
+import Accelerate
 
-struct EyeCropSharpness {
-    static let minimumVisibility: Float = 0.3
-    static let patchFraction: Float = 0.1
-    static let minimumPatchSize: Int = 8
+/// Head-region sharpness using circular mask around eye + Tenengrad.
+/// Ported from superpicky's `_calculate_head_sharpness` in keypoint_detector.py.
+struct HeadSharpness {
+    static let visibilityThreshold: Float = 0.3
+    static let radiusMultiplier: Float = 1.2
+    static let noBeakRadiusRatio: Float = 0.15
+    static let lowVisPenalty: Float = 0.8
 
-    /// Returns Laplacian sharpness of a small patch centered on the best visible eye.
-    /// Returns nil if both eyes have visibility < minimumVisibility or coordinates are nil.
+    /// Compute head-region sharpness of the bird crop using a circular mask centered on the best eye.
+    /// Returns nil if crop is too small to measure.
     static func score(
         birdCrop: CGImage,
         leftEyeX: Float?, leftEyeY: Float?, leftEyeVis: Float?,
-        rightEyeX: Float?, rightEyeY: Float?, rightEyeVis: Float?
+        rightEyeX: Float?, rightEyeY: Float?, rightEyeVis: Float?,
+        beakX: Float?, beakY: Float?, beakVis: Float?
     ) -> Float? {
-        let leftVis = leftEyeVis ?? 0
-        let rightVis = rightEyeVis ?? 0
-
-        // Pick the eye with higher visibility that meets the minimum threshold.
-        // Fall through to the other eye if coords are nil.
-        let eyeX: Float
-        let eyeY: Float
-        if leftVis >= minimumVisibility && leftVis >= rightVis,
-           let x = leftEyeX, let y = leftEyeY {
-            eyeX = x; eyeY = y
-        } else if rightVis >= minimumVisibility,
-                  let x = rightEyeX, let y = rightEyeY {
-            eyeX = x; eyeY = y
-        } else {
-            return nil
-        }
-
         let w = birdCrop.width
         let h = birdCrop.height
+        guard w > 10 && h > 10 else { return nil }
 
-        let patchSize = max(minimumPatchSize, Int(Float(min(w, h)) * patchFraction))
+        let leftVis = leftEyeVis ?? 0
+        let rightVis = rightEyeVis ?? 0
+        let beakVisible = (beakVis ?? 0) >= visibilityThreshold
 
-        // Image must be large enough to accommodate the minimum patch
-        guard w >= patchSize && h >= patchSize else { return nil }
+        // Both eyes below visibility threshold: fallback with penalty
+        let bothHidden = leftVis < visibilityThreshold && rightVis < visibilityThreshold
+        let eye: (Float, Float)
+        if bothHidden {
+            // Use whichever eye has higher visibility as fallback
+            if leftVis >= rightVis, let x = leftEyeX, let y = leftEyeY {
+                eye = (x, y)
+            } else if let x = rightEyeX, let y = rightEyeY {
+                eye = (x, y)
+            } else {
+                return nil
+            }
+        } else {
+            // Pick eye further from beak (matches superpicky logic)
+            let leftOK = leftVis >= visibilityThreshold
+            let rightOK = rightVis >= visibilityThreshold
+            if leftOK && rightOK, let lx = leftEyeX, let ly = leftEyeY,
+               let rx = rightEyeX, let ry = rightEyeY,
+               let bx = beakX, let by = beakY {
+                let leftDist = hypot(lx - bx, ly - by)
+                let rightDist = hypot(rx - bx, ry - by)
+                eye = leftDist >= rightDist ? (lx, ly) : (rx, ry)
+            } else if leftOK, let x = leftEyeX, let y = leftEyeY {
+                eye = (x, y)
+            } else if let x = rightEyeX, let y = rightEyeY {
+                eye = (x, y)
+            } else {
+                return nil
+            }
+        }
 
-        let half = patchSize / 2
+        let eyePx = (Int(eye.0 * Float(w)), Int(eye.1 * Float(h)))
 
-        let cx = Int(eyeX * Float(w))
-        let cy = Int(eyeY * Float(h))
+        // Compute radius from eye-beak distance × 1.2, or 15% of crop if no beak
+        var radius: Int
+        if beakVisible, let bx = beakX, let by = beakY {
+            let beakPx = (Int(bx * Float(w)), Int(by * Float(h)))
+            let dist = hypot(Float(eyePx.0 - beakPx.0), Float(eyePx.1 - beakPx.1))
+            radius = Int(dist * radiusMultiplier)
+        } else {
+            radius = Int(Float(max(w, h)) * noBeakRadiusRatio)
+        }
+        radius = max(10, min(radius, min(w, h) / 2))
 
-        let originX = max(0, min(w - patchSize, cx - half))
-        let originY = max(0, min(h - patchSize, cy - half))
+        // Compute masked Tenengrad
+        let score = TenengradSharpness.maskedScore(
+            image: birdCrop,
+            centerX: eyePx.0, centerY: eyePx.1,
+            radius: radius
+        )
 
-        let patchRect = CGRect(x: originX, y: originY, width: patchSize, height: patchSize)
-        guard let patch = birdCrop.cropping(to: patchRect) else { return nil }
-
-        return LaplacianSharpness.score(image: patch)
+        return bothHidden ? score * lowVisPenalty : score
     }
 }
