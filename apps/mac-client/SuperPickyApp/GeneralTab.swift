@@ -8,7 +8,7 @@ struct GeneralTab: View {
         Form {
             Picker("Skill Level", selection: $config.skillLevel) {
                 ForEach(SkillLevel.allCases, id: \.self) { level in
-                    Text(level.rawValue.capitalized).tag(level)
+                    Text(level.displayName).tag(level)
                 }
             }
             .pickerStyle(.segmented)

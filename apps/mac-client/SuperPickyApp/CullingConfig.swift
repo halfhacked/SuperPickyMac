@@ -21,6 +21,22 @@ enum SkillLevel: String, CaseIterable, Codable, Sendable {
         case .master: 5.5
         }
     }
+
+    var eyeSharpnessThreshold: Float {
+        switch self {
+        case .beginner: 80
+        case .intermediate: 120
+        case .master: 160
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .beginner: "Relaxed"
+        case .intermediate: "Balanced"
+        case .master: "Strict"
+        }
+    }
 }
 
 enum NamingStandard: String, CaseIterable, Codable, Sendable {
@@ -78,11 +94,13 @@ final class CullingConfig {
         didSet {
             sharpnessThreshold = skillLevel.sharpnessThreshold
             aestheticsThreshold = skillLevel.aestheticsThreshold
+            eyeSharpnessThreshold = skillLevel.eyeSharpnessThreshold
             save()
         }
     }
     var sharpnessThreshold: Float { didSet { save() } }
     var aestheticsThreshold: Float { didSet { save() } }
+    var eyeSharpnessThreshold: Float { didSet { save() } }
     var exposureDetectionEnabled: Bool { didSet { save() } }
     var exposureThreshold: Float { didSet { save() } }
     var burstDetectionEnabled: Bool { didSet { save() } }
@@ -98,6 +116,7 @@ final class CullingConfig {
         self.skillLevel = level
         self.sharpnessThreshold = defaults.object(forKey: "sharpnessThreshold") as? Float ?? level.sharpnessThreshold
         self.aestheticsThreshold = defaults.object(forKey: "aestheticsThreshold") as? Float ?? level.aestheticsThreshold
+        self.eyeSharpnessThreshold = defaults.object(forKey: "eyeSharpnessThreshold") as? Float ?? level.eyeSharpnessThreshold
         self.exposureDetectionEnabled = defaults.object(forKey: "exposureDetectionEnabled") as? Bool ?? true
         self.exposureThreshold = defaults.object(forKey: "exposureThreshold") as? Float ?? 0.10
         self.burstDetectionEnabled = defaults.object(forKey: "burstDetectionEnabled") as? Bool ?? true
@@ -113,6 +132,7 @@ final class CullingConfig {
         defaults.set(skillLevel.rawValue, forKey: "skillLevel")
         defaults.set(sharpnessThreshold, forKey: "sharpnessThreshold")
         defaults.set(aestheticsThreshold, forKey: "aestheticsThreshold")
+        defaults.set(eyeSharpnessThreshold, forKey: "eyeSharpnessThreshold")
         defaults.set(exposureDetectionEnabled, forKey: "exposureDetectionEnabled")
         defaults.set(exposureThreshold, forKey: "exposureThreshold")
         defaults.set(burstDetectionEnabled, forKey: "burstDetectionEnabled")
