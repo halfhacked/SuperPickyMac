@@ -23,8 +23,6 @@ struct RatingEngine: Sendable {
         bestEyeVisibility: Float = 1.0,
         isOverexposed: Bool = false,
         isUnderexposed: Bool = false,
-        focusSharpnessWeight: Float = 1.0,
-        focusAestheticsWeight: Float = 1.0,
         isFlying: Bool = false,
         config: Config
     ) -> RatingResult {
@@ -48,8 +46,8 @@ struct RatingEngine: Sendable {
             return RatingResult(rating: 1, reason: "All keypoints hidden")
         }
 
-        var adjSharpness = sharpness * focusSharpnessWeight
-        var adjAesthetics = (aesthetics ?? 0) * focusAestheticsWeight
+        var adjSharpness = sharpness
+        var adjAesthetics = aesthetics ?? 0
         if isFlying {
             adjSharpness *= 1.2
             adjAesthetics *= 1.1
