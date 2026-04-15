@@ -12,13 +12,17 @@ let package = Package(
         .target(
             name: "SuperPickyInference",
             path: "SuperPickyInference",
+            exclude: [
+                // Models/ is not bundled — downloaded on first launch via ModelManager
+                // into ~/Library/Application Support/…/ModelCache/
+                "Resources/Models",
+            ],
             resources: [
+                // manifest.json lists downloadable CoreML models with SHA-256;
+                // ModelManager fetches them on first launch.
                 .process("Resources/manifest.json"),
-                .copy("Resources/Models/FlightDetector.mlmodelc"),
-                .copy("Resources/Models/KeypointDetector.mlmodelc"),
-                .copy("Resources/Models/YOLOBirdDetector.mlmodelc"),
-                .copy("Resources/Models/OSEAClassifier.mlmodelc"),
-                .copy("Resources/Models/AestheticsModel.mlmodelc"),
+                // bird_reference.sqlite is small (~9 MB zipped) and always needed,
+                // so it ships bundled rather than via the download manager.
                 .copy("Resources/bird_reference.sqlite"),
             ]
         ),

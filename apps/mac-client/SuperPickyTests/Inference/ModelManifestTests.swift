@@ -10,10 +10,26 @@ struct ModelManifestTests {
         #expect(manifest.version == 1)
     }
 
-    @Test("Phase 0 stub manifest has zero model entries")
-    func emptyModels() throws {
+    @Test("Bundled manifest lists all five CoreML models with SHA-256 + size")
+    func bundledModels() throws {
         let manifest = try ModelManifest.loadBundled()
-        #expect(manifest.models.isEmpty)
+        let ids = Set(manifest.models.map(\.id))
+        #expect(ids == [
+            "flight-detector",
+            "keypoint-detector",
+            "yolo-bird-detector",
+            "osea-classifier",
+            "aesthetics-model",
+        ])
+        // SpeciesDatabase is bundled with the app, so it must NOT be in the
+        // download manifest.
+        #expect(!ids.contains("bird-reference-db"))
+        // Every entry must have a non-empty sha256 and a positive sizeBytes so
+        // the downloader can verify + report progress.
+        for entry in manifest.models {
+            #expect(entry.sha256.count == 64)
+            #expect(entry.sizeBytes > 0)
+        }
     }
 
     @Test("ModelEntry decodes from JSON with all required fields")

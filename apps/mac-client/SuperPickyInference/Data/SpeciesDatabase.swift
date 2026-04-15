@@ -58,7 +58,23 @@ public final class SpeciesDatabase: Sendable {
     public func lookup(classID: Int) -> SpeciesEntry? {
         byClassID[classID]
     }
+
+    /// Locate the bundled `bird_reference.sqlite` inside the SuperPickyInference
+    /// resource bundle. For SPM builds that's `Bundle.module`; for xcodebuild
+    /// framework builds it's the framework bundle located via a type anchor.
+    public static func bundledURL() -> URL? {
+        #if SWIFT_PACKAGE
+        let bundle = Bundle.module
+        #else
+        let bundle = Bundle(for: SpeciesDatabaseBundleAnchor.self)
+        #endif
+        return bundle.url(forResource: "bird_reference", withExtension: "sqlite")
+    }
 }
+
+/// Anchor class used by `Bundle(for:)` to locate the framework's resource bundle
+/// when built via xcodebuild. SPM builds use `Bundle.module` instead.
+private final class SpeciesDatabaseBundleAnchor {}
 
 public enum SpeciesDatabaseError: Error {
     case openFailed(String)
