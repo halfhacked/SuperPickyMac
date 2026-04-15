@@ -173,11 +173,6 @@ struct ContentView: View {
         } message: {
             Text("No photos match the current filter")
         }
-        .onChange(of: photos.count) { _, _ in
-            minimumStars = 0
-            topBurstOnly = false
-            pickedOnly = false
-        }
         .onChange(of: selectedPhotoID) { _, _ in
             brightnessAdj = 0
         }

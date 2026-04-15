@@ -89,6 +89,7 @@ private final class ThumbnailCache {
 
     init() {
         cache.countLimit = 500
+        cache.totalCostLimit = 50 * 1024 * 1024 // 50MB
     }
 
     func get(_ key: String) -> NSImage? {
@@ -96,7 +97,8 @@ private final class ThumbnailCache {
     }
 
     func set(_ key: String, image: NSImage) {
-        cache.setObject(image, forKey: key as NSString)
+        let cost = Int(image.size.width * image.size.height * 4) // approx bytes (RGBA)
+        cache.setObject(image, forKey: key as NSString, cost: cost)
     }
 }
 
