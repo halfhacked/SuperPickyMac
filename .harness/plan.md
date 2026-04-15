@@ -1,40 +1,47 @@
-# Culling Enhancement Implementation Plan
+# Port superpicky Algorithms to SuperPickyMac
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
-**Goal:** Upgrade the culling pipeline to a Lightroom-compatible 0–5 star workflow with manual overrides, zoom, XMP sidecar output, and one-click export of keepers.
-
-**Architecture:** Extend the existing RatingEngine to produce 0–5 ratings using continuous signal thresholds. Add zoom/pan to both preview and fullscreen viewers via a shared ZoomableImageView. Write XMP sidecars using pure Swift XML generation. Export copies filtered photos + sidecars to a user-chosen folder.
-
-**Tech Stack:** Swift/SwiftUI, GRDB, AppKit (NSOpenPanel), Foundation (FileManager)
-
----
+> Bring SuperPickyMac's rating pipeline to feature parity with superpicky's Python implementation. Every algorithm, threshold, and edge case from superpicky must be faithfully ported — no simplified stubs.
 
 ## Status
 
 | # | Commit | Description | Status |
 |---|--------|-------------|--------|
-| 1 | `docs: add culling enhancement plan` | This plan | done |
-| 2 | `test: update tests for 0-5 rating scale (TDD)` | Rating + pipeline + BDD tests | pending |
-| 3 | `feat: implement 0-5 rating engine (TDD)` | New rating logic + Photo default + Pipeline -1→0 | pending |
-| 4 | `feat: add isManualRating column + migration` | Database migration | pending |
-| 5 | `feat: update UI for 0-5 star scale` | StarRatingView, SourceListView, InfoBarView | pending |
-| 6 | `feat: wire manual rating in fullscreen viewer` | Keyboard 0-5 rating | pending |
-| 7 | `feat: skip manual ratings during reprocessing` | Pipeline respects overrides | pending |
-| 8 | `test: add ZoomableImageView tests (TDD)` | Zoom state logic tests | pending |
-| 9 | `feat: implement ZoomableImageView` | Zoom/pan image component | pending |
-| 10 | `feat: integrate zoom into preview and fullscreen` | Replace static image views | pending |
-| 11 | `test: add XMP writer tests (TDD)` | XMP output validation | pending |
-| 12 | `feat: implement XMPWriter` | XMP sidecar generation | pending |
-| 13 | `test: add ExportService tests (TDD)` | Export logic tests | pending |
-| 14 | `feat: implement ExportService` | Copy + XMP export | pending |
-| 15 | `feat: add Export button and wire to UI` | Toolbar button + progress | pending |
+| 1 | `docs: add algorithm parity plan` | This plan | done |
+| 2 | `test: add Tenengrad + HeadSharpness tests (TDD)` | Sharpness algorithm tests | pending |
+| 3 | `feat: port Tenengrad sharpness with masked head region` | Replace eye-visibility proxy | pending |
+| 4 | `test: add RatingEngine parity tests (TDD)` | Focus weights, visibility, thresholds | pending |
+| 5 | `feat: port RatingEngine with visibility + focus weights` | Full algorithm port | pending |
+| 6 | `feat: port ISO normalization` | EXIF ISO read + sharpness factor | pending |
+| 7 | `feat: port focus point detection` | Multi-brand EXIF AF parsing + 4-tier weights | pending |
+| 8 | `test: add advanced config tests (TDD)` | Skill level presets, all params | pending |
+| 9 | `feat: port advanced config parameters` | CullingConfig parity | pending |
+| 10 | `feat: port picked flag calculation` | Top sharpness ∩ aesthetics marking | pending |
+| 11 | `feat: port burst pHash verification` | Perceptual hash similarity check | pending |
+| 12 | `test: integration test with real photos` | Verify scores match installed app | pending |
 
 ---
 
 ## Background
 
-SuperPicky rates bird photos on a 0–3 scale using sharpness (eye visibility proxy) and aesthetics scores. The user's Lightroom workflow uses 0–5 stars. Manual rating override is stubbed. There's no way to export keepers or write metadata for Lightroom import. The preview has no zoom — critical for evaluating sharpness.
+SuperPickyMac's culling pipeline diverged from superpicky's Python implementation. Key gaps:
+
+1. **Sharpness**: Was `bestEyeVisibility × 600` (a proxy), not real pixel sharpness. Tenengrad was added this session but needs head-region masking.
+2. **Rating engine**: Missing eye visibility weighting, focus point weighting, and correct minimum aesthetics (3.5 vs 2.0).
+3. **ISO normalization**: High-ISO noise inflates sharpness scores — superpicky compensates, Mac doesn't.
+4. **Focus point detection**: superpicky reads AF data from RAW EXIF (Nikon/Sony/Canon/Olympus/Fuji/Panasonic) and adjusts ratings. Mac has no equivalent.
+5. **Advanced config**: superpicky has 25+ configurable parameters; Mac has 3.
+6. **Picked flag**: superpicky marks top sharpness ∩ aesthetics photos. Mac doesn't.
+7. **Burst pHash**: superpicky verifies burst groups with perceptual hash similarity. Mac uses timestamp only.
+
+### What's already done in this session
+
+- `TenengradSharpness.score()` — Sobel gradient + log normalization (0-1000 scale) ✓
+- `TenengradSharpness.maskedScore()` — circular mask variant ✓
+- `HeadSharpness.score()` — eye-centered circular mask with beak distance radius ✓
+- `RatingEngine` — visibility weighting + focus weight params + reason strings ✓
+- `PipelineCoordinator` — ISO normalization + HeadSharpness + focus weight wiring ✓
+- `FocusPointDetector` — basic ImageIO stub (needs proper multi-brand implementation) ⚠️
+- Minimum aesthetics updated to 3.5 ✓
 
 ---
 
@@ -47,18 +54,19 @@ cd apps/mac-client && swift build
 
 **Run:**
 ```bash
-cd apps/mac-client && swift test
+# Process real photos and compare scores
+pkill -f SuperPicky 2>/dev/null
+rm -f /path/to/real-photos/.report.db
+TEST_FOLDER=/path/to/real-photos .build/xcode/Build/Products/Debug/SuperPicky.app/Contents/MacOS/SuperPicky
 ```
 
 **Verify:**
-1. `swift test` — all tests pass (existing + new)
-2. `swift build` — compiles without warnings
-3. Launch app, process a folder — photos get 0–5 star ratings
-4. In fullscreen, press `0`–`5` keys — rating updates immediately, shows pencil icon
-5. Reprocess same folder — manual ratings are preserved
-6. Double-click or press `Z` on preview — toggles 100% zoom; scroll to zoom, drag to pan
-7. Click "Export" toolbar button — folder picker appears, copies filtered photos + .xmp sidecars
-8. Open exported .xmp in text editor — contains valid XMP with rating, species keywords, flight tag
+1. `swift test` — all tests pass
+2. Eagle photos (DSC00001-00009) get sharpness scores in the 400-600 range (head-region Tenengrad, not 590 eye-visibility proxy)
+3. Distant/blurry birds get noticeably lower sharpness than close-up sharp birds
+4. High-ISO photos get reduced sharpness (ISO 6400 → ~15% lower than ISO 800)
+5. Photos with visible eyes get higher ratings than those with hidden eyes (visibility weighting)
+6. Scores are different from the old `bestEyeVisibility × 600` formula — proving real pixel sharpness is being measured
 
 ---
 
@@ -66,132 +74,174 @@ cd apps/mac-client && swift test
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Rating scale | 0–5 Int (no -1) | Matches Lightroom; -1 becomes 0 (reject) for undetected birds |
-| minimumAesthetics | 2.0 (per code) | Code uses 2.0 in RatingEngine.swift; CLAUDE.md said 3.5 which was stale — update CLAUDE.md |
-| Zoom implementation | Custom SwiftUI view with GeometryReader + magnification gesture | No AppKit dependency needed; works in both preview and fullscreen |
-| XMP generation | Pure Swift string template | No external dependencies; XMP schema is simple and stable |
-| Export mechanism | FileManager.copyItem with async/await | Supports Task.checkCancellation() for user cancellation |
-| Manual rating flag | `isManualRating` Bool column | Lightweight; pipeline checks before overwriting |
-| Zoom state | Shared `ZoomState` ObservableObject | Reused between preview and fullscreen without duplication |
-| Source folder XMP write | Uses NSOpenPanel-granted URL access | App already has access to processed folders via NSOpenPanel; no extra bookmarks needed |
+| Sharpness algorithm | Tenengrad (Sobel gradient magnitude) | Matches superpicky; more robust to noise than Laplacian |
+| Sharpness normalization | Log scale, MIN_VAL=100, MAX_VAL=154016, range 0-1000 | Exact match of superpicky's calibration |
+| Head region mask | Circular mask at eye, radius = eye-beak distance × 1.2 | Matches superpicky's `_calculate_head_sharpness` |
+| Visibility weighting | `max(0.5, min(1.0, bestEyeVisibility × 2))` | Exact match of superpicky's formula |
+| Focus point detection | ImageIO MakerNote + SubjectArea parsing | Native macOS, no exiftool dependency; covers Sony ARW (SubjectArea) |
+| ISO normalization | 5% penalty per ISO doubling above 800, floor at 0.5 | Exact match of superpicky's `_get_iso_sharpness_factor` |
+| Minimum aesthetics | 3.5 | Matches superpicky's `min_nima` |
+| Default sharpness threshold | 400 | Matches superpicky's default |
+| Rating scale | 0-5 stars (Mac's existing scale) | superpicky uses -1 to 3; Mac maps differently but covers the same logic |
 
 ---
 
 ## Technical Design
 
-### Data Model Changes
+### Key Algorithms (exact formulas from superpicky)
 
-**Photo model** — `starRating` range changes from -1..3 to 0..5. Add `isManualRating: Bool`.
-
-```swift
-// Photo.swift — changes only
-var starRating: Int      // was -1..3, now 0..5
-var isManualRating: Bool // NEW — default false
-```
-
-**Database migration v2:**
-```sql
-ALTER TABLE photos ADD COLUMN isManualRating BOOLEAN NOT NULL DEFAULT 0;
--- Re-map existing ratings: -1 → 0, 1..3 stay (will be re-rated on next process)
-UPDATE photos SET starRating = 0 WHERE starRating = -1;
-```
-
-### RatingEngine — New Logic
+#### 1. Tenengrad Sharpness (keypoint_detector.py lines 313-355)
 
 ```
-Input: detected, confidence, sharpness, aesthetics, allKeypointsHidden,
-       isOverexposed, isUnderexposed, isFlying, focusSharpnessWeight, focusAestheticsWeight, config
+Input: grayscale image + binary mask
+gx = Sobel(gray, ksize=3, dx=1, dy=0)
+gy = Sobel(gray, ksize=3, dx=0, dy=1)
+gradient_magnitude = gx² + gy²
+raw_sharpness = mean(gradient_magnitude[mask > 0])
 
-moderateSharpness = (minimumSharpness + config.sharpnessThreshold) / 2
-moderateAesthetics = (minimumAesthetics + config.aestheticsThreshold) / 2
-
-adjSharpness = sharpness * focusSharpnessWeight * (isFlying ? 1.2 : 1.0)
-adjAesthetics = (aesthetics ?? 0) * focusAestheticsWeight * (isFlying ? 1.1 : 1.0)
-
-// Early returns (rating 0)
-if !detected → 0
-if confidence < 0.5 → 0
-if sharpness < minimumSharpness → 0
-if aesthetics != nil AND aesthetics < minimumAesthetics → 0
-
-// Special case
-if allKeypointsHidden → 1
-
-// Decision tree (mutually exclusive, evaluated in order):
-sharpAboveThreshold = adjSharpness >= config.sharpnessThreshold
-aestheticsAboveThreshold = adjAesthetics >= config.aestheticsThreshold
-sharpAboveModerate = adjSharpness >= moderateSharpness
-aestheticsAboveModerate = adjAesthetics >= moderateAesthetics
-
-if sharpAboveThreshold AND aestheticsAboveThreshold → 5
-if (sharpAboveThreshold OR aestheticsAboveThreshold) AND (sharpAboveModerate AND aestheticsAboveModerate) → 4
-if sharpAboveModerate AND aestheticsAboveModerate → 3
-if sharpAboveModerate OR aestheticsAboveModerate → 2
-else → 1  (both below moderate)
-
-Exposure penalty: rating = max(0, rating - 1) if overexposed or underexposed
-
-isPick = (finalRating == 5)
+Log normalization:
+  MIN_VAL = 100.0
+  MAX_VAL = 154016.0
+  if raw <= MIN_VAL → 0
+  if raw >= MAX_VAL → 1000
+  else → (log(raw) - log(MIN_VAL)) / (log(MAX_VAL) - log(MIN_VAL)) × 1000
 ```
 
-### ZoomableImageView
+#### 2. Head Region Mask (keypoint_detector.py lines 219-311)
 
 ```
-State: scale (CGFloat, default 1.0), offset (CGSize, default .zero), isFittedToView (Bool, default true)
+Constants:
+  VISIBILITY_THRESHOLD = 0.3
+  RADIUS_MULTIPLIER = 1.2
+  NO_BEAK_RADIUS_RATIO = 0.15
+  LOW_VIS_PENALTY = 0.8
 
-Gestures:
-- MagnificationGesture: multiply scale, clamp to 0.5..10.0
-- DragGesture: update offset (only when scale > 1.0)
-- Double-click / Z key: toggle between fit-to-view (scale=1.0) and 100% (scale = imagePixelWidth / viewWidth)
-- Scroll wheel: increment/decrement scale by 0.1 per tick
+Eye selection:
+  If both hidden (< 0.3): use higher-visibility eye → apply 0.8x penalty
+  If both visible: pick eye farther from beak
+  If one visible: use that one
 
-Reset: when photo changes, reset to fit-to-view
+Radius calculation:
+  If beak visible: radius = distance(eye, beak) × 1.2
+  Else if bbox available: radius = max(bbox_w, bbox_h) × 0.15
+  Else: radius = max(crop_w, crop_h) × 0.15
+  Clamp: max(10, min(radius, min(w, h) / 2))
+
+Mask: circular at eye position with computed radius
+If seg_mask available: intersection(circle, seg_mask)
+Compute Tenengrad on masked pixels
 ```
 
-### XMP Sidecar Format
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<x:xmpmeta xmlns:x="adobe:ns:meta/">
-  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
-    <rdf:Description
-      xmlns:xmp="http://ns.adobe.com/xap/1.0/"
-      xmlns:dc="http://purl.org/dc/elements/1.1/"
-      xmlns:lr="http://ns.adobe.com/lightroom/1.0/"
-      xmp:Rating="{rating}">
-      <dc:subject>
-        <rdf:Bag>
-          {<rdf:li>{species common name}</rdf:li> if identified}
-          {<rdf:li>{species scientific name}</rdf:li> if identified}
-          {<rdf:li>In Flight</rdf:li> if isFlying}
-        </rdf:Bag>
-      </dc:subject>
-      <lr:hierarchicalSubject>
-        <rdf:Bag>
-          {<rdf:li>Bird|{common name}</rdf:li> if identified}
-          {<rdf:li>Behavior|In Flight</rdf:li> if isFlying}
-        </rdf:Bag>
-      </lr:hierarchicalSubject>
-    </rdf:Description>
-  </rdf:RDF>
-</x:xmpmeta>
-```
-
-### ExportService
+#### 3. ISO Sharpness Factor (photo_processor.py lines 455-474)
 
 ```
-func export(photos: [Photo], to destination: URL, onProgress: @Sendable (Int, Int) -> Void) async throws -> ExportResult
+ISO_BASE = 800
+ISO_PENALTY_FACTOR = 0.05
+ISO_MIN_FACTOR = 0.5
 
-For each photo:
-1. Check Task.isCancelled — if true, return partial result
-2. Write XMP sidecar next to original (source folder) — XMPWriter.write(photo:)
-3. Copy original file to destination
-4. Copy .xmp file to destination
-5. Report progress
+if iso <= 800 → factor = 1.0
+else → penalty = 0.05 × log₂(iso / 800)
+       factor = max(0.5, 1.0 - penalty)
 
-ExportResult: exported count, skipped count (already exists), failed count, errors
-Note: async enables structured concurrency cancellation via Task.cancel()
+Examples: ISO 800→1.0, 1600→0.95, 3200→0.90, 6400→0.85
 ```
+
+#### 4. Rating Engine (rating_engine.py lines 101-271)
+
+```
+Early exits (must match Python order):
+  !detected → 0
+  confidence < 0.5 → 0
+  all_keypoints_hidden → 1  ← BEFORE sharpness check (Python order)
+  sharpness < 100 → 0
+  aesthetics < 3.5 → 0
+
+Focus + flying adjustments:
+  adj_sharpness = sharpness × focus_sharpness_weight
+  adj_aesthetics = aesthetics × focus_aesthetics_weight
+  if flying: adj_sharpness ×= 1.2, adj_aesthetics ×= 1.1
+
+Mac's 5-tier rating (extending superpicky's 3-tier):
+  moderate_sharpness = (100 + threshold) / 2
+  moderate_aesthetics = (3.5 + threshold) / 2
+
+  Both above threshold → 5
+  One above threshold + both above moderate → 4
+  Both above moderate → 3
+  One above moderate → 2
+  Neither → 1
+
+Visibility weighting:
+  weight = max(0.5, min(1.0, best_eye_visibility × 2))
+  rating = round(rating × weight)
+
+Exposure penalty:
+  if overexposed or underexposed: rating = max(0, rating - 1)
+```
+
+#### 5. Focus Point Weights (focus_point_detector.py lines 792-856)
+
+```
+4-layer detection:
+  Layer 1 (head circle): sharpness=1.1, aesthetics=1.0
+  Layer 2 (SEG mask):    sharpness=0.9, aesthetics=1.0  [Mac: same as bbox since no seg mask]
+  Layer 3 (BBox):        sharpness=0.8, aesthetics=0.9
+  Layer 4 (outside):     sharpness=0.5, aesthetics=0.8
+  Unfocused:             sharpness=0.8, aesthetics=0.9
+  No data:               sharpness=1.0, aesthetics=1.0
+```
+
+Mac receives seg masks from preen's YOLO seg model when available. Full 4-layer detection:
+- Focus in head circle → (1.1, 1.0)
+- Focus in seg mask (not head) → (0.9, 1.0)
+- Focus in bbox (not seg) → (0.8, 0.9)
+- Focus outside bbox → (0.5, 0.8)
+- Unfocused → (0.8, 0.9)
+- No focus data → (1.0, 1.0)
+- When seg mask unavailable: Layer 2 collapses into Layer 3 (bbox)
+
+#### 6. Picked Flag (photo_processor.py lines 2615-2663)
+
+```
+1. Filter to highest-rated photos only (5-star in Mac's scale)
+2. top_count = max(1, int(count × picked_top_percentage / 100))
+3. Sort by aesthetics desc → top N → aesthetics_top
+4. Sort by sharpness desc → top N → sharpness_top
+5. picked = aesthetics_top ∩ sharpness_top
+```
+
+#### 7. Burst pHash Verification (burst_detector.py)
+
+```
+Constants:
+  PHASH_THRESHOLD = 12 (hamming distance)
+  MIN_BURST_COUNT = 4
+
+After timestamp-based grouping:
+  For each pair in group: compute pHash of thumbnail
+  If hamming_distance(hash_a, hash_b) > 12: split group at that point
+```
+
+### Advanced Config Parameters to Add
+
+| Parameter | Type | Default | superpicky equivalent |
+|-----------|------|---------|----------------------|
+| `minConfidence` | Float | 0.5 | `min_confidence` |
+| `minAesthetics` | Float | 3.5 | `min_nima` |
+| `pickedTopPercentage` | Int | 25 | `picked_top_percentage` |
+| `burstFps` | Int | 10 | `burst_fps` |
+| `burstMinCount` | Int | 4 | `burst_min_count` |
+| `birdIdConfidence` | Int | 70 | `birdid_confidence` |
+| `skillLevel` | enum | intermediate | `skill_level` |
+
+Skill level presets:
+
+| Level | Sharpness | Aesthetics |
+|-------|-----------|------------|
+| beginner | 300 | 4.5 |
+| intermediate | 380 | 4.8 |
+| master | 520 | 5.5 |
+| custom | user-defined | user-defined |
 
 ---
 
@@ -199,18 +249,17 @@ Note: async enables structured concurrency cancellation via Task.cancel()
 
 | Scenario | Expected Behavior |
 |----------|-------------------|
-| No bird detected | Rating = 0 (was -1, now mapped to 0) |
-| Aesthetics is nil | Treated as 0 for comparison |
-| Manual rating then reprocess | Manual rating preserved, AI skips |
-| Export with no photos matching filter | Alert: "No photos match the current filter" |
-| Export file already exists in destination | Skip file, increment skip count |
-| Export disk full | Catch error, report partial results with error message |
-| Export cancelled by user | Stop iteration, report partial export count |
-| Zoom beyond image bounds | Clamp offset to keep image visible |
-| XMP special characters in species name | XML-escape: &, <, >, ", ' |
-| Photo has no species and is not flying | XMP has rating only, empty keyword bags |
-| Existing database with old -1 ratings | Migration maps -1 → 0 |
-| User presses rating key with no photo selected | No-op |
+| Both eyes invisible | Use higher-vis eye with 0.8x penalty; score may be 0 if gradient too low |
+| No beak visible | Head radius = 15% of max(crop_w, crop_h) |
+| Crop smaller than min radius (10px) | Return nil → fallback to full-crop Tenengrad |
+| ISO not in EXIF | Factor = 1.0 (no penalty) |
+| ISO 100 | Factor = 1.0 (below base) |
+| No focus data in EXIF | Weights = (1.0, 1.0) — no penalty |
+| Manual focus mode | Weights = (1.0, 1.0) — no penalty |
+| Focus outside image bounds | Treat as outside bbox → (0.5, 0.8) |
+| All 5-star photos identical sharpness | All get picked flag |
+| Fewer 5-star photos than top_count | All 5-star photos get picked |
+| pHash comparison of very different-sized images | Resize both to 8x8 before hashing |
 
 ---
 
@@ -220,37 +269,30 @@ Note: async enables structured concurrency cancellation via Task.cancel()
 
 | # | File | Op | Description |
 |---|------|----|-------------|
-| 1 | `apps/mac-client/SuperPickyApp/RatingEngine.swift` | modify | 0–5 rating logic with moderate thresholds |
-| 2 | `apps/mac-client/SuperPickyTests/Core/RatingEngineTests.swift` | modify | Rewrite tests for 0–5 scale |
-| 3 | `apps/mac-client/SuperPickyApp/Photo.swift` | modify | Add `isManualRating` property |
-| 4 | `apps/mac-client/SuperPickyApp/ReportDatabase.swift` | modify | v2 migration for isManualRating + remap -1 ratings |
-| 5 | `apps/mac-client/SuperPickyTests/Data/ReportDatabaseTests.swift` | modify | Test migration and new column |
-| 6 | `apps/mac-client/SuperPickyApp/StarRatingView.swift` | modify | Display 0–5 stars |
-| 7 | `apps/mac-client/SuperPickyApp/SourceListView.swift` | modify | Sidebar ratings 5,4,3,2,1,0 with new labels/colors |
-| 8 | `apps/mac-client/SuperPickyApp/PreviewView.swift` | modify | Replace InfoBarView star display, add manual indicator |
-| 9 | `apps/mac-client/SuperPickyApp/FullscreenViewer.swift` | modify | Wire 0–5 key handlers, add database write |
-| 10 | `apps/mac-client/SuperPickyApp/MainView.swift` | modify | Pass database to fullscreen, add Export button, update AppState |
-| 11 | `apps/mac-client/SuperPickyApp/ThumbnailStripView.swift` | modify | StarRatingView already uses `rating` param — just works with 0–5 |
-| 12 | `apps/mac-client/SuperPickyApp/PipelineCoordinator.swift` | modify | Change -1 → 0, skip rating for isManualRating photos |
-| 13 | `apps/mac-client/SuperPickyTests/Core/PipelineCoordinatorTests.swift` | modify | Update -1 assertions to 0 |
-| 14 | `apps/mac-client/SuperPickyTests/BDD/ProcessingFlowTests.swift` | modify | Update -1 assertions to 0 (if any) |
-| 14 | `apps/mac-client/SuperPickyApp/ZoomableImageView.swift` | create | Zoomable/pannable image component |
-| 15 | `apps/mac-client/SuperPickyApp/XMPWriter.swift` | create | XMP sidecar file generation |
-| 16 | `apps/mac-client/SuperPickyApp/ExportService.swift` | create | Export photos + sidecars to folder |
-| 17 | `apps/mac-client/SuperPickyTests/Core/XMPWriterTests.swift` | create | XMP output validation tests |
-| 18 | `apps/mac-client/SuperPickyTests/Core/ExportServiceTests.swift` | create | Export logic tests |
-| 19 | `apps/mac-client/SuperPickyTests/Core/ZoomStateTests.swift` | create | Zoom state logic tests |
+| 1 | `SuperPickyApp/LaplacianSharpness.swift` | modify | Already renamed to TenengradSharpness; add maskedScore |
+| 2 | `SuperPickyApp/EyeCropSharpness.swift` | modify | Already rewritten as HeadSharpness |
+| 3 | `SuperPickyApp/RatingEngine.swift` | modify | Add focus weights, visibility weighting, min aesthetics 3.5 |
+| 4 | `SuperPickyApp/PipelineCoordinator.swift` | modify | Wire HeadSharpness, ISO, focus weights |
+| 5 | `SuperPickyApp/CullingConfig.swift` | modify | Remove eyeSharpnessThreshold, add new config params |
+| 6 | `SuperPickyApp/FocusPointDetector.swift` | modify | Fix weight values, add multi-brand EXIF AF parsing, add unfocused detection |
+| 7 | `SuperPickyApp/AdvancedTab.swift` | modify | Remove eye threshold slider, add new config UI |
+| 8 | `SuperPickyApp/ThresholdCalibratorView.swift` | modify | Remove eye slider, update Config init |
+| 9 | `SuperPickyApp/MainView.swift` | modify | Update RatingEngine.Config init |
+| 10 | `SuperPickyApp/PreviewView.swift` | modify | Remove eye sharpness display |
+| 11 | `SuperPickyApp/BurstDetector.swift` | modify | Add pHash verification |
+| 12 | `SuperPickyApp/AppState.swift` | modify | Add picked flag calculation after processing |
+| 13 | `SuperPickyApp/Photo.swift` | modify | Remove eyeSharpnessScore field (unused) |
+| 14 | `SuperPickyTests/Core/LaplacianSharpnessTests.swift` | modify | Tests for Tenengrad + maskedScore |
+| 15 | `SuperPickyTests/Core/EyeCropSharpnessTests.swift` | modify | Tests for HeadSharpness |
+| 16 | `SuperPickyTests/Core/RatingEngineTests.swift` | modify | Tests for visibility + focus weights |
 
-### Files NOT Changed (and why)
+### Files NOT Changed
 
 | File | Reason |
 |------|--------|
-| `python-server/*` | No new endpoints needed — all changes are client-side |
-| `apps/mac-client/SuperPickyApp/BurstDetector.swift` | Burst logic unchanged |
-| `apps/mac-client/SuperPickyApp/ExposureDetector.swift` | Exposure detection unchanged |
-| `apps/mac-client/SuperPickyApp/CullingConfig.swift` | Thresholds drive the 4/5 boundary naturally — no changes needed |
-
-**Note:** The v1 database migration in ReportDatabase.swift remains as-is (defaults to -1). It's already applied to existing databases. The v2 migration remaps -1 → 0, and the Photo model initializer changes default from -1 to 0 for new records.
+| `python-server/*` | All changes are client-side Swift |
+| `SuperPickyApp/ExposureDetector.swift` | Exposure detection already matches |
+| `SuperPickyApp/ExportService.swift` | Export logic unchanged |
 
 ---
 
@@ -260,160 +302,114 @@ Note: async enables structured concurrency cancellation via Task.cancel()
 
 | # | Test | What It Validates |
 |---|------|-------------------|
-| 1 | `noBirdDetected → rating 0` | Undetected birds get 0 (not -1) |
-| 2 | `lowConfidence → rating 0` | Confidence gate still works |
-| 3 | `belowMinimumSharpness → rating 0` | Floor gate works |
-| 4 | `belowMinimumAesthetics → rating 0` | Floor gate works |
-| 5 | `allKeypointsHidden → rating 1` | Hidden keypoints cap at 1 |
-| 6 | `bothBelowModerate → rating 1` | Low signals = poor |
-| 7 | `oneBelowModerate → rating 2` | Mixed low = below average |
-| 8 | `bothModerateButBelowThreshold → rating 3` | Moderate signals = average |
-| 9 | `oneAboveThreshold → rating 4` | One strong signal = good |
-| 10 | `bothAboveThreshold → rating 5` | Both strong = excellent |
-| 11 | `exposurePenalty reduces by 1` | Overexposure drops rating |
-| 12 | `flyingBonus lifts below-threshold to above` | Flight adjustments work |
-| 13 | `isPick true only at rating 5` | Pick flag semantics |
-| 14 | `XMP with rating and species` | Correct XML output |
-| 15 | `XMP with no species no flight` | Rating-only XMP |
-| 16 | `XMP escapes special characters` | &, <, > in species names |
-| 17 | `ExportService copies files to destination` | Files appear in dest folder |
-| 18 | `ExportService skips existing files` | No overwrite, skip count incremented |
-| 19 | `ExportService writes XMP sidecars` | .xmp files created alongside copies |
-| 20 | `ZoomState toggleFitActualPixels` | Scale toggles between 1.0 and actual |
-| 21 | `ZoomState clampScale` | Scale stays within 0.5–10.0 |
-| 22 | `ZoomState resetOnPhotoChange` | State resets when photo changes |
-| 23 | `Database migration adds isManualRating` | Column exists after migration |
-| 24 | `Database migration remaps -1 to 0` | Old ratings updated |
+| 1 | `TenengradSharpness: solid color → 0` | Zero gradient = zero score |
+| 2 | `TenengradSharpness: sharp edges > 100` | High-frequency content scores high |
+| 3 | `TenengradSharpness: score capped at 1000` | Upper bound enforced |
+| 4 | `TenengradSharpness: maskedScore inside circle only` | Pixels outside mask excluded |
+| 5 | `HeadSharpness: both eyes hidden → penalized score` | 0.8x penalty applied |
+| 6 | `HeadSharpness: picks eye farther from beak` | Correct eye selection |
+| 7 | `HeadSharpness: no beak → 15% radius fallback` | Fallback radius |
+| 8 | `HeadSharpness: tiny crop → nil` | Guard against too-small images |
+| 9 | `RatingEngine: visibility 0.5 → weight 1.0` | No downgrade for visible eyes |
+| 10 | `RatingEngine: visibility 0.25 → weight 0.5` | Progressive downgrade |
+| 11 | `RatingEngine: focus head → sharpness 1.1x` | Head focus bonus |
+| 12 | `RatingEngine: focus outside → sharpness 0.5x` | Miss penalty |
+| 13 | `RatingEngine: min aesthetics 3.5 gate` | Below 3.5 → 0 stars |
+| 14 | `ISO factor: ISO 800 → 1.0` | No penalty at base |
+| 15 | `ISO factor: ISO 1600 → 0.95` | 5% per doubling |
+| 16 | `ISO factor: ISO 6400 → 0.85` | Correct decay |
+| 17 | `ISO factor: extreme ISO → floor 0.5` | Hard floor |
+
+### L2 — Integration
+
+| # | Test | What It Validates |
+|---|------|-------------------|
+| 1 | `Process real-photos and verify score distribution` | Sharp eagles > 400, blurry birds < 200 |
+| 2 | `Scores differ from old eyeVisibility×600` | Real sharpness, not proxy |
 
 ---
 
 ## Tasks
 
-### Task 1: 0–5 Star Rating Engine
+### Task 1: Tenengrad + HeadSharpness (sharpness algorithm)
 
-Rewrite RatingEngine to produce 0–5 ratings using moderate thresholds. Update Photo model default from -1 to 0. Change PipelineCoordinator's -1 assignments to 0. Update all existing tests that assert -1 to assert 0.
-
-**Important context:**
-- `PipelineCoordinator.swift` sets `photo.starRating = -1` at lines 81 and 124 — these must become 0
-- `Photo.swift` init sets `starRating = -1` — must become 0
-- `PipelineCoordinatorTests.swift` line 59 asserts `starRating == -1` — must become 0
-- `ProcessingFlowTests.swift` may also assert -1 — check and update
-- `RatingEngineTests.swift` existing test `noBirdDetected` expects -1 — must expect 0
+Port full-crop and masked Tenengrad sharpness from superpicky. Already partially done — needs test verification and edge case fixes.
 
 **Acceptance criteria:**
-- [ ] `RatingEngine.calculate()` returns ratings 0–5 per the new logic (no -1 anywhere)
-- [ ] `isPick` is true only when final rating is 5
-- [ ] No bird detected returns 0 (not -1)
-- [ ] Photo model initializer defaults starRating to 0
-- [ ] PipelineCoordinator uses 0 instead of -1 for error/undetected cases
-- [ ] All rating tests pass with updated expectations
-- [ ] `swift test` passes with no regressions (including PipelineCoordinatorTests, ProcessingFlowTests)
+- [ ] `TenengradSharpness.score()` produces 0-1000 scores with log normalization matching superpicky's MIN_VAL=100, MAX_VAL=154016
+- [ ] `TenengradSharpness.maskedScore()` computes Sobel only within a circular mask
+- [ ] `HeadSharpness.score()` selects correct eye (farther from beak when both visible)
+- [ ] 0.8x penalty when both eyes below visibility 0.3
+- [ ] Radius = eye-beak distance × 1.2 when beak visible, 15% fallback otherwise
+- [ ] When seg mask is available, intersect circle mask with seg mask before computing Tenengrad
+- [ ] All sharpness unit tests pass
 
-**Commits:**
-| # | Type | Message | Files |
-|---|------|---------|-------|
-| 2 | test | `test: update tests for 0-5 rating scale (TDD)` | `SuperPickyTests/Core/RatingEngineTests.swift`, `SuperPickyTests/Core/PipelineCoordinatorTests.swift`, `SuperPickyTests/BDD/ProcessingFlowTests.swift` |
-| 3 | feat | `feat: implement 0-5 rating engine (TDD)` | `SuperPickyApp/RatingEngine.swift`, `SuperPickyApp/Photo.swift`, `SuperPickyApp/PipelineCoordinator.swift` |
+### Task 2: RatingEngine parity
 
-### Task 2: UI Updates for 0–5 Stars + Database Migration
-
-Update StarRatingView to show 5 stars. Update SourceListView sidebar to list ratings 5–0 with new labels. Add `isManualRating` column via database migration. Remap old -1 ratings to 0. Update Photo model.
+Port visibility weighting, focus weight parameters, correct thresholds. Already partially done — needs tests for new behavior.
 
 **Acceptance criteria:**
-- [ ] StarRatingView renders 5 stars with correct fill
-- [ ] SourceListView shows ratings 5,4,3,2,1,0 with labels (Excellent, Good, Average, Below Average, Poor, Reject)
-- [ ] Database v2 migration adds `isManualRating` column
-- [ ] Existing -1 ratings become 0 after migration
-- [ ] Photo model has `isManualRating: Bool` defaulting to false
-- [ ] `swift build` compiles; `swift test` passes
+- [ ] `visibility_weight = max(0.5, min(1.0, bestEyeVisibility × 2))` applied to base rating
+- [ ] Focus weights applied before flying bonus (superpicky order)
+- [ ] Early exit order matches Python: detected → confidence → allKeypointsHidden → sharpness → aesthetics
+- [ ] Minimum aesthetics = 3.5 (was 2.0)
+- [ ] Reason string includes focus/visibility/exposure/flying info
+- [ ] All rating tests pass with updated thresholds
 
-**Commits:**
-| # | Type | Message | Files |
-|---|------|---------|-------|
-| 4 | feat | `feat: add isManualRating column + database migration` | `Photo.swift`, `ReportDatabase.swift`, `ReportDatabaseTests.swift` |
-| 5 | feat | `feat: update UI for 0-5 star scale` | `StarRatingView.swift`, `SourceListView.swift`, `PreviewView.swift` |
+### Task 3: ISO normalization
 
-### Task 3: Manual Rating Override
-
-Wire keyboard shortcuts 0–5 in FullscreenViewer to persist rating to database. Show manual indicator in InfoBarView. Pipeline skips photos with isManualRating=true during reprocessing.
-
-**Important context:**
-- `FullscreenViewer.swift` already has `.onKeyPress("0")` through `.onKeyPress("3")` with a stub `rateSelected()` method. Extend to add "4" and "5" handlers, and implement the stub to write to the database.
-- The FullscreenViewer needs access to a `ReportDatabase` instance — pass it via the MainView/AppState.
+Read ISO from EXIF and apply sharpness penalty for high ISO.
 
 **Acceptance criteria:**
-- [ ] Pressing 0–5 in fullscreen sets rating and persists to database
-- [ ] `isManualRating` set to true when user rates manually
-- [ ] InfoBarView shows pencil icon when rating is manual
-- [ ] PipelineCoordinator skips rating assignment for isManualRating=true photos
-- [ ] `swift build` compiles; `swift test` passes
+- [ ] ISO read from RAW EXIF via `EXIFReader`
+- [ ] Factor formula: `max(0.5, 1.0 - 0.05 × log₂(iso / 800))`
+- [ ] Applied to sharpness before rating
+- [ ] No penalty when ISO unavailable or ≤ 800
+- [ ] Unit tests for factor calculation
 
-**Commits:**
-| # | Type | Message | Files |
-|---|------|---------|-------|
-| 6 | feat | `feat: wire manual rating in fullscreen viewer` | `FullscreenViewer.swift`, `MainView.swift`, `PreviewView.swift` |
-| 7 | feat | `feat: skip manual ratings during reprocessing` | `PipelineCoordinator.swift` |
+### Task 4: Focus point detection
 
-### Task 4: Zoomable Image View
-
-Create a ZoomableImageView with scroll-to-zoom, drag-to-pan, double-click/Z-key toggle between fit and 100%. Integrate into PreviewView and FullscreenViewer.
+Read AF data from RAW EXIF (Sony SubjectArea, Nikon AFAreaXPosition, Canon) and compute 4-tier weights.
 
 **Acceptance criteria:**
-- [ ] Scroll wheel zooms in/out (0.5x–10x range)
-- [ ] Drag pans the image when zoomed past 1.0x
-- [ ] Double-click toggles between fit-to-view and 100%
-- [ ] Z key toggles between fit-to-view and 100%
-- [ ] State resets when selected photo changes
-- [ ] Works in both main preview and fullscreen viewer
-- [ ] `swift build` compiles; `swift test` passes
+- [ ] Reads focus point from Sony ARW (SubjectArea EXIF field)
+- [ ] Computes normalized (0-1) focus coordinates
+- [ ] Correct weight values: head=(1.1, 1.0), seg=(0.9, 1.0), bbox=(0.8, 0.9), outside=(0.5, 0.8), unfocused=(0.8, 0.9), unknown=(1.0, 1.0)
+- [ ] Remove nonexistent "birdFocus" tier from current code
+- [ ] Unfocused detection: when EXIF indicates AF attempted but didn't lock → (0.8, 0.9)
+- [ ] Seg mask intersection when available from preen's YOLO seg model
+- [ ] Default (1.0, 1.0) when no focus data available
+- [ ] Wired into PipelineCoordinator → RatingEngine
 
-**Commits:**
-| # | Type | Message | Files |
-|---|------|---------|-------|
-| 8 | test | `test: add ZoomState tests (TDD)` | `SuperPickyTests/Core/ZoomStateTests.swift` |
-| 9 | feat | `feat: implement ZoomableImageView` | `SuperPickyApp/ZoomableImageView.swift` |
-| 10 | feat | `feat: integrate zoom into preview and fullscreen` | `PreviewView.swift`, `FullscreenViewer.swift` |
+### Task 5: Advanced config parameters
 
-### Task 5: XMP Sidecar Writer
-
-Create XMPWriter that generates valid XMP sidecar files with star rating, species keywords, and flight tags.
+Add all missing config parameters matching superpicky's `advanced_config.py`.
 
 **Acceptance criteria:**
-- [ ] XMP contains `xmp:Rating` with correct value
-- [ ] Keywords include species common name, scientific name (if identified)
-- [ ] Keywords include "In Flight" if photo.isFlying
-- [ ] Hierarchical keywords use `Bird|name` and `Behavior|In Flight` format
-- [ ] Special characters in species names are XML-escaped
-- [ ] Sidecar file named `{original-stem}.xmp`
-- [ ] `swift test` passes
+- [ ] Skill level presets (beginner/intermediate/master/custom) with correct thresholds
+- [ ] All parameters from superpicky's config have equivalents in CullingConfig
+- [ ] Settings UI updated with new controls
+- [ ] Localized strings for all new labels
 
-**Commits:**
-| # | Type | Message | Files |
-|---|------|---------|-------|
-| 11 | test | `test: add XMP writer tests (TDD)` | `SuperPickyTests/Core/XMPWriterTests.swift` |
-| 12 | feat | `feat: implement XMPWriter` | `SuperPickyApp/XMPWriter.swift` |
+### Task 6: Picked flag calculation
 
-### Task 6: Export Service + UI
-
-Create ExportService that copies filtered photos + XMP sidecars to a destination folder. Add "Export" toolbar button with folder picker, progress sheet, and completion alert.
+Mark top photos by intersection of sharpness and aesthetics rankings.
 
 **Acceptance criteria:**
-- [ ] Export button visible in toolbar
-- [ ] Clicking Export opens NSOpenPanel for folder selection
-- [ ] All photos matching current filter are exported
-- [ ] For each photo: XMP written to source, original + XMP copied to destination
-- [ ] Progress shown during export
-- [ ] Completion alert shows count ("Exported 47 photos to /path")
-- [ ] Existing files in destination are skipped
-- [ ] Empty filter shows "No photos match the current filter" alert
-- [ ] `swift build` compiles; `swift test` passes
+- [ ] After processing, compute picked flag for photos with starRating == 5 (Mac's highest tier, equivalent to Python's 3-star)
+- [ ] `picked = top_N_by_aesthetics ∩ top_N_by_sharpness` (default N=25%)
+- [ ] Written to Photo.isPick in database
+- [ ] Configurable `pickedTopPercentage`
 
-**Commits:**
-| # | Type | Message | Files |
-|---|------|---------|-------|
-| 13 | test | `test: add ExportService tests (TDD)` | `SuperPickyTests/Core/ExportServiceTests.swift` |
-| 14 | feat | `feat: implement ExportService` | `SuperPickyApp/ExportService.swift` |
-| 15 | feat | `feat: add Export button and wire to UI` | `MainView.swift`, `ContentView` section in `MainView.swift` |
+### Task 7: Burst pHash verification
+
+Add perceptual hash comparison to verify burst groups.
+
+**Acceptance criteria:**
+- [ ] Check if existing BurstDetector already uses VNFeaturePrintObservation — if so, tune threshold to match superpicky's pHash behavior (hamming ≤ 12 equivalent). If not, add DCT-based pHash (8x8) with hamming distance threshold 12.
+- [ ] Split burst group when consecutive photos exceed similarity threshold
+- [ ] Only affects burst detection, not rating
+- [ ] Configurable threshold
 
 ---
 
@@ -421,40 +417,35 @@ Create ExportService that copies filtered photos + XMP sidecars to a destination
 
 | # | Task | Type | Message | Depends On |
 |---|------|------|---------|------------|
-| 1 | — | docs | `docs: add culling enhancement plan` | — |
-| 2 | 1 | test | `test: update tests for 0-5 rating scale (TDD)` | 1 |
-| 3 | 1 | feat | `feat: implement 0-5 rating engine (TDD)` | 2 |
-| 4 | 2 | feat | `feat: add isManualRating column + database migration` | 3 |
-| 5 | 2 | feat | `feat: update UI for 0-5 star scale` | 4 |
-| 6 | 3 | feat | `feat: wire manual rating in fullscreen viewer` | 5 |
-| 7 | 3 | feat | `feat: skip manual ratings during reprocessing` | 6 |
-| 8 | 4 | test | `test: add ZoomState tests (TDD)` | 7 |
-| 9 | 4 | feat | `feat: implement ZoomableImageView` | 8 |
-| 10 | 4 | feat | `feat: integrate zoom into preview and fullscreen` | 9 |
-| 11 | 5 | test | `test: add XMP writer tests (TDD)` | 10 |
-| 12 | 5 | feat | `feat: implement XMPWriter` | 11 |
-| 13 | 6 | test | `test: add ExportService tests (TDD)` | 12 |
-| 14 | 6 | feat | `feat: implement ExportService` | 13 |
-| 15 | 6 | feat | `feat: add Export button and wire to UI` | 14 |
+| 1 | — | docs | `docs: add algorithm parity plan` | — |
+| 2 | 1 | test | `test: add Tenengrad + HeadSharpness tests (TDD)` | 1 |
+| 3 | 1 | feat | `feat: port Tenengrad sharpness with masked head region` | 2 |
+| 4 | 2 | test | `test: add RatingEngine parity tests (TDD)` | 3 |
+| 5 | 2 | feat | `feat: port RatingEngine with visibility + focus weights` | 4 |
+| 6 | 3 | test | `test: add ISO normalization tests (TDD)` | 5 |
+| 7 | 3 | feat | `feat: port ISO normalization` | 6 |
+| 8 | 4 | test | `test: add focus point detection tests (TDD)` | 7 |
+| 9 | 4 | feat | `feat: port focus point detection` | 8 |
+| 10 | 5 | test | `test: add advanced config tests (TDD)` | 9 |
+| 11 | 5 | feat | `feat: port advanced config parameters` | 10 |
+| 12 | 6 | test | `test: add picked flag tests (TDD)` | 11 |
+| 13 | 6 | feat | `feat: port picked flag calculation` | 12 |
+| 14 | 7 | test | `test: add burst pHash tests (TDD)` | 13 |
+| 15 | 7 | feat | `feat: port burst pHash verification` | 14 |
+| 16 | — | test | `test: integration test with real photos` | 15 |
 
 ### Dependency Graph
 
 ```
 1 (plan)
-└─ 2 (task 1: rating tests)
-   └─ 3 (task 1: rating implementation)
-      └─ 4 (task 2: DB migration)
-         └─ 5 (task 2: UI updates)
-            └─ 6 (task 3: manual rating)
-               └─ 7 (task 3: pipeline skip)
-                  └─ 8 (task 4: zoom tests)
-                     └─ 9 (task 4: zoom implementation)
-                        └─ 10 (task 4: zoom integration)
-                           └─ 11 (task 5: XMP tests)
-                              └─ 12 (task 5: XMP implementation)
-                                 └─ 13 (task 6: export tests)
-                                    └─ 14 (task 6: export implementation)
-                                       └─ 15 (task 6: export UI)
+└─ 2-3 (task 1: sharpness)
+   └─ 4-5 (task 2: rating engine)
+      └─ 6 (task 3: ISO)
+         └─ 7 (task 4: focus point)
+            └─ 8-9 (task 5: config)
+               └─ 10 (task 6: picked flag)
+                  └─ 11 (task 7: burst pHash)
+                     └─ 12 (integration test)
 ```
 
 ---
@@ -463,18 +454,19 @@ Create ExportService that copies filtered photos + XMP sidecars to a destination
 
 | Risk | Severity | Mitigation |
 |------|----------|------------|
-| SwiftUI MagnificationGesture not available on macOS < 13 | low | App already requires macOS 14+ per existing SwiftUI usage |
-| XMP not recognized by Lightroom | medium | Use exact Adobe namespace URIs; test with real Lightroom import |
-| Large folder export (1000+ RAW files) slow | low | Progress indicator keeps user informed; sequential copy is fine |
-| Database migration on large .report.db | low | ALTER TABLE + UPDATE is fast for <100k rows |
-| Source folder write permission for XMP | medium | App accesses folders via NSOpenPanel which grants URL access; if access is lost, XMP write fails gracefully — export still copies originals |
+| ImageIO doesn't expose AF fields for all camera brands | high | Start with Sony ARW (SubjectArea); fallback to (1.0, 1.0) for unsupported cameras; add brands incrementally |
+| pHash requires DCT implementation | medium | Use vDSP_DCT from Accelerate framework; or simple average-hash as fallback |
+| Score distribution differs between Mac and Python | medium | Integration test compares scores on same real-photos folder; accept ±10% tolerance |
+| Config migration for existing users | low | New params get defaults matching superpicky; existing settings preserved |
 
 ---
 
+## In Scope (previously incorrectly excluded)
+
+- **Segmentation mask intersection**: preen's detector returns seg masks (`yolo11l-seg.pt`) when available. FocusPointDetector should use seg mask for Layer 2 vs Layer 3 distinction. HeadSharpness should intersect circle mask with seg mask.
+- **Focus point detection with exiftool**: Port superpicky's multi-brand EXIF parsing. Bundle exiftool or use the existing Python server as a proxy for AF data extraction.
+- **Flying bonus: multiplicative only**: `rating_sharpness = head_sharpness + 100` in photo_processor.py line 1876 is dead code (the variable is never passed to the rating engine — `normalized_sharpness` is used instead). Only the multiplicative bonus in rating_engine (×1.2, ×1.1) is active. The existing Swift implementation is already correct.
+
 ## Out of Scope
 
-- Real sharpness measurement (Laplacian variance) — separate future improvement
-- Batch rating operations (select multiple, rate all) — can be added later
-- Custom signal weighting in settings — current fixed logic is sufficient
-- CoreML inference — remains HTTP server for now
-- Focus point detection — column exists but still unpopulated
+- Metadata write modes (embedded/sidecar/inplace) — Mac already uses XMP sidecar only

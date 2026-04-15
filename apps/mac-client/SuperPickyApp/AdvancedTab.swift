@@ -6,35 +6,74 @@ struct AdvancedTab: View {
     var body: some View {
         @Bindable var config = config
         Form {
-            Section("Thresholds") {
+            Section(config.localized("Thresholds")) {
                 HStack {
-                    Text("Sharpness")
+                    Text(config.localized("Sharpness"))
                     Slider(value: $config.sharpnessThreshold, in: 100...800, step: 10)
                     Text("\(Int(config.sharpnessThreshold))")
                         .monospacedDigit()
                         .frame(width: 40)
                 }
+                .disabled(config.skillLevel != .custom)
                 HStack {
-                    Text("Aesthetics")
+                    Text(config.localized("Aesthetics"))
                     Slider(value: $config.aestheticsThreshold, in: 2.0...8.0, step: 0.1)
                     Text(String(format: "%.1f", config.aestheticsThreshold))
                         .monospacedDigit()
                         .frame(width: 40)
                 }
+                .disabled(config.skillLevel != .custom)
                 HStack {
-                    Text("Eye Sharpness")
-                    Slider(value: $config.eyeSharpnessThreshold, in: 0...300, step: 10)
-                    Text("\(Int(config.eyeSharpnessThreshold))")
+                    Text(config.localized("Min Confidence"))
+                    Slider(value: $config.minConfidence, in: 0.3...0.7, step: 0.05)
+                    Text(String(format: "%.2f", config.minConfidence))
+                        .monospacedDigit()
+                        .frame(width: 40)
+                }
+                HStack {
+                    Text(config.localized("Min Aesthetics"))
+                    Slider(value: $config.minAesthetics, in: 2.0...5.0, step: 0.1)
+                    Text(String(format: "%.1f", config.minAesthetics))
                         .monospacedDigit()
                         .frame(width: 40)
                 }
             }
-            Section("Burst Detection") {
-                Toggle("Enable burst detection", isOn: $config.burstDetectionEnabled)
+            Section(config.localized("Burst Detection")) {
+                Toggle(config.localized("Enable burst detection"), isOn: $config.burstDetectionEnabled)
+                if config.burstDetectionEnabled {
+                    HStack {
+                        Text(config.localized("Burst FPS"))
+                        Slider(
+                            value: Binding(
+                                get: { Double(config.burstFps) },
+                                set: { config.burstFps = Int($0) }
+                            ),
+                            in: 4...20,
+                            step: 1
+                        )
+                        Text("\(config.burstFps)")
+                            .monospacedDigit()
+                            .frame(width: 30)
+                    }
+                    HStack {
+                        Text(config.localized("Min Burst Count"))
+                        Slider(
+                            value: Binding(
+                                get: { Double(config.burstMinCount) },
+                                set: { config.burstMinCount = Int($0) }
+                            ),
+                            in: 3...10,
+                            step: 1
+                        )
+                        Text("\(config.burstMinCount)")
+                            .monospacedDigit()
+                            .frame(width: 30)
+                    }
+                }
             }
-            Section("Backend") {
+            Section(config.localized("Backend")) {
                 HStack {
-                    Text("Python server port")
+                    Text(config.localized("Python server port"))
                     TextField("Port", value: $config.backendPort, format: .number)
                         .frame(width: 80)
                 }

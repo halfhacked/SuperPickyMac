@@ -1,60 +1,84 @@
 import Accelerate
 import CoreGraphics
+import Foundation
 
-/// Computes image sharpness via Laplacian variance on a CGImage.
-/// Higher scores indicate sharper images. Returns values in approximately [0, 600].
-enum LaplacianSharpness {
+/// Computes image sharpness via Tenengrad (Sobel gradient magnitude) with log normalization.
+/// Ported from superpicky's Python implementation. Returns values in [0, 1000].
+enum TenengradSharpness {
 
-    /// Compute sharpness of `image` using the Laplacian variance method.
-    ///
-    /// The discrete Laplacian L[y,x] = src[y-1,x] + src[y+1,x] + src[y,x-1] + src[y,x+1] - 4*src[y,x]
-    /// captures edge density — sharp images have high-frequency edges and thus higher variance.
-    ///
-    /// Calibration: variance ~333 → score 100 (minimum threshold), ~1267 → score 380 (default threshold).
+    private static let minVal: Float = 100.0
+    private static let maxVal: Float = 154016.0
+    private static let logMinVal: Float = log(100.0)
+    private static let logRange: Float = log(154016.0) - log(100.0)
+
+    /// Full-image sharpness score.
     static func score(image: CGImage) -> Float {
+        maskedScore(image: image, centerX: image.width / 2, centerY: image.height / 2,
+                    radius: max(image.width, image.height))
+    }
+
+    /// Sharpness within a circular mask (for head-region measurement).
+    static func maskedScore(image: CGImage, centerX: Int, centerY: Int, radius: Int) -> Float {
         let w = image.width
         let h = image.height
-        guard w > 2 && h > 2 else { return 0 }
+        guard w > 2 && h > 2 && radius > 1 else { return 0 }
 
-        // Render to 8-bit planar grayscale
-        var gray = [UInt8](repeating: 0, count: w * h)
-        guard let ctx = CGContext(
-            data: &gray,
-            width: w,
-            height: h,
-            bitsPerComponent: 8,
-            bytesPerRow: w,
-            space: CGColorSpaceCreateDeviceGray(),
-            bitmapInfo: CGImageAlphaInfo.none.rawValue
-        ) else { return 0 }
-        ctx.draw(image, in: CGRect(x: 0, y: 0, width: CGFloat(w), height: CGFloat(h)))
+        guard let src = grayscaleFloats(from: image) else { return 0 }
 
-        // Upconvert uint8 → Float using vDSP
-        let n = w * h
-        var src = [Float](repeating: 0, count: n)
-        vDSP_vfltu8(gray, 1, &src, 1, vDSP_Length(n))
+        let r2 = radius * radius
+        var sum: Double = 0
+        var count = 0
 
-        // Compute Laplacian only for interior pixels; border stays 0
-        var lap = [Float](repeating: 0, count: n)
-        for y in 1..<(h - 1) {
-            let row = y * w
-            for x in 1..<(w - 1) {
-                let i = row + x
-                lap[i] = src[i - w] + src[i + w] + src[i - 1] + src[i + 1] - 4 * src[i]
+        let yMin = max(1, centerY - radius)
+        let yMax = min(h - 2, centerY + radius)
+        let xMin = max(1, centerX - radius)
+        let xMax = min(w - 2, centerX + radius)
+
+        for y in yMin...yMax {
+            let dy = y - centerY
+            let rowM = (y - 1) * w
+            let row0 = y * w
+            let rowP = (y + 1) * w
+            for x in xMin...xMax {
+                let dx = x - centerX
+                guard dx * dx + dy * dy <= r2 else { continue }
+
+                let gx = -src[rowM + x - 1] + src[rowM + x + 1]
+                       + -2 * src[row0 + x - 1] + 2 * src[row0 + x + 1]
+                       + -src[rowP + x - 1] + src[rowP + x + 1]
+                let gy = -src[rowM + x - 1] - 2 * src[rowM + x] - src[rowM + x + 1]
+                       + src[rowP + x - 1] + 2 * src[rowP + x] + src[rowP + x + 1]
+                sum += Double(gx * gx + gy * gy)
+                count += 1
             }
         }
 
-        // Variance = E[L²] - E[L]²  (using vDSP for the statistics)
-        let len = vDSP_Length(n)
-        var mean: Float = 0
-        var meanSq: Float = 0
-        var sq = [Float](repeating: 0, count: n)
-        vDSP_vsq(lap, 1, &sq, 1, len)
-        vDSP_meanv(lap, 1, &mean, len)
-        vDSP_meanv(sq, 1, &meanSq, len)
-        let variance = max(0, meanSq - mean * mean)
+        guard count > 0 else { return 0 }
+        return logNormalize(Float(sum / Double(count)))
+    }
 
-        // Scale: variance 333 → score 100 (minimum threshold), 1267 → score 380 (default threshold)
-        return min(variance * 0.3, 600)
+    // MARK: - Helpers
+
+    private static func grayscaleFloats(from image: CGImage) -> [Float]? {
+        let w = image.width
+        let h = image.height
+        var gray = [UInt8](repeating: 0, count: w * h)
+        guard let ctx = CGContext(
+            data: &gray, width: w, height: h,
+            bitsPerComponent: 8, bytesPerRow: w,
+            space: CGColorSpaceCreateDeviceGray(),
+            bitmapInfo: CGImageAlphaInfo.none.rawValue
+        ) else { return nil }
+        ctx.draw(image, in: CGRect(x: 0, y: 0, width: CGFloat(w), height: CGFloat(h)))
+
+        var src = [Float](repeating: 0, count: w * h)
+        vDSP_vfltu8(gray, 1, &src, 1, vDSP_Length(w * h))
+        return src
+    }
+
+    private static func logNormalize(_ raw: Float) -> Float {
+        guard raw > minVal else { return 0 }
+        guard raw < maxVal else { return 1000 }
+        return (log(raw) - logMinVal) / logRange * 1000
     }
 }

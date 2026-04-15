@@ -11,8 +11,7 @@ struct ThresholdCalibratorView: View {
             && (photo.beakVis ?? 0) < 0.3
         let cfg = RatingEngine.Config(
             sharpnessThreshold: config.sharpnessThreshold,
-            aestheticsThreshold: config.aestheticsThreshold,
-            eyeSharpnessThreshold: config.eyeSharpnessThreshold
+            aestheticsThreshold: config.aestheticsThreshold
         )
         return RatingEngine().calculate(
             detected: true,
@@ -23,7 +22,6 @@ struct ThresholdCalibratorView: View {
             isOverexposed: photo.exposureStatus == ExposureStatus.overexposed.rawValue,
             isUnderexposed: photo.exposureStatus == ExposureStatus.underexposed.rawValue,
             isFlying: photo.isFlying,
-            eyeSharpness: photo.eyeSharpnessScore,
             config: cfg
         ).rating
     }
@@ -51,15 +49,6 @@ struct ThresholdCalibratorView: View {
                 photoValue: photo?.aestheticsScore,
                 format: { String(format: "%.1f", $0) }
             )
-            ThresholdScoreRow(
-                label: "Eye",
-                threshold: $config.eyeSharpnessThreshold,
-                range: 0...300,
-                step: 10,
-                photoValue: photo?.eyeSharpnessScore,
-                format: { "\(Int($0))" }
-            )
-
             Divider().padding(.vertical, 10)
 
             if let rating = predictedRating {

@@ -2,7 +2,7 @@ import Testing
 import CoreGraphics
 @testable import SuperPicky
 
-@Suite struct LaplacianSharpnessTests {
+@Suite struct TenengradSharpnessTests {
 
     // Helper: create a solid-color 64×64 CGImage
     private func solidColorImage(gray: UInt8) -> CGImage {
@@ -15,13 +15,13 @@ import CoreGraphics
         return ctx.makeImage()!
     }
 
-    // Helper: create a 64×64 checkerboard (alternating 0/255 in each pixel)
-    private func checkerboardImage() -> CGImage {
-        let w = 64, h = 64
+    // Helper: create a 256×256 image with sharp vertical edges (4px stripe width)
+    private func sharpEdgesImage() -> CGImage {
+        let w = 256, h = 256
         var pixels = [UInt8](repeating: 0, count: w * h)
         for y in 0..<h {
             for x in 0..<w {
-                pixels[y * w + x] = UInt8((x + y) % 2 == 0 ? 255 : 0)
+                pixels[y * w + x] = (x / 4) % 2 == 0 ? 255 : 0
             }
         }
         let ctx = CGContext(data: &pixels, width: w, height: h,
@@ -33,29 +33,29 @@ import CoreGraphics
 
     @Test func solidColorImageScoresZero() {
         let image = solidColorImage(gray: 200)
-        let score = LaplacianSharpness.score(image: image)
-        // Solid color has zero gradient everywhere → Laplacian = 0 → variance = 0
+        let score = TenengradSharpness.score(image: image)
+        // Solid color has zero gradient everywhere → score = 0
         #expect(score < 1.0)
     }
 
     @Test func checkerboardScoresHigher() {
-        let image = checkerboardImage()
-        let score = LaplacianSharpness.score(image: image)
-        // Maximum-frequency pattern → very high Laplacian variance → high score
+        let image = sharpEdgesImage()
+        let score = TenengradSharpness.score(image: image)
+        // Maximum-frequency pattern → very high Sobel gradient → high score
         #expect(score > 100)
     }
 
     @Test func checkerboardScoresHigherThanBlur() {
-        let sharpImage = checkerboardImage()
+        let sharpImage = sharpEdgesImage()
         let blurImage = solidColorImage(gray: 128)
-        #expect(LaplacianSharpness.score(image: sharpImage) > LaplacianSharpness.score(image: blurImage))
+        #expect(TenengradSharpness.score(image: sharpImage) > TenengradSharpness.score(image: blurImage))
     }
 
     @Test func scoreIsCapped() {
-        let image = checkerboardImage()
-        let score = LaplacianSharpness.score(image: image)
-        // Score must never exceed 600
-        #expect(score <= 600)
+        let image = sharpEdgesImage()
+        let score = TenengradSharpness.score(image: image)
+        // Score must never exceed 1000
+        #expect(score <= 1000)
     }
 
     @Test func tinyImageReturnsZero() {
@@ -67,6 +67,6 @@ import CoreGraphics
                            bitmapInfo: CGImageAlphaInfo.none.rawValue)!
         let image = ctx.makeImage()!
         // No interior pixels → guard fails → 0
-        #expect(LaplacianSharpness.score(image: image) == 0)
+        #expect(TenengradSharpness.score(image: image) == 0)
     }
 }

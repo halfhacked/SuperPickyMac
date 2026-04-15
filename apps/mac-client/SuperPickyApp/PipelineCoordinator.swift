@@ -28,7 +28,9 @@ final class PipelineCoordinator {
         ratingConfig: RatingEngine.Config,
         exposureEnabled: Bool,
         exposureThreshold: Float,
+        flightDetectionEnabled: Bool = true,
         burstDetectionEnabled: Bool = true,
+        pickedTopPercentage: Int = PickedFlagCalculator.defaultTopPercentage,
         onPhotoProcessed: (@Sendable () async -> Void)? = nil
     ) async {
         isProcessing = true
@@ -80,6 +82,7 @@ final class PipelineCoordinator {
                     ratingConfig: ratingConfig,
                     exposureEnabled: exposureEnabled,
                     exposureThreshold: exposureThreshold,
+                    flightDetectionEnabled: flightDetectionEnabled,
                 )
             } catch {
                 logger.error("Failed to process \(fileURL.lastPathComponent): \(error)")
@@ -106,6 +109,9 @@ final class PipelineCoordinator {
         if burstDetectionEnabled {
             await runBurstDetection(db: db)
         }
+
+        // Picked flag calculation (intersection of top aesthetics & sharpness among 5-star)
+        await runPickedFlagCalculation(db: db, topPercentage: pickedTopPercentage)
     }
 
     private func runBurstDetection(db: ReportDatabase) async {
@@ -129,12 +135,43 @@ final class PipelineCoordinator {
         }
     }
 
+    private func runPickedFlagCalculation(db: ReportDatabase, topPercentage: Int) async {
+        do {
+            let allPhotos = try db.fetchAllPhotos()
+            let pickedIDs = PickedFlagCalculator.calculatePickedIDs(
+                photos: allPhotos, topPercentage: topPercentage
+            )
+
+            if pickedIDs.isEmpty {
+                logger.info("No picked photos (no 5-star photos or empty intersection)")
+                return
+            }
+
+            logger.info("Picked flag: \(pickedIDs.count) photos selected")
+
+            // Clear old picked flags and set new ones
+            for photo in allPhotos {
+                let shouldBePicked = pickedIDs.contains(photo.id)
+                // Only update if flag needs to change (avoid unnecessary DB writes)
+                if photo.isPick != shouldBePicked {
+                    var updated = photo
+                    updated.isPick = shouldBePicked
+                    try db.save(&updated)
+                    try? XMPWriter.write(photo: updated)
+                }
+            }
+        } catch {
+            logger.error("Picked flag calculation failed: \(error)")
+        }
+    }
+
     private func processOnePhoto(
         _ photo: inout Photo,
         fileURL: URL,
         ratingConfig: RatingEngine.Config,
         exposureEnabled: Bool,
         exposureThreshold: Float,
+        flightDetectionEnabled: Bool,
     ) async throws {
         // Single call to preen: YOLO detect + species identify (handles image loading, GPS, everything)
         let identifyResult = try await inferenceClient.identify(filePath: fileURL.path, topK: 1)
@@ -171,7 +208,9 @@ final class PipelineCoordinator {
 
         async let aestheticsResponse = inferenceClient.aesthetics(image: image)
         async let keypointResult = inferenceClient.keypoints(image: birdCrop)
-        async let flightResult = inferenceClient.flight(image: birdCrop)
+        async let flightResult = flightDetectionEnabled
+            ? inferenceClient.flight(image: birdCrop)
+            : FlightResult(isFlying: false, confidence: 0)
 
         let (aesthetics, keypoints, flight) = try await (aestheticsResponse, keypointResult, flightResult)
 
@@ -188,16 +227,21 @@ final class PipelineCoordinator {
         photo.isFlying = flight.isFlying
         photo.flightConfidence = flight.confidence
 
-        photo.sharpnessScore = LaplacianSharpness.score(image: birdCrop)
-        photo.eyeSharpnessScore = EyeCropSharpness.score(
+        // Head-region sharpness (circular mask around eye, matches superpicky)
+        let headSharpness = HeadSharpness.score(
             birdCrop: birdCrop,
-            leftEyeX: keypoints.leftEye.x,
-            leftEyeY: keypoints.leftEye.y,
+            leftEyeX: keypoints.leftEye.x, leftEyeY: keypoints.leftEye.y,
             leftEyeVis: keypoints.leftEye.visibility,
-            rightEyeX: keypoints.rightEye.x,
-            rightEyeY: keypoints.rightEye.y,
-            rightEyeVis: keypoints.rightEye.visibility
-        )
+            rightEyeX: keypoints.rightEye.x, rightEyeY: keypoints.rightEye.y,
+            rightEyeVis: keypoints.rightEye.visibility,
+            beakX: keypoints.beak.x, beakY: keypoints.beak.y,
+            beakVis: keypoints.beak.visibility
+        ) ?? TenengradSharpness.score(image: birdCrop) // fallback to full-crop
+
+        // ISO normalization: high ISO reduces sharpness (noise inflates gradients)
+        let exif = EXIFReader.read(from: fileURL.path)
+        let isoFactor = Self.isoSharpnessFactor(iso: exif?.iso)
+        photo.sharpnessScore = headSharpness * isoFactor
 
         if exposureEnabled {
             let exposure = exposureDetector.detect(image: image, threshold: exposureThreshold)
@@ -210,6 +254,31 @@ final class PipelineCoordinator {
             }
         }
 
+        // Focus point weighting: detect where camera focused relative to bird
+        let bestEye: (x: Float, y: Float) = {
+            let lv = keypoints.leftEye.visibility
+            let rv = keypoints.rightEye.visibility
+            if lv >= rv { return (keypoints.leftEye.x, keypoints.leftEye.y) }
+            return (keypoints.rightEye.x, keypoints.rightEye.y)
+        }()
+
+        // Seg mask: YOLO outputs a square mask at model resolution (e.g. 160x160).
+        // Infer dimensions from data size (sqrt of byte count for square masks).
+        let segMask: Data? = bird.mask.isEmpty ? nil : bird.mask
+        let maskSide = segMask != nil ? Int(sqrt(Double(bird.mask.count))) : 0
+        let maskWidth = (maskSide * maskSide == bird.mask.count) ? maskSide : 0
+        let maskHeight = maskWidth  // Square mask
+
+        let focusWeights = FocusPointDetector.computeWeights(
+            filePath: fileURL.path,
+            birdBbox: bird.bbox,
+            eyeCenter: bestEye,
+            headRadiusFraction: HeadSharpness.noBeakRadiusRatio,
+            segMask: segMask,
+            maskWidth: maskWidth,
+            maskHeight: maskHeight
+        )
+
         let ratingResult = ratingEngine.calculate(
             detected: true,
             confidence: bird.confidence,
@@ -218,10 +287,23 @@ final class PipelineCoordinator {
             allKeypointsHidden: keypoints.allKeypointsHidden,
             isOverexposed: photo.exposureStatus == ExposureStatus.overexposed.rawValue,
             isUnderexposed: photo.exposureStatus == ExposureStatus.underexposed.rawValue,
+            focusSharpnessWeight: focusWeights.sharpness,
+            focusAestheticsWeight: focusWeights.aesthetics,
             isFlying: flight.isFlying,
-            eyeSharpness: photo.eyeSharpnessScore,
             config: ratingConfig
         )
         photo.starRating = ratingResult.rating
+    }
+
+    /// ISO sharpness normalization: 5% penalty per ISO doubling above 800.
+    /// ISO ≤ 800 → 1.0, ISO 1600 → 0.95, ISO 3200 → 0.90, ISO 6400 → 0.85, floor at 0.5.
+    private static let isoBase: Float = 800
+    private static let isoPenaltyFactor: Float = 0.05
+    private static let isoMinFactor: Float = 0.5
+
+    static func isoSharpnessFactor(iso: Int?) -> Float {
+        guard let iso, iso > Int(isoBase) else { return 1.0 }
+        let penalty = isoPenaltyFactor * log2(Float(iso) / isoBase)
+        return max(isoMinFactor, 1.0 - penalty)
     }
 }
