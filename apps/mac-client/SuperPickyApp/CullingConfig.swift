@@ -112,7 +112,7 @@ final class CullingConfig {
         self.burstMinCount = defaults.object(forKey: "burstMinCount") as? Int ?? 4
         self.birdIdConfidence = defaults.object(forKey: "birdIdConfidence") as? Int ?? 70
         self.flightDetectionEnabled = defaults.object(forKey: "flightDetectionEnabled") as? Bool ?? true
-        self.inferenceBackend = InferenceBackend(rawValue: defaults.string(forKey: "inferenceBackend") ?? "") ?? .http
+        self.inferenceBackend = InferenceBackend(rawValue: defaults.string(forKey: "inferenceBackend") ?? "") ?? .native
     }
 
     /// Apply a skill level preset. For beginner/intermediate/master, updates thresholds.
