@@ -6,7 +6,8 @@
 //          delegate to HTTPInferenceClient.
 // Phase 2: keypoints() routes to native KeypointModel.
 // Phase 3: detect() routes to native YOLOBirdDetector.
-// Phase 4+: identify(), aesthetics() follow in later phases.
+// Phase 4: identify() routes to native OSEA + SpeciesDatabase.
+// Phase 5+: aesthetics() follows in a later phase.
 //
 // Lives in SuperPickyApp (not SuperPickyInference) because InferenceClient
 // is declared in SuperPickyApp — placing this in SuperPickyInference would
@@ -17,6 +18,7 @@
 
 import CoreML
 import CoreGraphics
+import ImageIO
 import Foundation
 import SuperPickyInference
 import os
@@ -26,15 +28,25 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
     private let flightModel: FlightModel
     private let keypointModel: KeypointModel
     private let yoloModel: YOLOBirdDetector?
+    private let oseaModel: OSEAClassifier?
+    private let speciesDB: SpeciesDatabase?
     private let httpFallback: HTTPInferenceClient
     private let logger = Logger(subsystem: "com.superpicky.mac", category: "CoreMLInference")
 
+    // OSEA inference constants (match osea_classifier.py)
+    private static let oseaTemperature: Float = 0.9
+    private static let oseaGlobalThreshold: Float = 0.90   // 90% confidence required
+
     init(flightModel: FlightModel, keypointModel: KeypointModel,
          yoloModel: YOLOBirdDetector? = nil,
+         oseaModel: OSEAClassifier? = nil,
+         speciesDB: SpeciesDatabase? = nil,
          httpFallback: HTTPInferenceClient) {
         self.flightModel = flightModel
         self.keypointModel = keypointModel
         self.yoloModel = yoloModel
+        self.oseaModel = oseaModel
+        self.speciesDB = speciesDB
         self.httpFallback = httpFallback
     }
 
@@ -75,32 +87,113 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
         return DetectionResult(birds: birds)
     }
 
-    // MARK: - HTTP fallback (replaced phase-by-phase in Phases 4+)
+    // MARK: - Phase 4: Native species identification
+
+    func identify(filePath: String, topK: Int) async throws -> IdentifyResponse {
+        guard let yolo = yoloModel, let osea = oseaModel, let db = speciesDB else {
+            return try await httpFallback.identify(filePath: filePath, topK: topK)
+        }
+
+        // 1. Load image from file path (CGImageSource handles RAW, JPEG, etc.)
+        let url = URL(fileURLWithPath: filePath) as CFURL
+        guard let source = CGImageSourceCreateWithURL(url, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            logger.error("OSEA identify: failed to load image at \(filePath)")
+            return try await httpFallback.identify(filePath: filePath, topK: topK)
+        }
+
+        // 2. YOLO detect
+        let detections = try yolo.predict(image: image)
+
+        // 3. For each bird, crop → OSEA → top species
+        var speciesMatches: [SpeciesMatch] = []
+        let imgW = CGFloat(image.width), imgH = CGFloat(image.height)
+
+        for det in detections {
+            let cropRect = CGRect(
+                x: CGFloat(det.x1) * imgW,
+                y: CGFloat(det.y1) * imgH,
+                width: CGFloat(det.x2 - det.x1) * imgW,
+                height: CGFloat(det.y2 - det.y1) * imgH
+            )
+            guard cropRect.width > 10, cropRect.height > 10,
+                  let crop = image.cropping(to: cropRect) else { continue }
+
+            // 4. OSEA logits (TTA on)
+            let logits = try osea.logits(image: crop, useTTA: true)
+            let validLogits = Array(logits.prefix(OSEAClassifier.numClasses))
+
+            // 5. Softmax with temperature=0.9
+            let probs = Self.softmax(logits: validLogits, temperature: Self.oseaTemperature)
+
+            // 6. Top-k species (global threshold: 90%)
+            let topK_probs = probs.enumerated()
+                .sorted { $0.element > $1.element }
+                .prefix(topK)
+
+            for (classID, prob) in topK_probs {
+                guard prob >= Self.oseaGlobalThreshold else { break }
+                guard let entry = db.lookup(classID: classID) else { continue }
+                speciesMatches.append(SpeciesMatch(
+                    scientificName: entry.scientificName,
+                    commonName: entry.englishName,
+                    confidence: prob,
+                    cnName: entry.chineseName,
+                    pinyin: nil,
+                    thresholdUsed: "global"
+                ))
+                break  // One species match per bird detection
+            }
+        }
+
+        let birds = detections.map { d in
+            BirdDetection(
+                bbox: CGRect(x: CGFloat(d.x1), y: CGFloat(d.y1),
+                             width: CGFloat(d.x2 - d.x1), height: CGFloat(d.y2 - d.y1)),
+                confidence: d.confidence,
+                mask: d.maskData
+            )
+        }
+
+        return IdentifyResponse(
+            species: Array(speciesMatches.prefix(topK)),
+            birds: birds,
+            totalDetected: detections.count
+        )
+    }
+
+    // MARK: - HTTP fallback (Phase 5: aesthetics)
 
     func aesthetics(image: CGImage) async throws -> AestheticsResponse {
         try await httpFallback.aesthetics(image: image)
     }
 
-    func identify(filePath: String, topK: Int) async throws -> IdentifyResponse {
-        try await httpFallback.identify(filePath: filePath, topK: topK)
-    }
-
     func healthCheck() async throws -> ServerHealth {
         let httpHealth = try await httpFallback.healthCheck()
-        let nativeModels = ["flight-coreml", "keypoint-coreml"] +
-                           (yoloModel != nil ? ["yolo-coreml"] : [])
+        var native = ["flight-coreml", "keypoint-coreml"]
+        if yoloModel != nil  { native.append("yolo-coreml") }
+        if oseaModel != nil  { native.append("osea-coreml") }
         return ServerHealth(
             status: httpHealth.status,
-            modelsLoaded: nativeModels + httpHealth.modelsLoaded,
+            modelsLoaded: native + httpHealth.modelsLoaded,
             device: "coreml+\(httpHealth.device)",
-            version: yoloModel != nil ? "hybrid-phase3" : "hybrid-phase2"
+            version: oseaModel != nil ? "hybrid-phase4" : (yoloModel != nil ? "hybrid-phase3" : "hybrid-phase2")
         )
+    }
+
+    // MARK: - Softmax helper
+
+    private static func softmax(logits: [Float], temperature: Float) -> [Float] {
+        let scaled = logits.map { $0 / temperature }
+        let maxVal = scaled.max() ?? 0
+        let exps = scaled.map { exp($0 - maxVal) }
+        let sumExps = exps.reduce(0, +)
+        return sumExps > 0 ? exps.map { $0 / sumExps } : exps
     }
 
     // MARK: - Factories
 
     /// Build a Phase 2 client: native flight + keypoints; HTTP fallback for detect/aesthetics/identify.
-    /// Throws `CoreMLClientError.modelNotFound` if either model file is absent.
     static func makePhase2(httpFallback: HTTPInferenceClient) throws -> CoreMLInferenceClient {
         guard let flightURL = Bundle.main.url(forResource: "FlightDetector", withExtension: "mlmodelc"),
               let keypointURL = Bundle.main.url(forResource: "KeypointDetector", withExtension: "mlmodelc") else {
@@ -114,7 +207,6 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
     }
 
     /// Build a Phase 3 client: native flight + keypoints + YOLO; HTTP fallback for aesthetics/identify.
-    /// Falls back to Phase 2 if YOLOBirdDetector.mlmodelc is absent.
     static func makePhase3(httpFallback: HTTPInferenceClient) throws -> CoreMLInferenceClient {
         guard let flightURL = Bundle.main.url(forResource: "FlightDetector", withExtension: "mlmodelc"),
               let keypointURL = Bundle.main.url(forResource: "KeypointDetector", withExtension: "mlmodelc") else {
@@ -126,6 +218,30 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
             flightModel:   try FlightModel(url: flightURL),
             keypointModel: try KeypointModel(url: keypointURL),
             yoloModel:     yolo,
+            httpFallback:  httpFallback
+        )
+    }
+
+    /// Build a Phase 4 client: native flight + keypoints + YOLO + OSEA; HTTP fallback for aesthetics.
+    static func makePhase4(httpFallback: HTTPInferenceClient) throws -> CoreMLInferenceClient {
+        guard let flightURL = Bundle.main.url(forResource: "FlightDetector", withExtension: "mlmodelc"),
+              let keypointURL = Bundle.main.url(forResource: "KeypointDetector", withExtension: "mlmodelc") else {
+            throw CoreMLClientError.modelNotFound("FlightDetector or KeypointDetector.mlmodelc not in app bundle")
+        }
+        let yoloURL   = Bundle.main.url(forResource: "YOLOBirdDetector", withExtension: "mlmodelc")
+        let oseaURL   = Bundle.main.url(forResource: "OSEAClassifier", withExtension: "mlmodelc")
+        let speciesURL = Bundle.main.url(forResource: "bird_reference", withExtension: "sqlite")
+
+        let yolo    = yoloURL.flatMap  { try? YOLOBirdDetector(url: $0) }
+        let osea    = oseaURL.flatMap  { try? OSEAClassifier(url: $0) }
+        let species = speciesURL.flatMap { try? SpeciesDatabase(url: $0) }
+
+        return CoreMLInferenceClient(
+            flightModel:   try FlightModel(url: flightURL),
+            keypointModel: try KeypointModel(url: keypointURL),
+            yoloModel:     yolo,
+            oseaModel:     osea,
+            speciesDB:     species,
             httpFallback:  httpFallback
         )
     }
