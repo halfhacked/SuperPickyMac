@@ -193,21 +193,32 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
 
     // MARK: - Factory
 
-    /// Build the native inference client loading all five CoreML models from the app bundle.
-    static func make() throws -> CoreMLInferenceClient {
-        guard let flightURL = Bundle.main.url(forResource: "FlightDetector", withExtension: "mlmodelc"),
-              let keypointURL = Bundle.main.url(forResource: "KeypointDetector", withExtension: "mlmodelc") else {
-            throw CoreMLClientError.modelNotFound("FlightDetector or KeypointDetector.mlmodelc not in app bundle")
-        }
-        let yoloURL       = Bundle.main.url(forResource: "YOLOBirdDetector", withExtension: "mlmodelc")
-        let oseaURL       = Bundle.main.url(forResource: "OSEAClassifier", withExtension: "mlmodelc")
-        let speciesURL    = Bundle.main.url(forResource: "bird_reference", withExtension: "sqlite")
-        let aestheticsURL = Bundle.main.url(forResource: "AestheticsModel", withExtension: "mlmodelc")
+    /// Build the native inference client from the model cache directory
+    /// populated by ModelManager. The directory is typically
+    /// ~/Library/Application Support/com.superpicky.mac/ModelCache/
+    /// The species SQLite database is bundled inside the app and loaded
+    /// from `Bundle.main`, not from the cache directory.
+    static func make(modelsDir: URL) throws -> CoreMLInferenceClient {
+        let fm = FileManager.default
 
-        let yolo       = yoloURL.flatMap       { try? YOLOBirdDetector(url: $0) }
-        let osea       = oseaURL.flatMap       { try? OSEAClassifier(url: $0) }
-        let species    = speciesURL.flatMap    { try? SpeciesDatabase(url: $0) }
-        let aesthetics = aestheticsURL.flatMap { try? AestheticsModel(url: $0) }
+        func cached(_ name: String, ext: String = "mlmodelc") -> URL? {
+            let url = modelsDir.appendingPathComponent("\(name).\(ext)")
+            return fm.fileExists(atPath: url.path) ? url : nil
+        }
+
+        guard let flightURL   = cached("FlightDetector"),
+              let keypointURL = cached("KeypointDetector") else {
+            throw CoreMLClientError.modelNotFound(
+                "FlightDetector or KeypointDetector not in model cache at \(modelsDir.path). " +
+                "Run ModelManager.ensureReady() before creating the client.")
+        }
+
+        let yolo       = cached("YOLOBirdDetector").flatMap  { try? YOLOBirdDetector(url: $0) }
+        let osea       = cached("OSEAClassifier").flatMap    { try? OSEAClassifier(url: $0) }
+        let aesthetics = cached("AestheticsModel").flatMap   { try? AestheticsModel(url: $0) }
+
+        // Species DB is bundled inside SuperPickyInference (small, always needed).
+        let species = SpeciesDatabase.bundledURL().flatMap { try? SpeciesDatabase(url: $0) }
 
         return CoreMLInferenceClient(
             flightModel:     try FlightModel(url: flightURL),

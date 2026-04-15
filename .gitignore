@@ -23,11 +23,10 @@ __pycache__/
 *.egg-info/
 dist/
 
-# Models (large files)
+# Models (large files — downloaded on first launch via ModelManager)
 python-server/models/*.pt
 python-server/models/*.pth
-# CoreML source packages — large; only compiled .mlmodelc is committed
-apps/mac-client/SuperPickyInference/Resources/Models/*.mlpackage/
+apps/mac-client/SuperPickyInference/Resources/Models/
 
 # macOS
 .DS_Store

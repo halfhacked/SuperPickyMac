@@ -3,6 +3,7 @@ import os
 
 struct MainView: View {
     @Environment(CullingConfig.self) private var config
+    let modelState: ModelDownloadState
     @State private var appState = AppState()
     @State private var processingTask: Task<Void, Never>?
     @State private var isExporting = false
@@ -251,7 +252,7 @@ struct MainView: View {
         let client: InferenceClient
         if isTestMode {
             client = MockInferenceClientForUI()
-        } else if let coreml = try? CoreMLInferenceClient.make() {
+        } else if let coreml = try? CoreMLInferenceClient.make(modelsDir: modelState.modelsDir) {
             client = coreml
         } else {
             logger.error("CoreML models not available — cannot process folder")
