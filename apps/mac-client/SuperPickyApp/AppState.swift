@@ -1,4 +1,5 @@
 import SwiftUI
+import os
 
 /// Species with its burst groups for the sidebar hierarchy.
 struct SpeciesEntry: Identifiable {
@@ -19,6 +20,8 @@ struct BurstGroupEntry: Identifiable {
 
 @Observable
 final class AppState {
+    private let logger = Logger(subsystem: "com.superpicky.mac", category: "AppState")
+
     var sidebarSelection: SidebarSelection?
     var selectedPhotoID: UUID?
     var folders: [URL] = []
@@ -95,6 +98,7 @@ final class AppState {
                 selectedPhotoID = photos.first?.id
             }
         } catch {
+            logger.error("loadPhotos failed: \(error)")
             allPhotos = []
             photos = []
             ratingCounts = [:]
@@ -206,9 +210,9 @@ final class AppState {
                 wasHidden: wasHidden
             )
             mutate(&photo)
-            try database.save(&photo)
+            try database.save(&photo)      // DB write FIRST
             try? XMPWriter.write(photo: photo)
-
+            // Only update in-memory state after successful DB write:
             if let idx = allPhotos.firstIndex(where: { $0.id == id }) {
                 allPhotos[idx] = photo
             }
@@ -221,7 +225,7 @@ final class AppState {
             ratingCounts = (try? database.ratingCounts()) ?? ratingCounts
             picksCount = allPhotos.filter { $0.isPick }.count
         } catch {
-            // Silently fail
+            logger.error("mutatePhoto failed: \(error)")
         }
     }
 
@@ -273,7 +277,7 @@ final class AppState {
             ratingCounts = (try? database.ratingCounts()) ?? ratingCounts
             picksCount = allPhotos.filter { $0.isPick }.count
         } catch {
-            // Silently fail
+            logger.error("undoLastAction failed: \(error)")
         }
     }
 

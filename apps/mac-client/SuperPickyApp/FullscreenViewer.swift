@@ -5,7 +5,7 @@ struct FullscreenViewer: View {
     @Binding var selectedPhotoID: UUID?
     @Binding var isPresented: Bool
     var onRatePhoto: ((UUID, Int) -> Void)?
-    @State private var showInfo = false
+    @State private var showInfo = true
     @Bindable var zoomState: ZoomState
     @State private var image: NSImage?
     @State private var isFullRes = false
@@ -38,6 +38,9 @@ struct FullscreenViewer: View {
                 }
             }
         }
+        .background(KeyboardMonitor { key in
+            handleKey(key)
+        })
         .task(id: selectedPhotoID) {
             isFullRes = false
             guard let photo = selectedPhoto else { image = nil; return }
@@ -63,5 +66,38 @@ struct FullscreenViewer: View {
     private var selectedPhoto: Photo? {
         guard let id = selectedPhotoID else { return nil }
         return photos.first { $0.id == id }
+    }
+
+    @discardableResult
+    private func handleKey(_ key: KeyboardMonitor.KeyEvent) -> Bool {
+        if key.characters == "i" {
+            showInfo.toggle()
+            return true
+        }
+        if key.characters == "f" || key.isEscape {
+            isPresented = false
+            return true
+        }
+        if key.isLeftArrow { navigatePhoto(direction: -1); return true }
+        if key.isRightArrow { navigatePhoto(direction: 1); return true }
+        if let char = key.characters.first,
+           let digit = char.wholeNumberValue,
+           (0...5).contains(digit),
+           key.modifiers.intersection([.command, .shift, .option, .control]).isEmpty {
+            if let id = selectedPhoto?.id {
+                onRatePhoto?(id, digit)
+            }
+            return true
+        }
+        return false
+    }
+
+    private func navigatePhoto(direction: Int) {
+        guard let currentID = selectedPhotoID,
+              let currentIndex = photos.firstIndex(where: { $0.id == currentID }) else { return }
+        let newIndex = currentIndex + direction
+        if photos.indices.contains(newIndex) {
+            selectedPhotoID = photos[newIndex].id
+        }
     }
 }
