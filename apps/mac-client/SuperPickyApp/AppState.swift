@@ -251,6 +251,28 @@ final class AppState {
         }
     }
 
+    func deletePhoto(id: UUID) throws {
+        let database = try db()
+        guard let photo = try database.fetchPhoto(id: id) else { return }
+
+        // Move to Trash
+        let fileURL = URL(fileURLWithPath: photo.filePath)
+        try FileManager.default.trashItem(at: fileURL, resultingItemURL: nil)
+
+        // Remove from DB
+        try database.delete(id: id)
+
+        // Remove from memory
+        allPhotos.removeAll { $0.id == id }
+        photos.removeAll { $0.id == id }
+        undoStack.removeAll { $0.photoID == id }
+
+        ratingCounts = (try? database.ratingCounts()) ?? ratingCounts
+        picksCount = allPhotos.filter { $0.isPick }.count
+
+        logger.info("Deleted photo: \(photo.filename)")
+    }
+
     func rejectPhoto(id: UUID) {
         mutatePhoto(id: id, wasHidden: true, { photo in
             photo.starRating = 0
