@@ -259,7 +259,7 @@ struct MainView: View {
         if isTestMode {
             client = MockInferenceClientForUI()
         } else if config.inferenceBackend == .native,
-                  let coreml = try? CoreMLInferenceClient.makePhase4(httpFallback: httpClient) {
+                  let coreml = try? CoreMLInferenceClient.makePhase5(httpFallback: httpClient) {
             client = coreml
         } else {
             client = httpClient
