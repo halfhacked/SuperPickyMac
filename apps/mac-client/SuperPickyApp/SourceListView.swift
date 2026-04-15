@@ -10,7 +10,6 @@ struct SourceListView: View {
     let speciesEntries: [SpeciesEntry]
     let processingFolder: URL?
     let processingProgress: Double
-    @Environment(ProcessManager.self) private var processManager
 
     let onAddFolder: () -> Void
     let onRemoveFolder: (URL) -> Void
@@ -174,11 +173,6 @@ struct SourceListView: View {
             }
         }
         .listStyle(.sidebar)
-        .safeAreaInset(edge: .bottom) {
-            ServerStatusView()
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-        }
     }
 
     private func removeFolder(_ folder: URL) {

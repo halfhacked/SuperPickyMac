@@ -53,16 +53,6 @@ targets:
     platform: macOS
     sources:
       - path: SuperPickyApp
-    postBuildScripts:
-      - name: "Bundle Python Server"
-        script: |
-          SERVER_SRC="${PROJECT_DIR}/../../python-server"
-          SERVER_DST="${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/Resources/python-server"
-          rm -rf "$SERVER_DST"
-          mkdir -p "$SERVER_DST/inference"
-          cp "$SERVER_SRC/superpicky_server.py" "$SERVER_DST/"
-          cp "$SERVER_SRC/requirements.txt" "$SERVER_DST/"
-          cp "$SERVER_SRC/inference/"*.py "$SERVER_DST/inference/"
     dependencies:
       - package: GRDB
       - target: SuperPickyInference

@@ -1,8 +1,8 @@
 import SwiftUI
+import os
 
 struct MainView: View {
     @Environment(CullingConfig.self) private var config
-    @Environment(ProcessManager.self) private var processManager
     @State private var appState = AppState()
     @State private var processingTask: Task<Void, Never>?
     @State private var isExporting = false
@@ -91,12 +91,6 @@ struct MainView: View {
             if let testFolder = ProcessInfo.processInfo.environment["TEST_FOLDER"] {
                 let folder = URL(fileURLWithPath: testFolder)
                 Task {
-                    if !isTestMode {
-                        for _ in 0..<30 {
-                            if processManager.isReady { break }
-                            try? await Task.sleep(for: .seconds(1))
-                        }
-                    }
                     await MainActor.run {
                         startProcessing(folder: folder)
                     }
@@ -177,7 +171,6 @@ struct MainView: View {
 
     private func reprocessFolder(_ folder: URL) {
         guard !appState.isProcessing else { return }
-        guard isTestMode || processManager.isReady else { return }
 
         // Clear non-manual photos so pipeline reprocesses them
         if let db = try? ReportDatabase(folderPath: folder) {
@@ -250,19 +243,19 @@ struct MainView: View {
         startProcessing(folder: url)
     }
 
+    private let logger = Logger(subsystem: "com.superpicky.mac", category: "MainView")
+
     private func startProcessing(folder: URL) {
-        guard isTestMode || processManager.isReady else { return }
         guard !appState.isProcessing else { return }
 
-        let httpClient = HTTPInferenceClient(port: processManager.port)
         let client: InferenceClient
         if isTestMode {
             client = MockInferenceClientForUI()
-        } else if config.inferenceBackend == .native,
-                  let coreml = try? CoreMLInferenceClient.makePhase5(httpFallback: httpClient) {
+        } else if let coreml = try? CoreMLInferenceClient.make() {
             client = coreml
         } else {
-            client = httpClient
+            logger.error("CoreML models not available — cannot process folder")
+            return
         }
 
         let pipeline = PipelineCoordinator(inferenceClient: client)
