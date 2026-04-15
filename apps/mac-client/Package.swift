@@ -14,6 +14,7 @@ let package = Package(
             path: "SuperPickyInference",
             resources: [
                 .process("Resources/manifest.json"),
+                .copy("Resources/Models/FlightDetector.mlmodelc"),
             ]
         ),
         .executableTarget(
