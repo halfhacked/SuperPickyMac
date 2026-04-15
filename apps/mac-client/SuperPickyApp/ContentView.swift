@@ -40,6 +40,7 @@ struct ContentView: View {
     @State private var showDeleteConfirm = false
     @State private var pendingDeleteID: UUID?
     @State private var showKeyboardHelp = false
+    @State private var showThresholdCalibrator = false
 
     private var filteredPhotos: [Photo] {
         var result = photos
@@ -252,6 +253,19 @@ struct ContentView: View {
                     .keyboardShortcut("e", modifiers: .command)
                     .frame(width: 0, height: 0)
                     .opacity(0)
+            }
+            ToolbarItem(placement: .automatic) {
+                Button {
+                    showThresholdCalibrator.toggle()
+                } label: {
+                    Image(systemName: "slider.horizontal.3")
+                }
+                .popover(isPresented: $showThresholdCalibrator, arrowEdge: .top) {
+                    ThresholdCalibratorView(photo: selectedPhoto)
+                        .environment(config)
+                }
+                .accessibilityIdentifier("ThresholdCalibratorButton")
+                .help("Calibrate thresholds against this photo")
             }
             ToolbarItem(placement: .automatic) {
                 Button {
