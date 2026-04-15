@@ -24,11 +24,16 @@ targets:
           - "Models/FlightDetector.mlpackage"
           - "Models/KeypointDetector.mlpackage"
           - "Models/YOLOBirdDetector.mlpackage"
+          - "Models/OSEAClassifier.mlpackage"
       - path: SuperPickyInference/Resources/Models/FlightDetector.mlmodelc
         buildPhase: resources
       - path: SuperPickyInference/Resources/Models/KeypointDetector.mlmodelc
         buildPhase: resources
       - path: SuperPickyInference/Resources/Models/YOLOBirdDetector.mlmodelc
+        buildPhase: resources
+      - path: SuperPickyInference/Resources/Models/OSEAClassifier.mlmodelc
+        buildPhase: resources
+      - path: SuperPickyInference/Resources/bird_reference.sqlite
         buildPhase: resources
     settings:
       base:
