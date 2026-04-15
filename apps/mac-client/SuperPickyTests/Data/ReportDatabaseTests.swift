@@ -126,4 +126,34 @@ import GRDB
         let fetched = try db.fetchPhoto(id: photo.id)
         #expect(fetched == nil)
     }
+
+    @Test func deletePhoto_removesFromDatabase() throws {
+        let dir = try makeTempDir()
+        var db = try ReportDatabase(folderPath: dir)
+        var photo = Photo(filename: "test.jpg", filePath: "/tmp/test.jpg", folderPath: dir.path)
+        try db.save(&photo)
+        try db.delete(id: photo.id)
+        let fetched = try db.fetchPhoto(id: photo.id)
+        #expect(fetched == nil)
+    }
+
+    @Test func deleteNonManualPhotos_preservesManualRatings() throws {
+        let dir = try makeTempDir()
+        var db = try ReportDatabase(folderPath: dir)
+
+        var autoPhoto = Photo(filename: "auto.jpg", filePath: "/tmp/auto.jpg", folderPath: dir.path)
+        autoPhoto.isManualRating = false
+        try db.save(&autoPhoto)
+
+        var manualPhoto = Photo(filename: "manual.jpg", filePath: "/tmp/manual.jpg", folderPath: dir.path)
+        manualPhoto.isManualRating = true
+        manualPhoto.starRating = 4
+        try db.save(&manualPhoto)
+
+        try db.deleteNonManualPhotos()
+
+        let remaining = try db.fetchAllPhotos()
+        #expect(remaining.count == 1)
+        #expect(remaining[0].filename == "manual.jpg")
+    }
 }
