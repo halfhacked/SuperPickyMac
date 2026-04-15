@@ -4,6 +4,14 @@ options:
   deploymentTarget:
     macOS: "14.0"
   developmentLanguage: en
+configs:
+  Debug: debug
+  Release: release
+settings:
+  base:
+    ARCHS: arm64
+    VALID_ARCHS: arm64
+    EXCLUDED_ARCHS: x86_64
 
 packages:
   GRDB:
