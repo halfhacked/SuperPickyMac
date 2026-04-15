@@ -59,6 +59,7 @@ struct MainView: View {
                     onUndo: {
                         appState.undoLastAction()
                     },
+                    canUndo: appState.canUndo,
                     onExportPicks: {
                         exportPicks()
                     }

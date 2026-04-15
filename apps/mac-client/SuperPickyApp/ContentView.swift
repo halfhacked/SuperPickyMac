@@ -9,6 +9,7 @@ struct ContentView: View {
     var onTogglePick: ((UUID) -> Void)?
     var onRejectPhoto: ((UUID) -> Void)?
     var onUndo: (() -> Void)?
+    var canUndo: Bool = false
     var onExportPicks: (() -> Void)?
     @Environment(CullingConfig.self) private var config
     @State private var minimumStars: Int = 0
@@ -188,8 +189,8 @@ struct ContentView: View {
 
         // Cmd+Z: undo
         if key.modifiers.contains(.command), key.characters == "z" {
-            onUndo?()
-            return true
+            if canUndo { onUndo?() }
+            return canUndo  // only consume the key event if we actually undid something
         }
 
         // Cmd+0-5: set minimum star filter
