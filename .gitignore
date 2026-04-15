@@ -23,10 +23,13 @@ __pycache__/
 *.egg-info/
 dist/
 
-# Models (large files — downloaded on first launch via ModelManager)
+# Models: scaffolds (~1 MB total) are committed; weight.bin files are
+# downloaded on first launch via ModelManager.
 python-server/models/*.pt
 python-server/models/*.pth
-apps/mac-client/SuperPickyInference/Resources/Models/
+apps/mac-client/SuperPickyInference/Resources/Models/*.mlmodelc/weights/weight.bin
+# CoreML source packages (~420 MB total) — never committed
+apps/mac-client/SuperPickyInference/Resources/Models/*.mlpackage/
 
 # macOS
 .DS_Store

@@ -10,25 +10,26 @@ struct ModelManifestTests {
         #expect(manifest.version == 1)
     }
 
-    @Test("Bundled manifest lists all five CoreML models with SHA-256 + size")
+    @Test("Bundled manifest lists one weight.bin per CoreML model")
     func bundledModels() throws {
         let manifest = try ModelManifest.loadBundled()
         let ids = Set(manifest.models.map(\.id))
         #expect(ids == [
-            "flight-detector",
-            "keypoint-detector",
-            "yolo-bird-detector",
-            "osea-classifier",
-            "aesthetics-model",
+            "flight-detector-weight",
+            "keypoint-detector-weight",
+            "yolo-bird-detector-weight",
+            "osea-classifier-weight",
+            "aesthetics-model-weight",
         ])
         // SpeciesDatabase is bundled with the app, so it must NOT be in the
         // download manifest.
         #expect(!ids.contains("bird-reference-db"))
-        // Every entry must have a non-empty sha256 and a positive sizeBytes so
-        // the downloader can verify + report progress.
+        // Every entry must have a non-empty sha256, a positive sizeBytes,
+        // and an installPath that lands inside a .mlmodelc/weights/ directory.
         for entry in manifest.models {
             #expect(entry.sha256.count == 64)
             #expect(entry.sizeBytes > 0)
+            #expect(entry.installPath.hasSuffix("weights/weight.bin"))
         }
     }
 
