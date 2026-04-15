@@ -11,7 +11,10 @@ let package = Package(
     targets: [
         .target(
             name: "SuperPickyInference",
-            path: "SuperPickyInference"
+            path: "SuperPickyInference",
+            resources: [
+                .process("Resources/manifest.json"),
+            ]
         ),
         .executableTarget(
             name: "SuperPicky",
