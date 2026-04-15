@@ -22,7 +22,10 @@ targets:
         buildPhase: resources
         excludes:
           - "Models/FlightDetector.mlpackage"
+          - "Models/KeypointDetector.mlpackage"
       - path: SuperPickyInference/Resources/Models/FlightDetector.mlmodelc
+        buildPhase: resources
+      - path: SuperPickyInference/Resources/Models/KeypointDetector.mlmodelc
         buildPhase: resources
     settings:
       base:
