@@ -12,15 +12,15 @@ struct SuperPickyApp: App {
             ZStack {
                 MainView()
                     .frame(minWidth: 900, minHeight: 600)
-                    .environment(processManager)
-                    .environment(config)
-                    .environment(\.locale, config.appLanguage.locale)
-                    .preferredColorScheme(config.appTheme.colorScheme)
 
                 if serverSetup.isSettingUp {
                     SetupOverlay(progress: serverSetup.setupProgress)
                 }
             }
+            .environment(processManager)
+            .environment(config)
+            .environment(\.locale, config.appLanguage.locale)
+            .preferredColorScheme(config.appTheme.colorScheme)
             .onAppear {
                 appDelegate.processManager = processManager
                 LocalizationManager.localizeMenuBar(language: config.appLanguage)
