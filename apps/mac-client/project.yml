@@ -20,6 +20,10 @@ targets:
           - "Resources/**"
       - path: SuperPickyInference/Resources
         buildPhase: resources
+        excludes:
+          - "Models/FlightDetector.mlpackage"
+      - path: SuperPickyInference/Resources/Models/FlightDetector.mlmodelc
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.superpicky.SuperPickyInference
