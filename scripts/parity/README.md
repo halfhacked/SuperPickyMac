@@ -11,18 +11,22 @@ pipeline and the native Swift rewrite.
 For each photo in a folder, runs the full per-photo pipeline through
 both sides and diffs the fields that end up in the Swift `.report.db`:
 
-| Model        | Field(s) compared                                               |
-|--------------|-----------------------------------------------------------------|
-| Flight       | `isFlying` decision, `flightConfidence`                         |
-| YOLO / bird  | `birdConfidence` (detection count and presence agreement)       |
-| Species      | `speciesScientificName` (top-1), `speciesConfidence`            |
-| Keypoints    | `(leftEye, rightEye, beak)` × `(X, Y, Vis)` — 9 fields          |
-| Aesthetics   | `aestheticsScore` (MOS in [1, 10])                              |
+| Model        | Field(s) compared                                                        |
+|--------------|--------------------------------------------------------------------------|
+| Flight       | `isFlying` decision, `flightConfidence`                                  |
+| YOLO / bird  | `birdConfidence` presence agreement, `birdBboxJSON` IoU                  |
+| Species      | `speciesScientificName` (top-1), top-5 Jaccard, top-1 ∈ other's top-5    |
+| Pinyin       | `speciesPinyin` exact-match rate (both sides currently null — agreement) |
+| Keypoints    | `(leftEye, rightEye, beak)` × `(X, Y, Vis)` — 9 fields                   |
+| Aesthetics   | `aestheticsScore` (MOS), `aestheticsDistributionJSON` (10-bin L1 delta)  |
+| GPS          | Regional OSEA filter exercised end-to-end (Swift SpeciesFilter cascade)  |
 
 The Swift side is read straight from the `.report.db` that
-`SuperPicky.app` writes. The Python reference mirrors
-`PipelineCoordinator.runAnalysis` stage-for-stage using the same
-models SuperPicky loads from `~/projects/SuperPicky/models/`.
+`SuperPicky.app` writes (schema v5+). The Python reference mirrors
+`CoreMLInferenceClient.identify` stage-for-stage using the same
+models SuperPicky loads from `~/projects/SuperPicky/models/`, and
+applies the same Avonet/eBird regional cascade when the photo has
+GPS EXIF.
 
 ## What it does NOT check
 
@@ -30,10 +34,9 @@ models SuperPicky loads from `~/projects/SuperPicky/models/`.
   the preprocessing paths are not identical at the pixel level
   (slightly different JPEG decoders, bilinear vs Lanczos where
   unavoidable). A few percent of confidence jitter is expected.
-- **YOLO bounding box coordinates.** The Swift `.report.db` schema
-  dropped `birdBbox` / `birdMask` in migration v3. Bbox drift is
-  detected indirectly because it propagates to every downstream
-  model (wrong crop → wrong flight/species confidence).
+- **Multi-bird photos.** Both sides record only the top-confidence
+  detection per photo. Photos with two birds in-frame still pass
+  through the pipeline, but the diff harness compares a single row.
 - **Head sharpness and star rating.** These are derived fields, not
   direct model outputs.
 
@@ -80,6 +83,27 @@ Species top-1 distribution (same on both sides): Common Loon 78,
 Bald Eagle 26, none 2. Left-eye visibility is low on both sides
 (Python 0.048, Swift 0.037) because most photos in the set show
 profile views of the bird where only the right eye is visible.
+
+### Extended parity checks (schema v5)
+
+After the v5 migration added `speciesTop5JSON`,
+`aestheticsDistributionJSON`, and `birdBboxJSON` columns, four new
+per-run metrics catch drift that was previously invisible:
+
+| Check | What it measures | Threshold |
+|---|---|---|
+| **Top-5 Jaccard** | `\|py_top5 ∩ sw_top5\| / \|py_top5 ∪ sw_top5\|` per photo, reported p50 + p5(worst) | p50 ≥ 0.60 |
+| **Top-1 inclusion** | "Each side's top-1 is somewhere in the other's top-5" | ≥ 95% both directions |
+| **Pinyin agreement** | Exact-string match on `speciesPinyin` when both sides have a Chinese name (currently null==null) | ≥ 98% |
+| **Aesthetics distribution L1** | `Σ\|py[i] − sw[i]\|` across 10 AVA bins (bounded by 2) | p95 < 0.30, max < 0.50 |
+| **YOLO bbox IoU** | Intersection-over-union on the top-confidence detection's normalized rectangle | p50 ≥ 0.80, p5(worst) ≥ 0.60 |
+
+The GPS/eBird regional filter is exercised end-to-end: photos with
+GPS EXIF get the same Avonet/eBird cascade on both sides, and
+species disagreements that used to stem from Swift's unfiltered
+global softmax now hit the same masked softmax the Python reference
+uses. The harness surfaces genuine model drift, not missing-filter
+artefacts.
 
 Tolerances live in `diff_python_vs_swift.py` as constants. Adjust
 based on observed deltas — the rule of thumb is: catch regressions

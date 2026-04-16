@@ -40,6 +40,14 @@
       "sha256": "9e3612f51c95331d69cf5aecfff5185f4f7316436f00186713f9656fb211f1b9",
       "sizeBytes": 278668800,
       "installPath": "AestheticsModel.mlmodelc/weights/weight.bin"
+    },
+    {
+      "id": "avonet-db",
+      "filename": "avonet.db",
+      "url": "https://huggingface.co/Airdreamer/SuperPicky-models/resolve/main/avonet.db",
+      "sha256": "6dd77175865bbfe034a3aa81bd293cad58ec66b912087727f078d4306086e8a0",
+      "sizeBytes": 107192320,
+      "installPath": "avonet.db"
     }
   ]
 }
