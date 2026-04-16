@@ -72,6 +72,45 @@ struct OSEAClassifierTests {
         #expect(array.shape[2] == 224)
         #expect(array.shape[3] == 224)
     }
+
+    // MARK: - YOLO-crop preprocessing mode
+
+    @Test func yoloCropPreprocessShape() throws {
+        // Non-square crop that a YOLO bird detection would produce —
+        // direct resize to 224×224, no center crop.
+        let crop = try makeSolid(width: 640, height: 320)
+        let array = try OSEAClassifier.preprocess(image: crop, isYOLOCropped: true)
+        #expect(array.shape[2] == 224)
+        #expect(array.shape[3] == 224)
+    }
+
+    @Test func yoloCropPreservesAllPixels() throws {
+        // Full-red on left half, full-blue on right half. With direct resize,
+        // both halves must still contribute color after preprocessing.
+        // (CenterCrop mode would chop off the outer columns.)
+        let cs = CGColorSpaceCreateDeviceRGB()
+        guard let ctx = CGContext(
+            data: nil, width: 400, height: 200,
+            bitsPerComponent: 8, bytesPerRow: 400 * 4,
+            space: cs,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { throw NSError(domain: "t", code: 0) }
+        ctx.setFillColor(red: 1, green: 0, blue: 0, alpha: 1)
+        ctx.fill(CGRect(x: 0, y: 0, width: 200, height: 200))
+        ctx.setFillColor(red: 0, green: 0, blue: 1, alpha: 1)
+        ctx.fill(CGRect(x: 200, y: 0, width: 200, height: 200))
+        guard let img = ctx.makeImage() else { throw NSError(domain: "t", code: 0) }
+
+        let array = try OSEAClassifier.preprocess(image: img, isYOLOCropped: true)
+        let ptr = array.dataPointer.bindMemory(to: Float.self, capacity: 3 * 224 * 224)
+        // Far left column (x=10) must be red-dominated, far right (x=210) blue-dominated.
+        let leftR = ptr[0 * 224 * 224 + 112 * 224 + 10]
+        let leftB = ptr[2 * 224 * 224 + 112 * 224 + 10]
+        let rightR = ptr[0 * 224 * 224 + 112 * 224 + 210]
+        let rightB = ptr[2 * 224 * 224 + 112 * 224 + 210]
+        #expect(leftR > leftB)
+        #expect(rightB > rightR)
+    }
 }
 
 // MARK: - Helpers

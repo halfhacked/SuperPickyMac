@@ -3,12 +3,17 @@
 // Wraps the CoreML OSEA ResNet34 bird species classifier.
 //
 // Architecture: torchvision ResNet34, num_classes=11000 (first 10964 used)
-// Preprocessing: Resize(256) → CenterCrop(224) → ImageNet normalize
-// TTA: (original + h-flip logits) / 2  — matches osea_classifier.py predict_with_tta()
+// Two preprocessing paths (match preen's osea_classifier.py exactly):
+//   - Full image (CENTER_CROP_TRANSFORM): Resize(256) → CenterCrop(224) →
+//     ImageNet normalize. The bird is assumed to be near the center.
+//   - YOLO crop (DIRECT_RESIZE_TRANSFORM): Resize(224, 224) bilinear →
+//     ImageNet normalize. Direct resize avoids losing any of the already
+//     tightly-cropped bird pixels.
+// TTA: (original + h-flip logits) / 2  — matches predict_with_tta().
 //
-// Input:  Any-size CGImage (bird crop from YOLO detection)
+// Input:  Any-size CGImage
 // Output: [Float] of length 11000 (raw logits, no softmax)
-//         Swift callers apply temperature softmax + species masking
+//         Swift callers apply temperature softmax + species masking.
 //
 // Thread safety: @unchecked Sendable. MLModel is thread-safe per Apple docs.
 // Each logits() call allocates a fresh MLMultiArray.
@@ -46,17 +51,22 @@ public final class OSEAClassifier: @unchecked Sendable {
     // MARK: - Inference
 
     /// Return raw logits (no softmax). Callers apply temperature + species masking.
-    /// - Parameter image: Bird crop CGImage (any size — will be resized/cropped)
-    /// - Parameter useTTA: If true, average logits with horizontal flip (matches Python TTA)
-    public func logits(image: CGImage, useTTA: Bool = true) throws -> [Float] {
-        let preprocessed = try Self.preprocess(image: image)
+    /// - Parameter image: Input CGImage (any size).
+    /// - Parameter isYOLOCropped: `true` when `image` is already a tight bird
+    ///   crop from YOLO; uses DIRECT_RESIZE_TRANSFORM (resize straight to
+    ///   224×224) to keep every pixel. `false` for full photos (CENTER_CROP).
+    /// - Parameter useTTA: If true, average logits with horizontal flip.
+    public func logits(image: CGImage,
+                       isYOLOCropped: Bool = false,
+                       useTTA: Bool = true) throws -> [Float] {
+        let preprocessed = try Self.preprocess(image: image, isYOLOCropped: isYOLOCropped)
         let output1 = try runModel(inputArray: preprocessed)
 
         if useTTA {
             guard let flipped = Self.flipHorizontal(image: image) else {
                 return output1
             }
-            let preprocessed2 = try Self.preprocess(image: flipped)
+            let preprocessed2 = try Self.preprocess(image: flipped, isYOLOCropped: isYOLOCropped)
             let output2 = try runModel(inputArray: preprocessed2)
             return zip(output1, output2).map { ($0 + $1) / 2 }
         }
@@ -75,16 +85,32 @@ public final class OSEAClassifier: @unchecked Sendable {
         return Array(UnsafeBufferPointer(start: ptr, count: Self.outputDim))
     }
 
-    /// Resize(256) → CenterCrop(224) → ImageNet normalize → MLMultiArray [1,3,224,224]
-    static func preprocess(image: CGImage) throws -> MLMultiArray {
-        // Step 1: Resize shorter side to 256
-        let resized = try resizeShorterSide(image: image, targetShortSide: resizeSize)
-
-        // Step 2: Center crop to 224×224
-        let cropped = try centerCrop(image: resized, cropSize: cropSize)
-
-        // Step 3: ImageNet normalize → MLMultiArray [1,3,224,224]
+    /// Preprocess into a [1,3,224,224] NCHW float32 MLMultiArray, ImageNet-normalized.
+    /// - `isYOLOCropped: true` → direct resize to 224×224 (DIRECT_RESIZE_TRANSFORM).
+    /// - `isYOLOCropped: false` → Resize(256) → CenterCrop(224) (CENTER_CROP_TRANSFORM).
+    static func preprocess(image: CGImage, isYOLOCropped: Bool = false) throws -> MLMultiArray {
+        let cropped: CGImage
+        if isYOLOCropped {
+            cropped = try directResize(image: image, targetSize: cropSize)
+        } else {
+            let resized = try resizeShorterSide(image: image, targetShortSide: resizeSize)
+            cropped = try centerCrop(image: resized, cropSize: cropSize)
+        }
         return try normalizeToMLMultiArray(image: cropped)
+    }
+
+    /// Direct resize to `targetSize × targetSize` (preserves all pixels, loses aspect ratio).
+    private static func directResize(image: CGImage, targetSize: Int) throws -> CGImage {
+        guard let ctx = CGContext(
+            data: nil, width: targetSize, height: targetSize,
+            bitsPerComponent: 8, bytesPerRow: targetSize * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { throw OSEAError.preprocessingFailed }
+        ctx.interpolationQuality = CGInterpolationQuality.high
+        ctx.draw(image, in: CGRect(x: 0, y: 0, width: targetSize, height: targetSize))
+        guard let result = ctx.makeImage() else { throw OSEAError.preprocessingFailed }
+        return result
     }
 
     /// Resize the image so the shorter side equals `targetShortSide`, maintaining aspect ratio.
