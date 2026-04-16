@@ -210,13 +210,12 @@ final class PipelineCoordinator {
         // Load 1280px thumbnail for aesthetics/keypoints/flight (fast, small payload)
         let image = try rawConverter.convert(fileURL: fileURL)
 
-        let cropRect = CGRect(
-            x: bird.bbox.origin.x * CGFloat(image.width),
-            y: bird.bbox.origin.y * CGFloat(image.height),
-            width: bird.bbox.size.width * CGFloat(image.width),
-            height: bird.bbox.size.height * CGFloat(image.height)
-        )
-        guard let birdCrop = image.cropping(to: cropRect) else {
+        // Smart square crop with 15% padding + letterboxing, matching preen's
+        // YOLOBirdDetector.detect_and_crop_bird. The flight / keypoint / OSEA
+        // models were all trained on square crops with ~15 % context; feeding
+        // a raw rectangular YOLO bbox stretched to their input size causes
+        // severe false positives in the flight classifier.
+        guard let birdCrop = image.smartSquareBirdCrop(bbox: bird.bbox) else {
             photo.starRating = 0
             return
         }
