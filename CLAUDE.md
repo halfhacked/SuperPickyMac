@@ -5,27 +5,24 @@ Native macOS app for AI-powered bird photo culling.
 ## Architecture
 
 - Swift/SwiftUI frontend (all UI + business logic)
-- Python HTTP server (model inference only — 5 endpoints)
+- CoreML inference in-process (native, no server required)
+  - Phase 1 ✅: Flight classifier (EfficientNet-B3, `FlightModel.swift`)
+  - Phase 2 ✅: Keypoint detector (ResNet50 PartLocalizer, `KeypointModel.swift`)
+  - Phase 3-5 pending: YOLO detect, OSEA species, TOPIQ aesthetics
+  - HTTP fallback (`HTTPInferenceClient`) available for Phases 3-5 during migration
 - GRDB for SQLite persistence
 - Vision/Accelerate/Core Image for image processing
+- Model conversion scripts: `tools/model-conversion/` (requires `~/projects/SuperPicky/models/`)
 
 ## Quality System
 
 | Layer | What | Command | Trigger |
 |-------|------|---------|---------|
-| G1 Static | swift build + flake8 | `scripts/pre-commit.sh` | pre-commit |
-| L1 Unit | Swift Testing + pytest (mocked) | `scripts/pre-commit.sh` | pre-commit |
-| L2 Integration | Swift ↔ real Python server | `scripts/run-l2.sh` | pre-push |
+| G1 Static | swift build + swiftlint | `scripts/pre-commit.sh` | pre-commit |
+| L1 Unit | Swift Testing | `scripts/pre-commit.sh` | pre-commit |
+| L2 Parity | CoreML ↔ HTTP parity (Phase 3+ stubs for now) | `scripts/run-l2.sh` | pre-push |
 | G2 Security | gitleaks | `scripts/gate-security.sh` | pre-push |
-| L3 BDD | XCUITest full user flows | `scripts/run-l3.sh` | on-demand |
-
-## Port Convention
-
-| Environment | Port |
-|-------------|------|
-| Dev | 8420 |
-| L2 Integration | 18420 |
-| L3 BDD | 28420 |
+| L3 BDD | XCUITest full user flows (TEST_MODE=1) | `scripts/run-l3.sh` | on-demand |
 
 ## Common Commands
 
@@ -36,22 +33,19 @@ cd apps/mac-client && swift build
 # Test
 cd apps/mac-client && swift test
 
-# Python server (dev)
-cd python-server && python superpicky_server.py --port 8420
-
-# Python server tests
-cd python-server && pytest tests/ -v
+# Re-convert CoreML models (requires ~/projects/SuperPicky/models/)
+python3 tools/model-conversion/convert_flight.py
+python3 tools/model-conversion/convert_keypoint.py
 ```
 
 ## Key Decisions
 
-- InferenceClient protocol abstracts Python HTTP vs future CoreML
+- InferenceClient protocol allows native CoreML or HTTP backends (Settings toggle)
 - One .report.db per processed folder
-- Python server is inference-only — no business logic
 - All business logic (rating, burst, exposure, sharpness) in Swift
+- CoreML models ship bundled in app bundle; loaded on first use
 - CullingConfig is @MainActor @Observable (UI state)
 - Fixed minimums (sharpness 100, aesthetics 2.0) separate from configurable thresholds
-- Species identification delegated to preen package (birdpreen on PyPI) — server sends file path, preen handles image loading, YOLO, crop, OSEA classify, GPS filtering
 - Keyboard shortcuts use NSEvent.addLocalMonitorForEvents (not SwiftUI .onKeyPress which requires focus)
 - Vertical scroll wheel on horizontal ScrollView uses NSEvent monitor + NSScrollView responder chain walk
 

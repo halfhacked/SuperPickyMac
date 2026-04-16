@@ -23,14 +23,6 @@ swift run SuperPicky
 swift test
 ```
 
-## Python Inference Server
-
-```bash
-cd python-server
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-python superpicky_server.py --port 8420
-```
 
 ## License
 

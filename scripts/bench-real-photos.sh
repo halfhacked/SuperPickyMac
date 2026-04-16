@@ -4,15 +4,8 @@
 set -e
 
 FOLDER="${1:-$(cd "$(dirname "$0")/.." && pwd)/real-photos}"
-PORT=8420
-SERVER_PID=""
-APP_PATH=""
 
 cleanup() {
-    if [ -n "$SERVER_PID" ]; then
-        kill "$SERVER_PID" 2>/dev/null || true
-        wait "$SERVER_PID" 2>/dev/null || true
-    fi
     pkill -f "SuperPicky" 2>/dev/null || true
 }
 trap cleanup EXIT
@@ -23,27 +16,6 @@ echo "Size:   $(du -sh "$FOLDER" | cut -f1)"
 
 # Remove existing .report.db so we process from scratch
 rm -f "$FOLDER/.report.db"
-
-# Start server if not running
-if ! curl -s "http://localhost:$PORT/health" | grep -q '"status"' 2>/dev/null; then
-    echo ""
-    echo "=== Starting inference server on port $PORT ==="
-    cd "$(dirname "$0")/../python-server"
-    if [ -f ".venv/bin/python" ]; then PYTHON=".venv/bin/python"; else PYTHON="python3"; fi
-    $PYTHON superpicky_server.py --port "$PORT" &
-    SERVER_PID=$!
-    cd ..
-
-    for i in $(seq 1 120); do
-        if curl -s "http://localhost:$PORT/health" | grep -q '"status"'; then
-            echo "Server ready after ${i}s"
-            break
-        fi
-        sleep 1
-    done
-else
-    echo "Server already running on port $PORT"
-fi
 
 # Build
 echo ""
