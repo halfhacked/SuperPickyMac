@@ -48,14 +48,18 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
     // MARK: - Native flight inference
 
     func flight(image: CGImage) async throws -> FlightResult {
+        let t = DispatchTime.now()
         let (isFlying, confidence) = try flightModel.predict(image: image)
+        logger.debug("flight \(Self.elapsedMs(since: t), privacy: .public)ms flying=\(isFlying, privacy: .public) conf=\(String(format: "%.2f", confidence), privacy: .public)")
         return FlightResult(isFlying: isFlying, confidence: confidence)
     }
 
     // MARK: - Native keypoint inference
 
     func keypoints(image: CGImage) async throws -> KeypointResult {
+        let t = DispatchTime.now()
         let result = try keypointModel.predict(image: image)
+        logger.debug("keypoints \(Self.elapsedMs(since: t), privacy: .public)ms")
         return KeypointResult(
             leftEye:  Keypoint(x: result.leftEyeX,  y: result.leftEyeY,  visibility: result.leftEyeVis),
             rightEye: Keypoint(x: result.rightEyeX, y: result.rightEyeY, visibility: result.rightEyeVis),
@@ -69,7 +73,9 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
         guard let yolo = yoloModel else {
             return DetectionResult(birds: [])
         }
+        let t = DispatchTime.now()
         let dets = try yolo.predict(image: image)
+        logger.debug("yolo \(Self.elapsedMs(since: t), privacy: .public)ms birds=\(dets.count, privacy: .public)")
         let birds = dets.map { d in
             BirdDetection(
                 bbox: CGRect(x: CGFloat(d.x1), y: CGFloat(d.y1),
@@ -88,14 +94,30 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
         guard let yolo = yoloModel, let osea = oseaModel, let db = speciesDB else {
             return IdentifyResponse(species: [], birds: nil, totalDetected: 0)
         }
+        // The body is fully synchronous — ImageIO + CoreML are sync APIs.
+        // Wrap in an explicit autoreleasepool so the CGImageSource, CGImage
+        // and MLMultiArray temporaries don't pile up on the Swift concurrency
+        // thread between photos. Without this, per-photo time on a large
+        // run degrades from ~800ms to >4s as the pool grows.
+        return try autoreleasepool {
+            try identifySync(yolo: yolo, osea: osea, db: db,
+                             filePath: filePath, topK: topK)
+        }
+    }
+
+    private func identifySync(yolo: YOLOBirdDetector, osea: OSEAClassifier,
+                              db: SpeciesDatabase, filePath: String, topK: Int) throws -> IdentifyResponse {
+        let identifyStart = DispatchTime.now()
 
         // 1. Load image from file path (CGImageSource handles RAW, JPEG, etc.)
+        let decodeStart = DispatchTime.now()
         let fileURL = URL(fileURLWithPath: filePath)
         guard let source = CGImageSourceCreateWithURL(fileURL as CFURL, nil),
               let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
             logger.error("OSEA identify: failed to load image at \(filePath)")
             return IdentifyResponse(species: [], birds: nil, totalDetected: 0)
         }
+        let decodeMs = Self.elapsedMs(since: decodeStart)
 
         // 1a. Extract GPS from EXIF and resolve an allowed species set.
         //     nil → no filter (either no GPS in file, or the filter
@@ -108,7 +130,9 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
         }()
 
         // 2. YOLO detect
+        let yoloStart = DispatchTime.now()
         let detections = try yolo.predict(image: image)
+        let yoloMs = Self.elapsedMs(since: yoloStart)
 
         // 3. For each bird, smart-square crop → OSEA → top species.
         //    Use the same 15%-padding + letterbox semantics as preen so OSEA
@@ -117,6 +141,7 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
         // Full top-5 from the BEST detection only — used by the parity
         // harness. UI still reads `species` (top-1 per detection).
         var bestTop5: [SpeciesMatch]? = nil
+        let oseaStart = DispatchTime.now()
 
         for det in detections {
             let normalizedBBox = CGRect(
@@ -134,6 +159,7 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
             //    softmax. If every mask-allowed class has probability under
             //    the floor, fall through to the global (unmasked) softmax —
             //    matches Python identify_bird's cascade.
+            var usedRegional = false
             let probs: [Float] = {
                 if let allowed = allowedIDs, !allowed.isEmpty {
                     let masked: [Float] = validLogits.enumerated().map { idx, v in
@@ -141,6 +167,7 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
                     }
                     let maskedProbs = Self.softmax(logits: masked, temperature: Self.oseaTemperature)
                     if (maskedProbs.max() ?? 0) >= Self.oseaFloorProbability {
+                        usedRegional = true
                         return maskedProbs
                     }
                     // Regional mask killed everything — fall back to global.
@@ -149,9 +176,18 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
                 return Self.softmax(logits: validLogits, temperature: Self.oseaTemperature)
             }()
 
-            // 6. Walk the top-5 probabilities; collect ALL DB-resolvable hits
-            //    into top5 (for the harness), and keep the first one as the
-            //    top-1 match the existing UI consumes.
+            // 6. Confidence threshold gate. Python reference keeps the
+            //    top-1 as a genuine identification only when it clears a
+            //    cascade threshold: `regionalSpeciesThreshold` (lower) when
+            //    the regional mask produced the distribution, otherwise
+            //    `globalSpeciesThreshold` (higher).
+            let top1Threshold = Self.top1ConfidenceThreshold(usedRegional: usedRegional)
+
+            // 7. Walk the top-5 probabilities; collect ALL DB-resolvable hits
+            //    into top5 (for the harness). The top-1 that the UI consumes
+            //    is only appended when the highest probability clears
+            //    `top1Threshold`; everything below leaves the photo
+            //    unidentified instead of confidently mislabelled.
             let topFive = probs.enumerated()
                 .sorted { $0.element > $1.element }
                 .prefix(max(5, topK))
@@ -166,10 +202,10 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
                     commonName: entry.englishName,
                     confidence: prob,
                     cnName: entry.chineseName,
-                    pinyin: nil,
-                    thresholdUsed: "global"
+                    pinyin: entry.pinyin,
+                    thresholdUsed: usedRegional ? "regional" : "global"
                 )
-                if !top1AppendedForThisCrop {
+                if !top1AppendedForThisCrop && prob >= top1Threshold {
                     speciesMatches.append(match)
                     top1AppendedForThisCrop = true
                 }
@@ -192,6 +228,8 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
             )
         }
 
+        let oseaMs = Self.elapsedMs(since: oseaStart)
+        logger.debug("identify \(Self.elapsedMs(since: identifyStart), privacy: .public)ms decode=\(decodeMs, privacy: .public)ms yolo=\(yoloMs, privacy: .public)ms osea=\(oseaMs, privacy: .public)ms detections=\(detections.count, privacy: .public) top1=\(speciesMatches.first?.commonName ?? "-", privacy: .public)")
         return IdentifyResponse(
             species: Array(speciesMatches.prefix(topK)),
             birds: birds,
@@ -206,8 +244,30 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
         guard let model = aestheticsModel else {
             return AestheticsResponse(score: 5.0, distribution: [])
         }
+        let t = DispatchTime.now()
         let (mos, distribution) = try model.score(image: image)
+        logger.debug("aesthetics \(Self.elapsedMs(since: t), privacy: .public)ms mos=\(String(format: "%.2f", mos), privacy: .public)")
         return AestheticsResponse(score: mos, distribution: distribution)
+    }
+
+    // MARK: - Threshold helper (exposed for tests)
+
+    /// Map the 0–100 percent thresholds in `InferenceConstants` to the
+    /// 0–1 softmax-probability scale the gate actually compares against.
+    /// Picks regional (lower) when an eBird/GPS mask produced the
+    /// distribution, otherwise global (higher).
+    static func top1ConfidenceThreshold(usedRegional: Bool) -> Float {
+        let percent = usedRegional
+            ? InferenceConstants.regionalSpeciesThreshold
+            : InferenceConstants.globalSpeciesThreshold
+        return percent / 100
+    }
+
+    // MARK: - Timing helper
+
+    private static func elapsedMs(since start: DispatchTime) -> String {
+        let ns = DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds
+        return String(format: "%.0f", Double(ns) / 1_000_000)
     }
 
     // MARK: - Softmax helper

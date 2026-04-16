@@ -247,13 +247,6 @@ struct ContentView: View {
                 .accessibilityIdentifier("ExportMenu")
                 .help(config.localized("Export photos (⌘E for picks)"))
             }
-            // Keep ⌘E for picks shortcut
-            ToolbarItem(placement: .automatic) {
-                Button("") { onExportPicks?() }
-                    .keyboardShortcut("e", modifiers: .command)
-                    .frame(width: 0, height: 0)
-                    .opacity(0)
-            }
             ToolbarItem(placement: .automatic) {
                 Button {
                     showThresholdCalibrator.toggle()
@@ -307,6 +300,16 @@ struct ContentView: View {
         if key.modifiers.contains(.command), key.characters == "z" {
             if canUndo { onUndo?() }
             return canUndo  // only consume the key event if we actually undid something
+        }
+
+        // Cmd+E: export picks. The matching Button lives inside the toolbar
+        // Menu (for mouse-driven access via the menu item), but SwiftUI does
+        // not reliably register `.keyboardShortcut` on a Menu-nested Button
+        // when the menu is closed — so the canonical app-wide NSEvent
+        // monitor is the reliable path.
+        if key.modifiers.contains(.command), key.characters == "e" {
+            onExportPicks?()
+            return onExportPicks != nil
         }
 
         // Cmd+0-5: set minimum star filter

@@ -45,12 +45,16 @@ struct EXIFData: Sendable {
 enum EXIFReader {
     /// Returns nil if the file does not exist or cannot be read as an image.
     static func read(from filePath: String) -> EXIFData? {
-        let url = URL(fileURLWithPath: filePath)
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any] else {
+        guard let properties = ImageProperties.load(filePath: filePath) else {
             return nil
         }
+        return parse(properties: properties, imagePath: filePath)
+    }
 
+    /// Parse EXIF from a pre-loaded properties dict. Lets callers share one
+    /// `CGImageSourceCopyPropertiesAtIndex` call across multiple consumers
+    /// (EXIFReader + FocusPointDetector) to avoid re-reading the file.
+    static func parse(properties: [String: Any], imagePath: String) -> EXIFData {
         let exif = properties[kCGImagePropertyExifDictionary as String] as? [String: Any]
         let tiff = properties[kCGImagePropertyTIFFDictionary as String] as? [String: Any]
         let exifAux = properties[kCGImagePropertyExifAuxDictionary as String] as? [String: Any]
@@ -99,10 +103,19 @@ enum EXIFReader {
         data.imageWidth = properties[kCGImagePropertyPixelWidth as String] as? Int
         data.imageHeight = properties[kCGImagePropertyPixelHeight as String] as? Int
 
-        // IPTC keywords
+        // Keywords: IPTC first, then merge in dc:subject from the sibling
+        // `.xmp` sidecar if one exists. The pipeline writes keywords to the
+        // sidecar only (RAWs aren't rewritten), so the sidecar is the source
+        // of truth for anything we generated (species, flight).
+        var keywords: [String] = []
+        var seen: Set<String> = []
         if let kw = iptc?[kCGImagePropertyIPTCKeywords as String] as? [String] {
-            data.keywords = kw
+            for k in kw where seen.insert(k).inserted { keywords.append(k) }
         }
+        for k in readXMPKeywords(imagePath: imagePath) where seen.insert(k).inserted {
+            keywords.append(k)
+        }
+        data.keywords = keywords
 
         // GPS
         let gps = properties[kCGImagePropertyGPSDictionary as String] as? [String: Any]
@@ -150,6 +163,41 @@ enum EXIFReader {
         }
         let denominator = 1.0 / exposure
         return "1/\(Int(denominator.rounded()))"
+    }
+
+    /// Reads `dc:subject` items from a sibling `<stem>.xmp` sidecar. Returns
+    /// an empty array when the sidecar is absent or unparseable. Intentionally
+    /// lightweight — we only extract the one field the EXIF panel displays.
+    private static func readXMPKeywords(imagePath: String) -> [String] {
+        let url = URL(fileURLWithPath: imagePath).deletingPathExtension()
+            .appendingPathExtension("xmp")
+        guard let data = try? Data(contentsOf: url),
+              let xml = String(data: data, encoding: .utf8) else {
+            return []
+        }
+        // XMP `dc:subject` is an rdf:Bag of rdf:li strings. A narrow regex
+        // captures just the text between the opening <rdf:li …> and closing
+        // </rdf:li>, scoped to the first dc:subject block.
+        guard let subjectRange = xml.range(of: "<dc:subject>"),
+              let endRange = xml.range(of: "</dc:subject>", range: subjectRange.upperBound..<xml.endIndex) else {
+            return []
+        }
+        let block = String(xml[subjectRange.upperBound..<endRange.lowerBound])
+        let pattern = #"<rdf:li[^>]*>([^<]+)</rdf:li>"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+        let nsBlock = block as NSString
+        let matches = regex.matches(in: block, range: NSRange(location: 0, length: nsBlock.length))
+        return matches.map { xmlUnescape(nsBlock.substring(with: $0.range(at: 1))) }
+    }
+
+    private static func xmlUnescape(_ s: String) -> String {
+        var out = s
+        out = out.replacingOccurrences(of: "&apos;", with: "'")
+        out = out.replacingOccurrences(of: "&quot;", with: "\"")
+        out = out.replacingOccurrences(of: "&lt;",   with: "<")
+        out = out.replacingOccurrences(of: "&gt;",   with: ">")
+        out = out.replacingOccurrences(of: "&amp;",  with: "&")
+        return out
     }
 
     private static func describeMeteringMode(_ mode: Int?) -> String? {

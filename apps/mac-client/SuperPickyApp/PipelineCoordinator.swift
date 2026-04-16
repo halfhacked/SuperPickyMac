@@ -123,6 +123,9 @@ final class PipelineCoordinator {
                 folderPath: folder.path
             )
 
+            let startedAt = DispatchTime.now()
+            var pHashFromDecoded: UInt64?
+            var imageSize: (width: Int, height: Int)?
             do {
                 try await processOnePhoto(
                     &photo,
@@ -131,6 +134,8 @@ final class PipelineCoordinator {
                     exposureEnabled: exposureEnabled,
                     exposureThreshold: exposureThreshold,
                     flightDetectionEnabled: flightDetectionEnabled,
+                    pHashOut: &pHashFromDecoded,
+                    imageSizeOut: &imageSize
                 )
             } catch {
                 logger.error("Failed to process \(fileURL.lastPathComponent): \(error)")
@@ -144,13 +149,19 @@ final class PipelineCoordinator {
                 logger.error("Failed to save photo: \(error)")
             }
             processedCount += 1
+            let elapsedMs = Double(DispatchTime.now().uptimeNanoseconds - startedAt.uptimeNanoseconds) / 1_000_000
+            let species = photo.speciesCommonName ?? "unidentified"
+            let conf = photo.speciesConfidence.map { String(format: "%.2f", $0) } ?? "-"
+            let sizeStr = imageSize.map { "\($0.width)x\($0.height)" } ?? "-"
+            logger.info("processed \(fileURL.lastPathComponent, privacy: .public) size=\(sizeStr, privacy: .public) elapsed=\(String(format: "%.0f", elapsedMs), privacy: .public)ms stars=\(photo.starRating, privacy: .public) species=\(species, privacy: .public) conf=\(conf, privacy: .public)")
 
             // Incremental burst detection against the previous photo only.
             if burstDetectionEnabled {
                 let ts = timestampByPath[fileURL.path]
-                let pHash: UInt64? = ts.flatMap { _ in
-                    burstDetector.computePHash(filePath: fileURL.path)
-                }
+                // processOnePhoto computed pHash from the already-decoded
+                // RAW — no second CGImageSource open here. Only honour it
+                // when we also have a timestamp to compare against.
+                let pHash: UInt64? = ts != nil ? pHashFromDecoded : nil
 
                 let extendsBurst: Bool = {
                     guard let ts, let lt = lastTimestamp,
@@ -287,7 +298,19 @@ final class PipelineCoordinator {
         exposureEnabled: Bool,
         exposureThreshold: Float,
         flightDetectionEnabled: Bool,
+        pHashOut: inout UInt64?,
+        imageSizeOut: inout (width: Int, height: Int)?
     ) async throws {
+        // Single-read EXIF: one CGImageSource open powers the original
+        // image dimensions (logged for perf correlation), the ISO sharpness
+        // factor, and the focus-point weighting below.
+        let imageProps = ImageProperties.load(filePath: fileURL.path)
+        if let props = imageProps,
+           let w = props[kCGImagePropertyPixelWidth as String] as? Int,
+           let h = props[kCGImagePropertyPixelHeight as String] as? Int {
+            imageSizeOut = (w, h)
+        }
+
         // Single call: YOLO detect + OSEA species identify (with GPS/eBird
         // filtering if the filter is loaded). We ask for top-5 so the parity
         // harness can compare full top-5 overlap, not just top-1.
@@ -320,6 +343,9 @@ final class PipelineCoordinator {
 
         // Load 1280px thumbnail for aesthetics/keypoints/flight (fast, small payload)
         let image = try rawConverter.convert(fileURL: fileURL)
+        // Perceptual hash for the burst-similarity check — reuse the already
+        // decoded image instead of reopening the file for a 64px thumbnail.
+        pHashOut = BurstDetector.pHash(from: image)
 
         // Smart square crop with 15% padding + letterboxing, matching preen's
         // YOLOBirdDetector.detect_and_crop_bird. The flight / keypoint / OSEA
@@ -367,8 +393,10 @@ final class PipelineCoordinator {
             beakVis: keypoints.beak.visibility
         ) ?? TenengradSharpness.score(image: birdCrop) // fallback to full-crop
 
-        // ISO normalization: high ISO reduces sharpness (noise inflates gradients)
-        let exif = EXIFReader.read(from: fileURL.path)
+        // `imageProps` (loaded at the top) also feeds the ISO sharpness
+        // factor and the focus-point weighting below — one CGImageSource
+        // open per photo, reused by every downstream consumer.
+        let exif = imageProps.map { EXIFReader.parse(properties: $0, imagePath: fileURL.path) }
         let isoFactor = Self.isoSharpnessFactor(iso: exif?.iso)
         photo.sharpnessScore = headSharpness * isoFactor
 
@@ -398,15 +426,30 @@ final class PipelineCoordinator {
         let maskWidth = (maskSide * maskSide == bird.mask.count) ? maskSide : 0
         let maskHeight = maskWidth  // Square mask
 
-        let focusWeights = FocusPointDetector.computeWeights(
-            filePath: fileURL.path,
-            birdBbox: bird.bbox,
-            eyeCenter: bestEye,
-            headRadiusFraction: HeadSharpness.noBeakRadiusRatio,
-            segMask: segMask,
-            maskWidth: maskWidth,
-            maskHeight: maskHeight
-        )
+        let focusWeights: FocusPointDetector.FocusWeights = {
+            if let props = imageProps {
+                return FocusPointDetector.computeWeights(
+                    properties: props,
+                    birdBbox: bird.bbox,
+                    eyeCenter: bestEye,
+                    headRadiusFraction: HeadSharpness.noBeakRadiusRatio,
+                    segMask: segMask,
+                    maskWidth: maskWidth,
+                    maskHeight: maskHeight
+                )
+            }
+            // File was unreadable above; preserve original behavior and
+            // fall back to the file-path API which also returns `.unknown`.
+            return FocusPointDetector.computeWeights(
+                filePath: fileURL.path,
+                birdBbox: bird.bbox,
+                eyeCenter: bestEye,
+                headRadiusFraction: HeadSharpness.noBeakRadiusRatio,
+                segMask: segMask,
+                maskWidth: maskWidth,
+                maskHeight: maskHeight
+            )
+        }()
 
         let ratingResult = ratingEngine.calculate(
             detected: true,
