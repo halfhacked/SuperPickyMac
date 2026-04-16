@@ -121,6 +121,78 @@ import ImageIO
         #expect(data.keywords == ["Bird", "Eagle", "Wildlife"])
     }
 
+    @Test func readMergesKeywordsFromXMPSidecar() {
+        let stem = "xmp_sidecar_\(UUID().uuidString)"
+        let imagePath = NSTemporaryDirectory() + "EXIFReaderTests_\(stem).jpg"
+        let sidecarPath = NSTemporaryDirectory() + "EXIFReaderTests_\(stem).xmp"
+        defer {
+            try? FileManager.default.removeItem(atPath: imagePath)
+            try? FileManager.default.removeItem(atPath: sidecarPath)
+        }
+        createTestJPEG(
+            at: imagePath,
+            iptc: [kCGImagePropertyIPTCKeywords as String: ["Bird"]]
+        )
+        let xmp = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <x:xmpmeta xmlns:x="adobe:ns:meta/">
+              <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+                <rdf:Description xmlns:dc="http://purl.org/dc/elements/1.1/">
+                  <dc:subject>
+                    <rdf:Bag>
+                      <rdf:li>Anna&apos;s Hummingbird</rdf:li>
+                      <rdf:li>Calypte anna</rdf:li>
+                      <rdf:li>安氏蜂鸟</rdf:li>
+                      <rdf:li>Bird</rdf:li>
+                    </rdf:Bag>
+                  </dc:subject>
+                </rdf:Description>
+              </rdf:RDF>
+            </x:xmpmeta>
+            """
+        try? xmp.write(toFile: sidecarPath, atomically: true, encoding: .utf8)
+
+        let data = EXIFReader.read(from: imagePath)
+        #expect(data != nil)
+        // IPTC "Bird" first, then XMP items that aren't already in the list;
+        // duplicate "Bird" from XMP is de-duped, and "&apos;" is unescaped.
+        #expect(data!.keywords == [
+            "Bird",
+            "Anna's Hummingbird",
+            "Calypte anna",
+            "安氏蜂鸟",
+        ])
+    }
+
+    @Test func readXMPKeywordsWhenImageHasNoIPTC() {
+        let stem = "xmp_only_\(UUID().uuidString)"
+        let imagePath = NSTemporaryDirectory() + "EXIFReaderTests_\(stem).jpg"
+        let sidecarPath = NSTemporaryDirectory() + "EXIFReaderTests_\(stem).xmp"
+        defer {
+            try? FileManager.default.removeItem(atPath: imagePath)
+            try? FileManager.default.removeItem(atPath: sidecarPath)
+        }
+        createTestJPEG(at: imagePath)
+        let xmp = """
+            <?xml version="1.0"?>
+            <x:xmpmeta xmlns:x="adobe:ns:meta/">
+              <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+                <rdf:Description xmlns:dc="http://purl.org/dc/elements/1.1/">
+                  <dc:subject>
+                    <rdf:Bag>
+                      <rdf:li>Bald Eagle</rdf:li>
+                    </rdf:Bag>
+                  </dc:subject>
+                </rdf:Description>
+              </rdf:RDF>
+            </x:xmpmeta>
+            """
+        try? xmp.write(toFile: sidecarPath, atomically: true, encoding: .utf8)
+
+        let data = EXIFReader.read(from: imagePath)
+        #expect(data?.keywords == ["Bald Eagle"])
+    }
+
     @Test func shutterSpeedFormattingForLongExposure() {
         let path = tempPath("long_exposure.jpg")
         defer { try? FileManager.default.removeItem(atPath: path) }

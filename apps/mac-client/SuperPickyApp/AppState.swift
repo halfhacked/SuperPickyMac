@@ -63,7 +63,6 @@ final class AppState {
     var processingFolder: URL?
     var processingProgress: Double = 0
     var currentFolder: URL?
-
     var isProcessing: Bool { processingFolder != nil }
 
     var selectedPhoto: Photo? {
@@ -125,12 +124,15 @@ final class AppState {
         speciesEntries = SpeciesHierarchyBuilder.build(from: allPhotos)
     }
 
-    /// Incrementally append or replace a single processed photo. O(1) per call
-    /// (amortized over counts; species hierarchy is rebuilt, which is O(n)).
-    /// Used by the pipeline to reflect every photo in the UI as it is processed.
+    /// Incrementally append or replace a single processed photo. Incremental
+    /// species-hierarchy update keeps this O(k) (k = number of species seen
+    /// so far, typically 1–5) instead of the O(n) full rebuild that the
+    /// naive path used to run on every photo.
     func appendProcessedPhoto(_ photo: Photo) {
+        let oldPhoto: Photo?
         if let idx = allPhotos.firstIndex(where: { $0.id == photo.id }) {
             let old = allPhotos[idx]
+            oldPhoto = old
             allPhotos[idx] = photo
             ratingCounts[old.starRating, default: 0] -= 1
             if ratingCounts[old.starRating] == 0 { ratingCounts.removeValue(forKey: old.starRating) }
@@ -138,6 +140,7 @@ final class AppState {
             if old.isPick { picksCount -= 1 }
             photos.removeAll { $0.id == photo.id }
         } else {
+            oldPhoto = nil
             allPhotos.append(photo)
         }
 
@@ -145,14 +148,75 @@ final class AppState {
         if photo.isFlying { flyingCount += 1 }
         if photo.isPick { picksCount += 1 }
 
-        // Rebuild hierarchy — still O(n) in allPhotos but runs in-process with
-        // no DB round-trip. Kept live so the sidebar reflects species/bursts
-        // as photos arrive.
-        buildSpeciesHierarchy()
+        updateSpeciesHierarchy(removing: oldPhoto, adding: photo)
 
         if photoMatchesCurrentFilter(photo) {
             photos.append(photo)
         }
+    }
+
+    /// Incremental species-hierarchy update. Touches only the bucket(s)
+    /// affected by this single photo — adding 1 row to an existing entry
+    /// is constant work, not a full `SpeciesHierarchyBuilder.build` pass.
+    private func updateSpeciesHierarchy(removing old: Photo?, adding photo: Photo) {
+        // Burst reassignment across species is too subtle to get right
+        // incrementally (dominant species can flip). When either side
+        // touches a burst, fall back to a full rebuild — still O(n) in
+        // allPhotos but rare enough not to dominate.
+        if (old?.burstGroupID != nil) || (photo.burstGroupID != nil) {
+            buildSpeciesHierarchy()
+            return
+        }
+
+        if let old { remove(old) }
+        add(photo)
+        speciesEntries.sort {
+            if $0.isUnidentified != $1.isUnidentified { return $0.isUnidentified }
+            return $0.count > $1.count
+        }
+    }
+
+    private func add(_ photo: Photo) {
+        let hasSpecies = photo.speciesScientificName != nil
+        let name = photo.speciesCommonName ?? photo.speciesScientificName ?? String(localized: "Unidentified")
+        if let idx = speciesEntries.firstIndex(where: { $0.name == name }) {
+            let existing = speciesEntries[idx]
+            speciesEntries[idx] = SpeciesEntry(
+                name: existing.name,
+                cnName: existing.cnName ?? photo.speciesCnName,
+                count: existing.count + 1,
+                burstGroups: existing.burstGroups,
+                singlePhotos: existing.singlePhotos + 1,
+                isUnidentified: existing.isUnidentified
+            )
+        } else {
+            speciesEntries.append(SpeciesEntry(
+                name: name,
+                cnName: photo.speciesCnName,
+                count: 1,
+                burstGroups: [],
+                singlePhotos: 1,
+                isUnidentified: !hasSpecies
+            ))
+        }
+    }
+
+    private func remove(_ photo: Photo) {
+        let name = photo.speciesCommonName ?? photo.speciesScientificName ?? String(localized: "Unidentified")
+        guard let idx = speciesEntries.firstIndex(where: { $0.name == name }) else { return }
+        let existing = speciesEntries[idx]
+        if existing.count <= 1 && existing.burstGroups.isEmpty {
+            speciesEntries.remove(at: idx)
+            return
+        }
+        speciesEntries[idx] = SpeciesEntry(
+            name: existing.name,
+            cnName: existing.cnName,
+            count: max(0, existing.count - 1),
+            burstGroups: existing.burstGroups,
+            singlePhotos: max(0, existing.singlePhotos - 1),
+            isUnidentified: existing.isUnidentified
+        )
     }
 
     private func photoMatchesCurrentFilter(_ photo: Photo) -> Bool {

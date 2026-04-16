@@ -14,6 +14,7 @@ public struct SpeciesEntry: Sendable {
     public let scientificName: String
     public let englishName: String
     public let chineseName: String
+    public let pinyin: String?
 }
 
 public final class SpeciesDatabase: Sendable {
@@ -31,7 +32,7 @@ public final class SpeciesDatabase: Sendable {
         defer { sqlite3_close(db) }
 
         let sql = """
-            SELECT model_class_id, scientific_name, english_name, chinese_simplified
+            SELECT model_class_id, scientific_name, english_name, chinese_simplified, pinyin
             FROM BirdCountInfo
             WHERE model_class_id IS NOT NULL
         """
@@ -47,10 +48,14 @@ public final class SpeciesDatabase: Sendable {
             let scientific = String(cString: sqlite3_column_text(stmt, 1))
             let english    = String(cString: sqlite3_column_text(stmt, 2))
             let chinese    = String(cString: sqlite3_column_text(stmt, 3))
+            let pinyin: String? = sqlite3_column_type(stmt, 4) == SQLITE_NULL
+                ? nil
+                : String(cString: sqlite3_column_text(stmt, 4))
             dict[classID] = SpeciesEntry(classID: classID,
                                           scientificName: scientific,
                                           englishName: english,
-                                          chineseName: chinese)
+                                          chineseName: chinese,
+                                          pinyin: pinyin)
         }
         self.byClassID = dict
     }

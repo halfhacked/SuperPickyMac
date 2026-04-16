@@ -68,6 +68,33 @@ struct FocusPointDetector {
         )
     }
 
+    /// Variant that consumes a pre-loaded `CGImageSource` properties dict,
+    /// so the pipeline can open the file once per photo and fan the dict
+    /// out to every consumer (EXIFReader, this detector, …).
+    static func computeWeights(
+        properties: [String: Any],
+        birdBbox: CGRect,
+        eyeCenter: (x: Float, y: Float)?,
+        headRadiusFraction: Float,
+        segMask: Data? = nil,
+        maskWidth: Int = 0,
+        maskHeight: Int = 0
+    ) -> FocusWeights {
+        guard let focusResult = readFocusPoint(properties: properties) else {
+            return .unknown
+        }
+        return computeWeights(
+            focusPoint: (x: focusResult.x, y: focusResult.y),
+            isFocused: focusResult.isFocused,
+            birdBbox: birdBbox,
+            eyeCenter: eyeCenter,
+            headRadiusFraction: headRadiusFraction,
+            segMask: segMask,
+            maskWidth: maskWidth,
+            maskHeight: maskHeight
+        )
+    }
+
     // MARK: - Pure computation API (testable without files)
 
     /// Compute focus weights from pre-extracted focus point and bird geometry.
@@ -134,12 +161,12 @@ struct FocusPointDetector {
     /// Supports: Sony (SubjectArea), Nikon (MakerNote AF), generic SubjectArea.
     /// Returns nil when no AF data is available.
     static func readFocusPoint(filePath: String) -> FocusPointResult? {
-        let url = URL(fileURLWithPath: filePath) as CFURL
-        guard let source = CGImageSourceCreateWithURL(url, nil),
-              let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any] else {
-            return nil
-        }
+        guard let props = ImageProperties.load(filePath: filePath) else { return nil }
+        return readFocusPoint(properties: props)
+    }
 
+    /// Parse the focus point from a pre-loaded properties dict.
+    static func readFocusPoint(properties props: [String: Any]) -> FocusPointResult? {
         let pixelWidth = (props["PixelWidth"] as? Int) ?? 0
         let pixelHeight = (props["PixelHeight"] as? Int) ?? 0
 

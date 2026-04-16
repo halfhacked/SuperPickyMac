@@ -85,6 +85,9 @@ final class ReportDatabase: Sendable {
                 t.add(column: "birdBboxJSON", .text)
             }
         }
+        migrator.registerMigration("v6_drop_eye_sharpness") { db in
+            try db.execute(sql: "ALTER TABLE photos DROP COLUMN eyeSharpnessScore")
+        }
         try migrator.migrate(dbQueue)
     }
 
