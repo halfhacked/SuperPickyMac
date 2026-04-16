@@ -25,8 +25,7 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
     private let speciesFilter: SpeciesFilter?
     private let logger = Logger(subsystem: "com.superpicky.mac", category: "CoreMLInference")
 
-    // OSEA inference constants (match preen's osea_classifier.py)
-    private static let oseaTemperature: Float = 0.9
+    private static let oseaTemperature = InferenceConstants.oseaTemperature
     // Match preen: drop only near-zero noise; the user's birdIdConfidence
     // setting is applied by downstream UI/filters, not here.
     private static let oseaFloorProbability: Float = 0.003  // 0.3%

@@ -23,13 +23,21 @@ import Foundation
 import SQLite3
 import os
 
-public final class SpeciesFilter: Sendable {
+public final class SpeciesFilter: @unchecked Sendable {
 
-    private let avonetPath: URL
     private let ebirdBundle: Bundle
     /// Inverted map: eBird code ("mallar3") → OSEA class id (integer).
     private let classIDByEbirdCode: [String: Int]
     private let logger = Logger(subsystem: "com.superpicky.mac", category: "SpeciesFilter")
+
+    /// Long-lived SQLite handle. nil if the DB file wasn't present at init
+    /// (offline first-launch). SQLITE_OPEN_FULLMUTEX makes the connection
+    /// safe to share across threads — no extra locking needed.
+    private let avonetDB: OpaquePointer?
+
+    /// Cache of parsed eBird regional species sets. Empty set = cached miss.
+    private let ebirdCacheLock = NSLock()
+    private var ebirdCache: [String: Set<Int>] = [:]
 
     /// - Parameters:
     ///   - avonetPath: Path to the Avonet SQLite DB (downloaded via
@@ -39,9 +47,23 @@ public final class SpeciesFilter: Sendable {
     ///     under Resources/ebird/. Defaults to the SuperPickyInference
     ///     framework bundle.
     public init(avonetPath: URL, ebirdBundle: Bundle = .inferenceModule) throws {
-        self.avonetPath = avonetPath
         self.ebirdBundle = ebirdBundle
         self.classIDByEbirdCode = try Self.loadClassIDMapping(from: ebirdBundle)
+
+        var db: OpaquePointer?
+        if FileManager.default.fileExists(atPath: avonetPath.path) {
+            let rc = sqlite3_open_v2(avonetPath.path, &db,
+                                     SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX, nil)
+            if rc != SQLITE_OK {
+                sqlite3_close(db)
+                db = nil
+            }
+        }
+        self.avonetDB = db
+    }
+
+    deinit {
+        if let avonetDB { sqlite3_close(avonetDB) }
     }
 
     // MARK: - Public API
@@ -62,17 +84,7 @@ public final class SpeciesFilter: Sendable {
     // MARK: - Avonet SQLite query
 
     private func queryAvonet(lat: Double, lon: Double) -> Set<Int>? {
-        guard FileManager.default.fileExists(atPath: avonetPath.path) else {
-            return nil
-        }
-        var db: OpaquePointer?
-        guard sqlite3_open_v2(avonetPath.path, &db,
-                              SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK,
-              let db else {
-            logger.error("Avonet open failed at \(self.avonetPath.path, privacy: .public)")
-            return nil
-        }
-        defer { sqlite3_close(db) }
+        guard let db = avonetDB else { return nil }
 
         // Same query as AvonetSpeciesFilter.get_species_by_gps.
         let sql = """
@@ -101,6 +113,21 @@ public final class SpeciesFilter: Sendable {
     // MARK: - eBird JSON fallback
 
     private func loadEbirdSpecies(regionCode: String) -> Set<Int>? {
+        ebirdCacheLock.lock()
+        if let cached = ebirdCache[regionCode] {
+            ebirdCacheLock.unlock()
+            return cached.isEmpty ? nil : cached
+        }
+        ebirdCacheLock.unlock()
+
+        let parsed = parseEbirdSpeciesUncached(regionCode: regionCode) ?? []
+        ebirdCacheLock.lock()
+        ebirdCache[regionCode] = parsed
+        ebirdCacheLock.unlock()
+        return parsed.isEmpty ? nil : parsed
+    }
+
+    private func parseEbirdSpeciesUncached(regionCode: String) -> Set<Int>? {
         guard let url = ebirdBundle.url(forResource: "species_list_\(regionCode)",
                                          withExtension: "json",
                                          subdirectory: "ebird") else {

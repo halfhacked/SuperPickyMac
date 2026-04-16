@@ -1,11 +1,12 @@
 import Foundation
 import CoreGraphics
 import Accelerate
+import SuperPickyInference
 
 /// Head-region sharpness using circular mask around eye + Tenengrad.
 /// Ported from superpicky's `_calculate_head_sharpness` in keypoint_detector.py.
 struct HeadSharpness {
-    static let visibilityThreshold: Float = 0.3
+    static let visibilityThreshold = InferenceConstants.keypointVisibilityThreshold
     static let radiusMultiplier: Float = 1.2
     static let noBeakRadiusRatio: Float = 0.15
     static let lowVisPenalty: Float = 0.8

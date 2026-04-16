@@ -20,10 +20,7 @@ import Foundation
 public final class KeypointModel: @unchecked Sendable {
 
     private let model: MLModel
-    public static let imageSize = 416
-
-    private static let mean: [Float] = [0.485, 0.456, 0.406]
-    private static let std:  [Float] = [0.229, 0.224, 0.225]
+    public static let imageSize = InferenceConstants.keypointInputSize
 
     // MARK: - Init
 
@@ -103,14 +100,16 @@ public final class KeypointModel: @unchecked Sendable {
         let rOff = 0 * size * size
         let gOff = 1 * size * size
         let bOff = 2 * size * size
+        let mean = InferenceConstants.imageNetMean
+        let std = InferenceConstants.imageNetStd
 
         for i in 0..<(size * size) {
             let r = Float(rgba[i * bytesPerPixel + 0]) / 255.0
             let g = Float(rgba[i * bytesPerPixel + 1]) / 255.0
             let b = Float(rgba[i * bytesPerPixel + 2]) / 255.0
-            ptr[rOff + i] = (r - mean[0]) / std[0]
-            ptr[gOff + i] = (g - mean[1]) / std[1]
-            ptr[bOff + i] = (b - mean[2]) / std[2]
+            ptr[rOff + i] = (r - mean.x) / std.x
+            ptr[gOff + i] = (g - mean.y) / std.y
+            ptr[bOff + i] = (b - mean.z) / std.z
         }
         return inputArray
     }

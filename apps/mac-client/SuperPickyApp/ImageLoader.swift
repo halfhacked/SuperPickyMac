@@ -9,7 +9,6 @@ enum ImageLoader {
     /// Uses embedded preview for speed (IfAbsent), or full decode for full-res.
     static func load(path: String, maxPixelSize: Int? = nil) async -> NSImage? {
         let url = URL(fileURLWithPath: path)
-        guard FileManager.default.fileExists(atPath: path) else { return nil }
 
         return await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {

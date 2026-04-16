@@ -26,14 +26,10 @@ import os
 public final class OSEAClassifier: @unchecked Sendable {
 
     // MARK: - Constants (match osea_classifier.py)
-    public static let resizeSize = 256       // Resize shorter side to this
-    public static let cropSize = 224         // Center crop to this
-    public static let numClasses = 10964     // Valid OSEA classes (out of 11000 output)
-    public static let outputDim = 11000      // Full model output dimension
-
-    // ImageNet normalization (matches osea_classifier.py CENTER_CROP_TRANSFORM)
-    private static let mean: [Float] = [0.485, 0.456, 0.406]
-    private static let std:  [Float] = [0.229, 0.224, 0.225]
+    public static let resizeSize = 256
+    public static let cropSize = InferenceConstants.oseaInputSize
+    public static let numClasses = InferenceConstants.oseaNumClasses
+    public static let outputDim = 11000
 
     private static let outputName = "var_602"
 
@@ -91,26 +87,15 @@ public final class OSEAClassifier: @unchecked Sendable {
     static func preprocess(image: CGImage, isYOLOCropped: Bool = false) throws -> MLMultiArray {
         let cropped: CGImage
         if isYOLOCropped {
-            cropped = try directResize(image: image, targetSize: cropSize)
+            guard let resized = image.resized(to: CGSize(width: cropSize, height: cropSize)) else {
+                throw OSEAError.preprocessingFailed
+            }
+            cropped = resized
         } else {
             let resized = try resizeShorterSide(image: image, targetShortSide: resizeSize)
             cropped = try centerCrop(image: resized, cropSize: cropSize)
         }
         return try normalizeToMLMultiArray(image: cropped)
-    }
-
-    /// Direct resize to `targetSize × targetSize` (preserves all pixels, loses aspect ratio).
-    private static func directResize(image: CGImage, targetSize: Int) throws -> CGImage {
-        guard let ctx = CGContext(
-            data: nil, width: targetSize, height: targetSize,
-            bitsPerComponent: 8, bytesPerRow: targetSize * 4,
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else { throw OSEAError.preprocessingFailed }
-        ctx.interpolationQuality = CGInterpolationQuality.high
-        ctx.draw(image, in: CGRect(x: 0, y: 0, width: targetSize, height: targetSize))
-        guard let result = ctx.makeImage() else { throw OSEAError.preprocessingFailed }
-        return result
     }
 
     /// Resize the image so the shorter side equals `targetShortSide`, maintaining aspect ratio.
@@ -167,14 +152,16 @@ public final class OSEAClassifier: @unchecked Sendable {
                                      dataType: .float32)
         let ptr = array.dataPointer.bindMemory(to: Float.self, capacity: 3 * size * size)
         let channelStride = size * size
+        let mean = InferenceConstants.imageNetMean
+        let std = InferenceConstants.imageNetStd
 
         for i in 0..<(size * size) {
             let r = Float(pixels[i * 4 + 0]) / 255.0
             let g = Float(pixels[i * 4 + 1]) / 255.0
             let b = Float(pixels[i * 4 + 2]) / 255.0
-            ptr[0 * channelStride + i] = (r - mean[0]) / std[0]
-            ptr[1 * channelStride + i] = (g - mean[1]) / std[1]
-            ptr[2 * channelStride + i] = (b - mean[2]) / std[2]
+            ptr[0 * channelStride + i] = (r - mean.x) / std.x
+            ptr[1 * channelStride + i] = (g - mean.y) / std.y
+            ptr[2 * channelStride + i] = (b - mean.z) / std.z
         }
         return array
     }

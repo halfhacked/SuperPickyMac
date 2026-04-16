@@ -25,10 +25,10 @@ import os
 public final class YOLOBirdDetector: @unchecked Sendable {
 
     // MARK: - Constants (match ultralytics defaults + COCO class map)
-    public static let imageSize = 640
-    public static let birdClassID = 14       // COCO class index for "bird"
-    public static let confThreshold: Float = 0.25
-    public static let nmsIoUThreshold: Float = 0.45
+    public static let imageSize = InferenceConstants.yoloInputSize
+    public static let birdClassID = InferenceConstants.yoloBirdClassID
+    public static let confThreshold = InferenceConstants.yoloConfThreshold
+    public static let nmsIoUThreshold = InferenceConstants.yoloNMSThreshold
 
     private static let numClasses = 80
     private static let numMaskCoefs = 32
