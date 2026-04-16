@@ -60,77 +60,32 @@ The runner exits 0 on all-green, 1 if any model breaches its tolerance,
 
 ## Observed baseline
 
-Running the harness on `real-photos/` (93 of a 156-photo RAW set —
-26 Bald Eagles on poles including one 11-frame takeoff burst, and
-65 Common Loons on water) on the current `main`:
+Running the harness on 106 photos from `real-photos/` (a 156-photo
+RAW set of 26 Bald Eagles including one 11-frame takeoff burst, and
+Common Loons on water) on the current `main`:
 
-### Flight (EfficientNet-B3 binary classifier)
+| Model | Metric | Python | Swift | Δ / Agreement | Tolerance | Status |
+|---|---|---|---|---|---|---|
+| **Flight** | Photos classified flying | 12/106 (11.3%) | 11/106 (10.4%) | 105/106 agree (**99.1%**) | ≥ 95% | PASS |
+| **Flight** | Mean `flightConfidence` (flying) | 0.961 | 0.976 | p95 Δ = **0.161** | < 0.20 | PASS |
+| **YOLO** | Birds detected | 104/106 | 104/106 | 2/106 presence disagree (**1.9%**) | < 3% | PASS |
+| **YOLO** | Mean `birdConfidence` | 0.888 | 0.897 | p95 Δ = **0.133** | < 0.25 | PASS |
+| **Species** | Top-1 matches (both ID'd) | 104 | 104 | 104/104 (**100.0%**) | ≥ 90% | PASS |
+| **Species** | Mean `speciesConfidence` on matches | 0.916 | 0.923 | p95 Δ = **0.063** | < 0.20 | PASS |
+| **Keypoints** | Mean `rightEyeVis` | 0.884 | 0.862 | coord p95 Δ = **0.040** | < 0.08 | PASS |
+| **Keypoints** | Mean `beakVis` | 0.957 | 0.953 | vis p95 Δ = **0.039** | < 0.15 | PASS |
+| **Aesthetics** | Mean MOS | 4.95 | 4.92 | p50/p95/max = 0.04 / **0.11** / **0.15** | p95 < 0.5, max < 1.0 | PASS |
 
-| Metric                              | Python     | Swift      | Δ / match         |
-|-------------------------------------|------------|------------|-------------------|
-| Photos classified as flying         | 12/93 (13%)| 11/93 (12%)| —                 |
-| Mean `flightConfidence` (all)       | 0.168      | 0.204      | —                 |
-| Mean `flightConfidence` (flying)    | 0.961      | 0.976      | —                 |
-| Decision agreement                  | —          | —          | 92/93 (98.9%)     |
-| Confidence Δ on matching decisions  | —          | —          | p95 = 0.167       |
+Species top-1 distribution (same on both sides): Common Loon 78,
+Bald Eagle 26, none 2. Left-eye visibility is low on both sides
+(Python 0.048, Swift 0.037) because most photos in the set show
+profile views of the bird where only the right eye is visible.
 
-### YOLO (yolo11l-seg, COCO class 14 = bird)
-
-| Metric                     | Python   | Swift    | Δ / match                |
-|----------------------------|----------|----------|--------------------------|
-| Birds detected             | 91/93    | 91/93    | presence disagree 2/93   |
-| Mean `birdConfidence`      | 0.885    | 0.895    | p95 Δ = 0.135            |
-
-### Species (OSEA ResNet34, 10 964 classes)
-
-| Metric                              | Python | Swift | Δ / match      |
-|-------------------------------------|--------|-------|----------------|
-| Top-1 species = "Common Loon"       | 65     | 65    | —              |
-| Top-1 species = "Bald Eagle"        | 26     | 26    | —              |
-| Top-1 species = none (YOLO miss)    | 2      | 2     | —              |
-| Top-1 agreement (both identified)   | —      | —     | 91/91 (100.0%) |
-| Mean `speciesConfidence` on matches | 0.916  | 0.921 | p95 Δ = 0.119  |
-
-### Keypoints (ResNet50 PartLocalizer)
-
-| Metric                           | Python | Swift | Δ / match                    |
-|----------------------------------|--------|-------|------------------------------|
-| Mean `leftEyeVis`                | 0.055  | 0.043 | —                            |
-| Mean `rightEyeVis`               | 0.869  | 0.844 | —                            |
-| Mean `beakVis`                   | 0.952  | 0.948 | —                            |
-| Coord Δ (x, y across 6 values)   | —      | —     | p95 = 0.043, max = 0.138     |
-| Visibility Δ                     | —      | —     | p95 = 0.050                  |
-
-(`leftEyeVis` is low because most photos in the test set show a
-profile view of the bird with only the right eye visible — the mean
-is dominated by the low values for the hidden-side eye.)
-
-### Aesthetics (CFANet / TOPIQ)
-
-| Metric     | Python | Swift | Δ / match                           |
-|------------|--------|-------|-------------------------------------|
-| Mean MOS   | 4.98   | 4.95  | —                                   |
-| MOS Δ      | —      | —     | p50 = 0.04, p95 = 0.12, max = 0.15  |
-
-## Tolerances
-
-| Model      | Primary metric                                  | Tolerance              |
-|------------|--------------------------------------------------|------------------------|
-| Flight     | `isFlying` decision agreement                    | ≥ 95 %                 |
-| Flight     | `flightConfidence` Δ on matching decisions (p95) | < 0.20                 |
-| YOLO       | presence disagreement (one side found a bird)    | < 3 %                  |
-| YOLO       | `birdConfidence` Δ (p95)                          | < 0.25                 |
-| Species    | Top-1 `speciesScientificName` exact match        | ≥ 90 %                 |
-| Species    | `speciesConfidence` Δ on matches (p95)           | < 0.20                 |
-| Keypoints  | Any (x, y) coord Δ (p95)                          | < 0.08                 |
-| Keypoints  | Visibility Δ (p95)                                | < 0.15                 |
-| Aesthetics | MOS Δ (p95) / (max)                               | < 0.5 / < 1.0          |
-
-Tolerances live in `diff_python_vs_swift.py` as constants. Adjust based
-on observed deltas — the rule of thumb is: catch regressions wider
-than fp16 jitter, don't fail on it. When loosening, record the
-observed p50/p95/max so a future reader knows why the number was
-chosen.
+Tolerances live in `diff_python_vs_swift.py` as constants. Adjust
+based on observed deltas — the rule of thumb is: catch regressions
+wider than fp16 jitter, don't fail on it. When loosening, record
+the observed p50/p95/max so a future reader knows why the number
+was chosen.
 
 ## When to run
 
