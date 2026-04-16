@@ -125,6 +125,64 @@ final class AppState {
         speciesEntries = SpeciesHierarchyBuilder.build(from: allPhotos)
     }
 
+    /// Incrementally append or replace a single processed photo. O(1) per call
+    /// (amortized over counts; species hierarchy is rebuilt, which is O(n)).
+    /// Used by the pipeline to reflect every photo in the UI as it is processed.
+    func appendProcessedPhoto(_ photo: Photo) {
+        if let idx = allPhotos.firstIndex(where: { $0.id == photo.id }) {
+            let old = allPhotos[idx]
+            allPhotos[idx] = photo
+            ratingCounts[old.starRating, default: 0] -= 1
+            if ratingCounts[old.starRating] == 0 { ratingCounts.removeValue(forKey: old.starRating) }
+            if old.isFlying { flyingCount -= 1 }
+            if old.isPick { picksCount -= 1 }
+            photos.removeAll { $0.id == photo.id }
+        } else {
+            allPhotos.append(photo)
+        }
+
+        ratingCounts[photo.starRating, default: 0] += 1
+        if photo.isFlying { flyingCount += 1 }
+        if photo.isPick { picksCount += 1 }
+
+        // Rebuild hierarchy — still O(n) in allPhotos but runs in-process with
+        // no DB round-trip. Kept live so the sidebar reflects species/bursts
+        // as photos arrive.
+        buildSpeciesHierarchy()
+
+        if photoMatchesCurrentFilter(photo) {
+            photos.append(photo)
+        }
+    }
+
+    private func photoMatchesCurrentFilter(_ photo: Photo) -> Bool {
+        switch sidebarSelection {
+        case .folder, nil:
+            return true
+        case .rating(let rating):
+            return photo.starRating == rating
+        case .flying:
+            return photo.isFlying
+        case .picks:
+            return photo.isPick
+        case .species(let name):
+            let isUnidentified = speciesEntries.first { $0.name == name }?.isUnidentified ?? false
+            if isUnidentified {
+                return photo.speciesScientificName == nil
+            }
+            return photo.speciesCommonName == name || photo.speciesScientificName == name
+        case .burstGroup(let groupID):
+            return photo.burstGroupID == groupID
+        case .singles(let speciesName):
+            guard photo.burstGroupID == nil else { return false }
+            let isUnidentified = speciesEntries.first { $0.name == speciesName }?.isUnidentified ?? false
+            if isUnidentified {
+                return photo.speciesScientificName == nil
+            }
+            return photo.speciesCommonName == speciesName || photo.speciesScientificName == speciesName
+        }
+    }
+
     /// Clear all photo data (when folder is removed).
     func clearPhotos() {
         allPhotos = []
