@@ -40,6 +40,8 @@ targets:
         buildPhase: resources
       - path: SuperPickyInference/Resources/Models/AestheticsModel.mlmodelc
         buildPhase: resources
+      - path: SuperPickyInference/Resources/ebird
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.superpicky.SuperPickyInference

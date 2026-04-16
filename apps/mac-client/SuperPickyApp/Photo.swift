@@ -34,6 +34,13 @@ struct Photo: Identifiable, Codable, Sendable, FetchableRecord, PersistableRecor
     var isBurstBest: Bool
     var isManualRating: Bool
 
+    // Parity-harness fields: persisted by PipelineCoordinator but not shown
+    // in the UI. All JSON-encoded strings so we don't need typed columns
+    // for variable-length payloads (top-5 list, 10-bin distribution, bbox).
+    var speciesTop5JSON: String?
+    var aestheticsDistributionJSON: String?
+    var birdBboxJSON: String?
+
     static let databaseTableName = "photos"
 
     init(id: UUID = UUID(), filename: String, filePath: String, folderPath: String, dateCreated: Date = Date()) {

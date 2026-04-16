@@ -36,6 +36,9 @@ let package = Package(
                 .copy("Resources/Models/YOLOBirdDetector.mlmodelc"),
                 .copy("Resources/Models/OSEAClassifier.mlmodelc"),
                 .copy("Resources/Models/AestheticsModel.mlmodelc"),
+                // Offline eBird country/region species lists (~1.8 MB)
+                // used by SpeciesFilter for GPS-based OSEA candidate filtering.
+                .copy("Resources/ebird"),
             ]
         ),
         .executableTarget(
