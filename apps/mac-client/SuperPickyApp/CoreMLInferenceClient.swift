@@ -101,19 +101,18 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
         // 2. YOLO detect
         let detections = try yolo.predict(image: image)
 
-        // 3. For each bird, crop → OSEA (YOLO-crop mode) → top species
+        // 3. For each bird, smart-square crop → OSEA → top species.
+        //    Use the same 15%-padding + letterbox semantics as preen so OSEA
+        //    sees exactly the crop it was trained on.
         var speciesMatches: [SpeciesMatch] = []
-        let imgW = CGFloat(image.width), imgH = CGFloat(image.height)
 
         for det in detections {
-            let cropRect = CGRect(
-                x: CGFloat(det.x1) * imgW,
-                y: CGFloat(det.y1) * imgH,
-                width: CGFloat(det.x2 - det.x1) * imgW,
-                height: CGFloat(det.y2 - det.y1) * imgH
+            let normalizedBBox = CGRect(
+                x: CGFloat(det.x1), y: CGFloat(det.y1),
+                width: CGFloat(det.x2 - det.x1), height: CGFloat(det.y2 - det.y1)
             )
-            guard cropRect.width > 10, cropRect.height > 10,
-                  let crop = image.cropping(to: cropRect) else { continue }
+            guard let crop = image.smartSquareBirdCrop(bbox: normalizedBBox) else { continue }
+            guard crop.width > 10, crop.height > 10 else { continue }
 
             // 4. OSEA logits with YOLO-crop preprocessing (direct resize, not center crop)
             let logits = try osea.logits(image: crop, isYOLOCropped: true, useTTA: true)
