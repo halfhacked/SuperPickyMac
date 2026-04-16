@@ -70,5 +70,4 @@ struct MockInferenceClientForUI: InferenceClient {
         )
         return IdentifyResponse(species: [species], birds: [bird], totalDetected: 1)
     }
-    func healthCheck() async throws -> ServerHealth { ServerHealth(status: "ready", modelsLoaded: [], device: "cpu", version: "1.0.0") }
 }

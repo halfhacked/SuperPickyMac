@@ -8,7 +8,6 @@
 "Auto-advance after rating" = "Auto-advance after rating";
 "Average" = "Average";
 "AviList v2025" = "AviList v2025";
-"Backend" = "Backend";
 "Below Average" = "Below Average";
 "Bird ID" = "Bird ID";
 "BirdLife International v9" = "BirdLife International v9";
@@ -80,7 +79,6 @@
 "Processing" = "Processing";
 "Processing complete!" = "Processing complete!";
 "Processing settings will appear here." = "Processing settings will appear here.";
-"Python server port" = "Python server port";
 "Quit" = "Quit";
 "Rating ≥ %lld (⌘0 to reset)" = "Rating ≥ %lld (⌘0 to reset)";
 "Ratings" = "Ratings";
@@ -158,7 +156,6 @@
 "Select a processed photo" = "Select a processed photo";
 "This photo:" = "This photo:";
 "Not measured" = "Not measured";
-"Port" = "Port";
 "Delete Photo?" = "Delete Photo?";
 "Move to Trash?" = "Move to Trash?";
 "Export All Visible" = "Export All Visible";
@@ -179,7 +176,3 @@
 "Zoom locked (click to unlock)" = "Zoom locked (click to unlock)";
 "Lock zoom (sync both panels)" = "Lock zoom (sync both panels)";
 "Unknown" = "Unknown";
-"Inference Backend" = "Inference Backend";
-"HTTP (Python server)" = "HTTP (Python server)";
-"Native Core ML" = "Native Core ML";
-"Native Core ML backend will be available in a future release." = "Native Core ML backend will be available in a future release.";

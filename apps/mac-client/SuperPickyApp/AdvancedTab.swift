@@ -71,21 +71,6 @@ struct AdvancedTab: View {
                     }
                 }
             }
-            Section(config.localized("Backend")) {
-                HStack {
-                    Text(config.localized("Python server port"))
-                    TextField(config.localized("Port"), value: $config.backendPort, format: .number)
-                        .frame(width: 80)
-                }
-            }
-            Section(config.localized("Inference Backend")) {
-                Picker(config.localized("Inference Backend"), selection: $config.inferenceBackend) {
-                    Text(config.localized("HTTP (Python server)")).tag(InferenceBackend.http)
-                    Text(config.localized("Native Core ML")).tag(InferenceBackend.native)
-                }
-                .pickerStyle(.inline)
-                .labelsHidden()
-            }
         }
         .formStyle(.grouped)
     }
