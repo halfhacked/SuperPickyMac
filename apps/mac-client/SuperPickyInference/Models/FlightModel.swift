@@ -18,11 +18,7 @@ import CoreGraphics
 public final class FlightModel: @unchecked Sendable {
 
     private let model: MLModel
-    public static let imageSize = 384
-
-    // ImageNet normalization constants (torchvision defaults — must match convert_flight.py)
-    private static let mean: [Float] = [0.485, 0.456, 0.406]
-    private static let std:  [Float] = [0.229, 0.224, 0.225]
+    public static let imageSize = InferenceConstants.flightInputSize
 
     // MARK: - Init
 
@@ -93,14 +89,16 @@ public final class FlightModel: @unchecked Sendable {
         let rOffset = 0 * size * size
         let gOffset = 1 * size * size
         let bOffset = 2 * size * size
+        let mean = InferenceConstants.imageNetMean
+        let std = InferenceConstants.imageNetStd
 
         for i in 0..<(size * size) {
             let r = Float(rgba[i * bytesPerPixel + 0]) / 255.0
             let g = Float(rgba[i * bytesPerPixel + 1]) / 255.0
             let b = Float(rgba[i * bytesPerPixel + 2]) / 255.0
-            ptr[rOffset + i] = (r - mean[0]) / std[0]
-            ptr[gOffset + i] = (g - mean[1]) / std[1]
-            ptr[bOffset + i] = (b - mean[2]) / std[2]
+            ptr[rOffset + i] = (r - mean.x) / std.x
+            ptr[gOffset + i] = (g - mean.y) / std.y
+            ptr[bOffset + i] = (b - mean.z) / std.z
         }
 
         return inputArray

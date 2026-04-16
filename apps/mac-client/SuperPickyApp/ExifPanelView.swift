@@ -209,29 +209,17 @@ struct ExifPanelView: View {
     }
 
     private func formatDate(_ raw: String) -> String {
-        // "2025:03:15 07:30:22" → "Mar 15, 2025  07:30"
-        let parts = raw.split(separator: " ")
-        guard let datePart = parts.first else { return raw }
-        let dateComponents = datePart.split(separator: ":")
-        guard dateComponents.count == 3,
-              let year = Int(dateComponents[0]),
-              let month = Int(dateComponents[1]),
-              let day = Int(dateComponents[2]) else { return raw }
+        // EXIF "yyyy:MM:dd HH:mm:ss" → localized medium date + short time.
+        let parser = DateFormatter()
+        parser.dateFormat = "yyyy:MM:dd HH:mm:ss"
+        parser.locale = Locale(identifier: "en_US_POSIX")
+        guard let date = parser.date(from: raw) else { return raw }
 
-        let months = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-        let monthName = month >= 1 && month <= 12 ? months[month] : "\(month)"
-
-        var result = "\(monthName) \(day), \(year)"
-        if parts.count > 1 {
-            let time = String(parts[1])
-            // Drop seconds: "07:30:22" → "07:30"
-            let timeParts = time.split(separator: ":")
-            if timeParts.count >= 2 {
-                result += "  \(timeParts[0]):\(timeParts[1])"
-            }
-        }
-        return result
+        let display = DateFormatter()
+        display.locale = config.appLanguage.locale
+        display.dateStyle = .medium
+        display.timeStyle = .short
+        return display.string(from: date)
     }
 
     private func formatLocation(_ data: EXIFData) -> String? {
