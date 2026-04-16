@@ -27,9 +27,11 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
     private let aestheticsModel: AestheticsModel?
     private let logger = Logger(subsystem: "com.superpicky.mac", category: "CoreMLInference")
 
-    // OSEA inference constants (match osea_classifier.py)
+    // OSEA inference constants (match preen's osea_classifier.py)
     private static let oseaTemperature: Float = 0.9
-    private static let oseaGlobalThreshold: Float = 0.90   // 90% confidence required
+    // Match preen: drop only near-zero noise; the user's birdIdConfidence
+    // setting is applied by downstream UI/filters, not here.
+    private static let oseaFloorProbability: Float = 0.003  // 0.3%
 
     init(flightModel: FlightModel, keypointModel: KeypointModel,
          yoloModel: YOLOBirdDetector? = nil,
@@ -99,7 +101,7 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
         // 2. YOLO detect
         let detections = try yolo.predict(image: image)
 
-        // 3. For each bird, crop → OSEA → top species
+        // 3. For each bird, crop → OSEA (YOLO-crop mode) → top species
         var speciesMatches: [SpeciesMatch] = []
         let imgW = CGFloat(image.width), imgH = CGFloat(image.height)
 
@@ -113,20 +115,22 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
             guard cropRect.width > 10, cropRect.height > 10,
                   let crop = image.cropping(to: cropRect) else { continue }
 
-            // 4. OSEA logits (TTA on)
-            let logits = try osea.logits(image: crop, useTTA: true)
+            // 4. OSEA logits with YOLO-crop preprocessing (direct resize, not center crop)
+            let logits = try osea.logits(image: crop, isYOLOCropped: true, useTTA: true)
             let validLogits = Array(logits.prefix(OSEAClassifier.numClasses))
 
             // 5. Softmax with temperature=0.9
             let probs = Self.softmax(logits: validLogits, temperature: Self.oseaTemperature)
 
-            // 6. Top-k species (global threshold: 90%)
+            // 6. Best species for this detection — walk top-K in case the top
+            //    prediction's classID isn't in the DB (don't break on a missing
+            //    entry, just try the next candidate).
             let topK_probs = probs.enumerated()
                 .sorted { $0.element > $1.element }
                 .prefix(topK)
 
             for (classID, prob) in topK_probs {
-                guard prob >= Self.oseaGlobalThreshold else { break }
+                guard prob >= Self.oseaFloorProbability else { break }
                 guard let entry = db.lookup(classID: classID) else { continue }
                 speciesMatches.append(SpeciesMatch(
                     scientificName: entry.scientificName,
@@ -136,7 +140,7 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
                     pinyin: nil,
                     thresholdUsed: "global"
                 ))
-                break  // One species match per bird detection
+                break  // one match per detection
             }
         }
 

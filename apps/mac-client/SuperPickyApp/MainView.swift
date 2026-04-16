@@ -293,10 +293,12 @@ struct MainView: View {
                         if pipeline.totalCount > 0 {
                             appState.processingProgress = Double(pipeline.processedCount) / Double(pipeline.totalCount)
                         }
-                        // Reload UI every 5 photos to avoid jarring per-photo re-renders
-                        // Skip hierarchy rebuild during incremental updates (perf: avoids O(n²))
+                        // Reload UI every 5 photos. The species-hierarchy rebuild
+                        // is O(n) over allPhotos and cheap enough to run live so
+                        // the sidebar reflects newly-identified species as they
+                        // come in instead of only at the end of processing.
                         if pipeline.processedCount % 5 == 0 {
-                            appState.loadPhotos(for: folder, skipHierarchy: true)
+                            appState.loadPhotos(for: folder)
                         }
                     }
                 }
