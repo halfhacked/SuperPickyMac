@@ -154,7 +154,6 @@ private struct StubInferenceClient: InferenceClient {
     func identify(filePath: String, topK: Int) async throws -> IdentifyResponse {
         IdentifyResponse(species: [], birds: identifyBirds, totalDetected: identifyBirds.count)
     }
-    func healthCheck() async throws -> ServerHealth { ServerHealth(status: "ready", modelsLoaded: [], device: "cpu", version: "1.0.0") }
 }
 
 private struct SlowInferenceClient: InferenceClient {
@@ -173,5 +172,4 @@ private struct SlowInferenceClient: InferenceClient {
         try await Task.sleep(for: .milliseconds(100))
         return IdentifyResponse(species: [], birds: [], totalDetected: 0)
     }
-    func healthCheck() async throws -> ServerHealth { ServerHealth(status: "ready", modelsLoaded: [], device: "cpu", version: "1.0.0") }
 }

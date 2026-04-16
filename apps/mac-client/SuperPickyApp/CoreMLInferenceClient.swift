@@ -1,7 +1,4 @@
-// CoreMLInferenceClient.swift
-//
-// Implements InferenceClient using native CoreML model wrappers.
-// All five inference endpoints run on-device — no Python server required.
+// InferenceClient implementation backed by native CoreML model wrappers.
 //
 // Lives in SuperPickyApp (not SuperPickyInference) because InferenceClient
 // is declared in SuperPickyApp — placing this in SuperPickyInference would
@@ -212,22 +209,6 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
         }
         let (mos, distribution) = try model.score(image: image)
         return AestheticsResponse(score: mos, distribution: distribution)
-    }
-
-    // MARK: - Health check
-
-    func healthCheck() async throws -> ServerHealth {
-        var models = ["flight-coreml", "keypoint-coreml"]
-        if yoloModel != nil       { models.append("yolo-coreml") }
-        if oseaModel != nil       { models.append("osea-coreml") }
-        if aestheticsModel != nil { models.append("aesthetics-coreml") }
-        if speciesFilter != nil   { models.append("species-filter") }
-        return ServerHealth(
-            status: "ready",
-            modelsLoaded: models,
-            device: "coreml",
-            version: "native-phase5"
-        )
     }
 
     // MARK: - Softmax helper
