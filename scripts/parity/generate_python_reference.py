@@ -21,9 +21,7 @@ import argparse
 import datetime as dt
 import json
 import logging
-import os
 import sys
-import tempfile
 import time
 from pathlib import Path
 
@@ -35,7 +33,8 @@ SUPERPICKY = Path.home() / "projects" / "SuperPicky"
 sys.path.insert(0, str(SUPERPICKY))
 sys.path.insert(0, str(SUPERPICKY / "birdid"))
 
-from birdid.bird_identifier import YOLOBirdDetector, load_image  # noqa: E402
+from birdid.avonet_filter import AvonetFilter  # noqa: E402
+from birdid.bird_identifier import YOLOBirdDetector, extract_gps_from_exif, load_image  # noqa: E402
 from birdid.osea_classifier import OSEAClassifier  # noqa: E402
 from core.flight_detector import FlightDetector  # noqa: E402
 from core.keypoint_detector import KeypointDetector  # noqa: E402
@@ -70,6 +69,7 @@ def _null_result() -> dict:
         "speciesScientificName": None,
         "speciesCommonName": None,
         "speciesCnName": None,
+        "speciesPinyin": None,
         "speciesConfidence": None,
         "leftEyeX": None, "leftEyeY": None, "leftEyeVis": None,
         "rightEyeX": None, "rightEyeY": None, "rightEyeVis": None,
@@ -77,6 +77,11 @@ def _null_result() -> dict:
         "isFlying": False,
         "flightConfidence": None,
         "aestheticsScore": None,
+        # Extended parity fields — mirror the Swift .report.db columns.
+        "speciesTop5": None,
+        "aestheticsDistribution": None,
+        "birdBbox": None,           # [x1, y1, x2, y2] normalized
+        "gps": None,                # [lat, lon] decimal degrees, or null
     }
 
 
@@ -87,9 +92,25 @@ def process_photo(
     keypoint: KeypointDetector,
     osea: OSEAClassifier,
     aesthetics: TOPIQScorer,
+    species_filter: AvonetFilter | None,
 ) -> dict:
     """Run all 5 upstream models on one photo and return DB-shaped fields."""
     out = _null_result()
+
+    # GPS extraction + regional filter (mirrors Swift identify's cascade).
+    allowed_ids: set[int] | None = None
+    try:
+        lat, lon, _ = extract_gps_from_exif(str(path))
+    except Exception:
+        lat, lon = None, None
+    if lat is not None and lon is not None:
+        out["gps"] = [float(lat), float(lon)]
+        if species_filter is not None:
+            ids = species_filter.get_species_by_gps(lat, lon)
+            if not ids:
+                country_ids, _ = species_filter.get_species_by_country_ebird(lat, lon)
+                ids = country_ids
+            allowed_ids = ids if ids else None
 
     try:
         image = loaded_image_at_inference_resolution(path)
@@ -97,25 +118,57 @@ def process_photo(
         log.error("%s load failed: %s", path.name, e)
         return out
 
-    # Aesthetics: TOPIQScorer.calculate_score takes a file path and opens it
-    # with PIL, which can't read RAW. Swift's AestheticsModel runs on the
-    # decoded 1280 px thumbnail — mirror that by writing the same thumbnail
-    # to a temp JPEG and passing that path.
-    tmp_jpeg = None
+    # Aesthetics: TOPIQScorer.calculate_score takes a file path and opens
+    # it with PIL, which can't read RAW. Run the same preprocessing path
+    # inline so we can also extract the 10-bin distribution alongside MOS.
     try:
-        fd, tmp_jpeg = tempfile.mkstemp(prefix="parity-", suffix=".jpg")
-        os.close(fd)
-        image.save(tmp_jpeg, format="JPEG", quality=95)
-        mos = aesthetics.calculate_score(tmp_jpeg)
-        out["aestheticsScore"] = float(mos) if mos is not None else None
+        import torch
+        import torchvision.transforms as T
+        model = aesthetics._load_model()
+        aesthetic_img = image.resize((384, 384), Image.LANCZOS)
+        img_tensor = T.ToTensor()(aesthetic_img).unsqueeze(0).to(aesthetics.device)
+        with torch.no_grad():
+            dist_tensor = model(img_tensor, return_mos=False, return_dist=True)
+            dist_values = dist_tensor.squeeze().cpu().numpy().tolist()
+        mos_value = sum((i + 1) * p for i, p in enumerate(dist_values))
+        out["aestheticsScore"] = float(mos_value)
+        out["aestheticsDistribution"] = [float(v) for v in dist_values]
     except Exception as e:
         log.warning("%s aesthetics failed: %s", path.name, e)
-    finally:
-        if tmp_jpeg and os.path.exists(tmp_jpeg):
-            os.unlink(tmp_jpeg)
 
-    # YOLO + smart-square crop. detect_and_crop_bird returns a PIL image
-    # already expanded to max_side*(1+padding), centered, letterboxed.
+    # YOLO bbox + smart-square crop. We run ultralytics directly once so
+    # we capture the bbox for the parity harness, then use
+    # detect_and_crop_bird for the exact same crop the Python inference
+    # pipeline uses downstream.
+    try:
+        img_array = np.array(image)
+        results = yolo.model(img_array, conf=0.25, verbose=False)
+        detections = []
+        for result in results:
+            if result.boxes is None:
+                continue
+            for box in result.boxes:
+                class_id = int(box.cls[0].cpu().numpy())
+                if class_id != 14:
+                    continue
+                x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().tolist()
+                detections.append({
+                    "bbox": [float(x1), float(y1), float(x2), float(y2)],
+                    "confidence": float(box.conf[0].cpu().numpy()),
+                })
+        if detections:
+            best = max(detections, key=lambda d: d["confidence"])
+            out["birdConfidence"] = best["confidence"]
+            # Normalize bbox to [0, 1] against the thumbnail we fed to YOLO.
+            w, h = image.size
+            x1, y1, x2, y2 = best["bbox"]
+            out["birdBbox"] = [x1 / w, y1 / h, x2 / w, y2 / h]
+    except Exception as e:
+        log.warning("%s yolo failed: %s", path.name, e)
+
+    # Use detect_and_crop_bird for the smart-square + letterbox crop that
+    # mirrors Swift. This re-runs YOLO internally; cheap enough for the
+    # test set, simplifies the code path.
     try:
         crop, info = yolo.detect_and_crop_bird(
             image,
@@ -123,18 +176,11 @@ def process_photo(
             padding_ratio=0.15,
         )
     except Exception as e:
-        log.warning("%s yolo failed: %s", path.name, e)
+        log.warning("%s yolo crop failed: %s", path.name, e)
         crop, info = None, str(e)
 
     if crop is None:
         return out
-
-    # detect_and_crop_bird prints "conf=0.xxx, size=(w,h)" — parse the conf.
-    if info and info.startswith("conf="):
-        try:
-            out["birdConfidence"] = float(info.split("conf=")[1].split(",")[0])
-        except ValueError:
-            pass
 
     crop_rgb = np.array(crop)
 
@@ -160,18 +206,82 @@ def process_photo(
     except Exception as e:
         log.warning("%s keypoint failed: %s", path.name, e)
 
-    # OSEA species — Swift uses TTA (h-flip average) + temperature=0.9. Match
-    # that by calling predict_with_tta with the same temperature. Confidence is
-    # returned as percent [0, 100]; Swift DB stores [0, 1].
+    # OSEA species — inline TTA (h-flip average) + masked softmax mirrors the
+    # exact Swift CoreMLInferenceClient.identify path:
+    #   - temperature=0.9
+    #   - if allowed_ids is non-empty, mask disallowed class logits to -inf
+    #     before softmax; if masked top-1 falls below the floor, retry global
+    #   - drop near-zero probabilities (< 0.003) when picking top-5
+    # Confidences in the output dict are normalized [0, 1] to match Swift DB.
+    OSEA_TEMPERATURE = 0.9
+    OSEA_FLOOR = 0.003
     try:
-        results = osea.predict_with_tta(crop, top_k=1, temperature=0.9)
-        if results:
-            top = results[0]
-            out["speciesScientificName"] = top.get("scientific_name") or None
-            out["speciesCommonName"] = top.get("en_name") or None
-            out["speciesCnName"] = top.get("cn_name") or None
-            conf = top.get("confidence")
-            out["speciesConfidence"] = float(conf) / 100.0 if conf is not None else None
+        import torch
+        input1 = osea.transform(crop).unsqueeze(0).to(osea.device)
+        flipped = crop.transpose(Image.FLIP_LEFT_RIGHT)
+        input2 = osea.transform(flipped).unsqueeze(0).to(osea.device)
+        osea.model.eval()
+        with torch.no_grad():
+            out1 = osea.model(input1)[0][: osea.num_classes]
+            out2 = osea.model(input2)[0][: osea.num_classes]
+        avg_logits = ((out1 + out2) / 2).detach().cpu().numpy()
+
+        def _softmax(logits: np.ndarray) -> np.ndarray:
+            scaled = logits / OSEA_TEMPERATURE
+            m = float(np.max(scaled)) if scaled.size else 0.0
+            exps = np.exp(scaled - m)
+            s = float(exps.sum())
+            return exps / s if s > 0 else exps
+
+        probs = None
+        if allowed_ids:
+            masked = np.full_like(avg_logits, -np.inf)
+            for idx in allowed_ids:
+                if 0 <= idx < avg_logits.shape[0]:
+                    masked[idx] = avg_logits[idx]
+            masked_probs = _softmax(masked)
+            if float(masked_probs.max()) >= OSEA_FLOOR:
+                probs = masked_probs
+            else:
+                # Regional mask wiped every candidate → fall through to global
+                # softmax, matching Swift's cascade.
+                log.info("%s regional mask wiped candidates; falling back to global", path.name)
+        if probs is None:
+            probs = _softmax(avg_logits)
+
+        # Top-5 with DB resolution; stop at floor.
+        top_indices = np.argsort(-probs)[:5]
+        top5: list[dict] = []
+        for idx in top_indices:
+            p = float(probs[idx])
+            if p < OSEA_FLOOR:
+                break
+            info = osea.bird_info[int(idx)] if int(idx) < len(osea.bird_info) else None
+            if not info:
+                continue
+            cn_name = info[0] if info[0] and info[0] != "Unknown" else None
+            en_name = info[1] if info[1] and info[1] != "Unknown" else None
+            sci_name = info[2] if len(info) > 2 and info[2] else None
+            # Keys match Swift's SpeciesMatch Codable CodingKeys exactly so
+            # the diff script can pull matching fields from both sides.
+            top5.append({
+                "classID": int(idx),
+                "name": sci_name,         # scientificName on Swift
+                "common_name": en_name,
+                "cn_name": cn_name,
+                "pinyin": None,           # neither side populates; parity is null==null
+                "confidence": p,          # [0, 1]
+                "threshold_used": "global" if not allowed_ids else "regional",
+            })
+
+        if top5:
+            top = top5[0]
+            out["speciesScientificName"] = top["name"]
+            out["speciesCommonName"] = top["common_name"]
+            out["speciesCnName"] = top["cn_name"]
+            out["speciesPinyin"] = top["pinyin"]
+            out["speciesConfidence"] = top["confidence"]
+            out["speciesTop5"] = top5
     except Exception as e:
         log.warning("%s osea failed: %s", path.name, e)
 
@@ -206,12 +316,23 @@ def main() -> int:
     # both sides share the same preprocessing on YOLO bird crops.
     osea = OSEAClassifier(use_center_crop=False)
     aesthetics = TOPIQScorer()
+    # AvonetFilter wraps the regional SQLite DB + eBird country JSONs and
+    # implements the same cascade Swift SpeciesFilter does. If the DB isn't
+    # present on disk, process_photo falls through to an unfiltered (global)
+    # softmax — matches Swift's behavior when avonet.db hasn't been downloaded.
+    try:
+        species_filter: AvonetFilter | None = AvonetFilter()
+    except Exception as e:
+        log.warning("AvonetFilter init failed (%s); reference will be unfiltered", e)
+        species_filter = None
 
     results: dict[str, dict] = {}
     t0 = time.time()
     for i, path in enumerate(files, 1):
         tp = time.time()
-        results[path.name] = process_photo(path, yolo, flight, keypoint, osea, aesthetics)
+        results[path.name] = process_photo(
+            path, yolo, flight, keypoint, osea, aesthetics, species_filter
+        )
         log.info("[%d/%d] %s (%.2fs)", i, len(files), path.name, time.time() - tp)
 
     output = Path(args.output).expanduser().resolve()
