@@ -78,7 +78,6 @@ final class CullingConfig {
     var exposureThreshold: Float { didSet { save() } }
     var burstDetectionEnabled: Bool { didSet { save() } }
     var namingStandard: NamingStandard { didSet { save() } }
-    var backendPort: Int { didSet { save() } }
     var autoAdvance: Bool { didSet { save() } }
     var appLanguage: AppLanguage { didSet { save() } }
     var appTheme: AppTheme { didSet { save() } }
@@ -90,7 +89,6 @@ final class CullingConfig {
     var burstMinCount: Int { didSet { save() } }
     var birdIdConfidence: Int { didSet { save() } }
     var flightDetectionEnabled: Bool { didSet { save() } }
-    var inferenceBackend: InferenceBackend { didSet { save() } }
 
     init() {
         let defaults = UserDefaults.standard
@@ -100,7 +98,6 @@ final class CullingConfig {
         self.exposureThreshold = defaults.object(forKey: "exposureThreshold") as? Float ?? 0.10
         self.burstDetectionEnabled = defaults.object(forKey: "burstDetectionEnabled") as? Bool ?? true
         self.namingStandard = NamingStandard(rawValue: defaults.string(forKey: "namingStandard") ?? "") ?? .osea
-        self.backendPort = defaults.object(forKey: "backendPort") as? Int ?? 8420
         self.autoAdvance = defaults.object(forKey: "autoAdvance") as? Bool ?? false
         self.appLanguage = AppLanguage(rawValue: defaults.string(forKey: "appLanguage") ?? "") ?? .en
         self.appTheme = AppTheme(rawValue: defaults.string(forKey: "appTheme") ?? "") ?? .dark
@@ -112,7 +109,6 @@ final class CullingConfig {
         self.burstMinCount = defaults.object(forKey: "burstMinCount") as? Int ?? 4
         self.birdIdConfidence = defaults.object(forKey: "birdIdConfidence") as? Int ?? 70
         self.flightDetectionEnabled = defaults.object(forKey: "flightDetectionEnabled") as? Bool ?? true
-        self.inferenceBackend = InferenceBackend(rawValue: defaults.string(forKey: "inferenceBackend") ?? "") ?? .native
     }
 
     /// Apply a skill level preset. For beginner/intermediate/master, updates thresholds.
@@ -135,7 +131,6 @@ final class CullingConfig {
         defaults.set(exposureThreshold, forKey: "exposureThreshold")
         defaults.set(burstDetectionEnabled, forKey: "burstDetectionEnabled")
         defaults.set(namingStandard.rawValue, forKey: "namingStandard")
-        defaults.set(backendPort, forKey: "backendPort")
         defaults.set(autoAdvance, forKey: "autoAdvance")
         defaults.set(appLanguage.rawValue, forKey: "appLanguage")
         defaults.set(appTheme.rawValue, forKey: "appTheme")
@@ -147,7 +142,6 @@ final class CullingConfig {
         defaults.set(burstMinCount, forKey: "burstMinCount")
         defaults.set(birdIdConfidence, forKey: "birdIdConfidence")
         defaults.set(flightDetectionEnabled, forKey: "flightDetectionEnabled")
-        defaults.set(inferenceBackend.rawValue, forKey: "inferenceBackend")
     }
 
     /// Look up a localized string. Reading `appLanguage` makes SwiftUI

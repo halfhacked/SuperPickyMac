@@ -23,9 +23,6 @@ struct MockInferenceClient: InferenceClient {
     func identify(filePath: String, topK: Int) async throws -> IdentifyResponse {
         IdentifyResponse(species: [], birds: identifyBirds, totalDetected: identifyBirds.count)
     }
-    func healthCheck() async throws -> ServerHealth {
-        ServerHealth(status: "ready", modelsLoaded: [], device: "cpu", version: "1.0.0")
-    }
 }
 
 @Suite struct PipelineCoordinatorTests {

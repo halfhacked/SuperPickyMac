@@ -67,23 +67,6 @@ struct FlightResult: Codable, Sendable {
     }
 }
 
-struct ServerHealth: Codable, Sendable {
-    let status: String
-    let modelsLoaded: [String]
-    let device: String
-    let version: String
-
-    enum CodingKeys: String, CodingKey {
-        case status
-        case modelsLoaded = "models_loaded"
-        case device, version
-    }
-}
-
-struct KeypointResponseWrapper: Codable, Sendable {
-    let keypoints: KeypointResult
-}
-
 struct AestheticsResponse: Codable, Sendable {
     let score: Float
     let distribution: [Float]
