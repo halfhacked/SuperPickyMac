@@ -93,9 +93,22 @@ struct IdentifyResponse: Codable, Sendable {
     let species: [SpeciesMatch]
     let birds: [BirdDetection]?
     let totalDetected: Int?
+    /// Full top-5 species from OSEA (best detection only). Used by the
+    /// parity harness; UI code should read `species` (top-1) as before.
+    let top5: [SpeciesMatch]?
 
     enum CodingKeys: String, CodingKey {
-        case species, birds
+        case species, birds, top5
         case totalDetected = "total_detected"
+    }
+
+    init(species: [SpeciesMatch],
+         birds: [BirdDetection]?,
+         totalDetected: Int?,
+         top5: [SpeciesMatch]? = nil) {
+        self.species = species
+        self.birds = birds
+        self.totalDetected = totalDetected
+        self.top5 = top5
     }
 }

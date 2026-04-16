@@ -25,6 +25,7 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
     private let oseaModel: OSEAClassifier?
     private let speciesDB: SpeciesDatabase?
     private let aestheticsModel: AestheticsModel?
+    private let speciesFilter: SpeciesFilter?
     private let logger = Logger(subsystem: "com.superpicky.mac", category: "CoreMLInference")
 
     // OSEA inference constants (match preen's osea_classifier.py)
@@ -37,13 +38,15 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
          yoloModel: YOLOBirdDetector? = nil,
          oseaModel: OSEAClassifier? = nil,
          speciesDB: SpeciesDatabase? = nil,
-         aestheticsModel: AestheticsModel? = nil) {
+         aestheticsModel: AestheticsModel? = nil,
+         speciesFilter: SpeciesFilter? = nil) {
         self.flightModel = flightModel
         self.keypointModel = keypointModel
         self.yoloModel = yoloModel
         self.oseaModel = oseaModel
         self.speciesDB = speciesDB
         self.aestheticsModel = aestheticsModel
+        self.speciesFilter = speciesFilter
     }
 
     // MARK: - Native flight inference
@@ -91,12 +94,22 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
         }
 
         // 1. Load image from file path (CGImageSource handles RAW, JPEG, etc.)
-        let url = URL(fileURLWithPath: filePath) as CFURL
-        guard let source = CGImageSourceCreateWithURL(url, nil),
+        let fileURL = URL(fileURLWithPath: filePath)
+        guard let source = CGImageSourceCreateWithURL(fileURL as CFURL, nil),
               let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
             logger.error("OSEA identify: failed to load image at \(filePath)")
             return IdentifyResponse(species: [], birds: nil, totalDetected: 0)
         }
+
+        // 1a. Extract GPS from EXIF and resolve an allowed species set.
+        //     nil → no filter (either no GPS in file, or the filter
+        //     isn't installed, or the region has no data — all fall
+        //     through to the existing global-top-1 behavior).
+        let allowedIDs: Set<Int>? = {
+            guard let filter = speciesFilter,
+                  let gps = GPSExtractor.gps(for: fileURL) else { return nil }
+            return filter.allowedClassIDs(lat: gps.lat, lon: gps.lon)
+        }()
 
         // 2. YOLO detect
         let detections = try yolo.predict(image: image)
@@ -105,6 +118,9 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
         //    Use the same 15%-padding + letterbox semantics as preen so OSEA
         //    sees exactly the crop it was trained on.
         var speciesMatches: [SpeciesMatch] = []
+        // Full top-5 from the BEST detection only — used by the parity
+        // harness. UI still reads `species` (top-1 per detection).
+        var bestTop5: [SpeciesMatch]? = nil
 
         for det in detections {
             let normalizedBBox = CGRect(
@@ -118,28 +134,56 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
             let logits = try osea.logits(image: crop, isYOLOCropped: true, useTTA: true)
             let validLogits = Array(logits.prefix(OSEAClassifier.numClasses))
 
-            // 5. Softmax with temperature=0.9
-            let probs = Self.softmax(logits: validLogits, temperature: Self.oseaTemperature)
+            // 5. Apply the regional (GPS/eBird) mask to the logits before
+            //    softmax. If every mask-allowed class has probability under
+            //    the floor, fall through to the global (unmasked) softmax —
+            //    matches Python identify_bird's cascade.
+            let probs: [Float] = {
+                if let allowed = allowedIDs, !allowed.isEmpty {
+                    let masked: [Float] = validLogits.enumerated().map { idx, v in
+                        allowed.contains(idx) ? v : -.infinity
+                    }
+                    let maskedProbs = Self.softmax(logits: masked, temperature: Self.oseaTemperature)
+                    if (maskedProbs.max() ?? 0) >= Self.oseaFloorProbability {
+                        return maskedProbs
+                    }
+                    // Regional mask killed everything — fall back to global.
+                    logger.info("Regional mask wiped OSEA candidates; falling back to global for \(filePath, privacy: .public)")
+                }
+                return Self.softmax(logits: validLogits, temperature: Self.oseaTemperature)
+            }()
 
-            // 6. Best species for this detection — walk top-K in case the top
-            //    prediction's classID isn't in the DB (don't break on a missing
-            //    entry, just try the next candidate).
-            let topK_probs = probs.enumerated()
+            // 6. Walk the top-5 probabilities; collect ALL DB-resolvable hits
+            //    into top5 (for the harness), and keep the first one as the
+            //    top-1 match the existing UI consumes.
+            let topFive = probs.enumerated()
                 .sorted { $0.element > $1.element }
-                .prefix(topK)
+                .prefix(max(5, topK))
 
-            for (classID, prob) in topK_probs {
+            var thisCropTop5: [SpeciesMatch] = []
+            var top1AppendedForThisCrop = false
+            for (classID, prob) in topFive {
                 guard prob >= Self.oseaFloorProbability else { break }
                 guard let entry = db.lookup(classID: classID) else { continue }
-                speciesMatches.append(SpeciesMatch(
+                let match = SpeciesMatch(
                     scientificName: entry.scientificName,
                     commonName: entry.englishName,
                     confidence: prob,
                     cnName: entry.chineseName,
                     pinyin: nil,
                     thresholdUsed: "global"
-                ))
-                break  // one match per detection
+                )
+                if !top1AppendedForThisCrop {
+                    speciesMatches.append(match)
+                    top1AppendedForThisCrop = true
+                }
+                thisCropTop5.append(match)
+                if thisCropTop5.count >= 5 { break }
+            }
+            // Capture top-5 from the first detection that produced any matches
+            // (that's the highest-confidence bird YOLO found).
+            if bestTop5 == nil && !thisCropTop5.isEmpty {
+                bestTop5 = thisCropTop5
             }
         }
 
@@ -155,7 +199,8 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
         return IdentifyResponse(
             species: Array(speciesMatches.prefix(topK)),
             birds: birds,
-            totalDetected: detections.count
+            totalDetected: detections.count,
+            top5: bestTop5
         )
     }
 
@@ -176,6 +221,7 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
         if yoloModel != nil       { models.append("yolo-coreml") }
         if oseaModel != nil       { models.append("osea-coreml") }
         if aestheticsModel != nil { models.append("aesthetics-coreml") }
+        if speciesFilter != nil   { models.append("species-filter") }
         return ServerHealth(
             status: "ready",
             modelsLoaded: models,
@@ -223,13 +269,22 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
         // Species DB is bundled inside SuperPickyInference (small, always needed).
         let species = SpeciesDatabase.bundledURL().flatMap { try? SpeciesDatabase(url: $0) }
 
+        // Species filter: Avonet SQLite is downloaded on first launch via
+        // ModelManager into the same modelsDir; the eBird JSONs live in
+        // the framework bundle. If avonet.db isn't there yet (fresh
+        // install, offline), the filter still loads with a nil Avonet
+        // path and falls straight through to the eBird cascade.
+        let avonetURL = modelsDir.appendingPathComponent("avonet.db")
+        let filter = try? SpeciesFilter(avonetPath: avonetURL)
+
         return CoreMLInferenceClient(
             flightModel:     try FlightModel(url: flightURL),
             keypointModel:   try KeypointModel(url: keypointURL),
             yoloModel:       yolo,
             oseaModel:       osea,
             speciesDB:       species,
-            aestheticsModel: aesthetics
+            aestheticsModel: aesthetics,
+            speciesFilter:   filter
         )
     }
 }

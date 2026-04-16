@@ -188,14 +188,22 @@ final class PipelineCoordinator {
         exposureThreshold: Float,
         flightDetectionEnabled: Bool,
     ) async throws {
-        // Single call to preen: YOLO detect + species identify (handles image loading, GPS, everything)
-        let identifyResult = try await inferenceClient.identify(filePath: fileURL.path, topK: 1)
+        // Single call: YOLO detect + OSEA species identify (with GPS/eBird
+        // filtering if the filter is loaded). We ask for top-5 so the parity
+        // harness can compare full top-5 overlap, not just top-1.
+        let identifyResult = try await inferenceClient.identify(filePath: fileURL.path, topK: 5)
 
         guard let bird = identifyResult.birds?.first else {
             photo.starRating = 0
             return
         }
         photo.birdConfidence = bird.confidence
+        // Persist YOLO bbox (normalized [x1, y1, x2, y2]) so the parity
+        // harness can compute IoU against the Python reference.
+        photo.birdBboxJSON = Self.encodeJSON([
+            Float(bird.bbox.minX), Float(bird.bbox.minY),
+            Float(bird.bbox.maxX), Float(bird.bbox.maxY),
+        ])
 
         // Save species
         if let top = identifyResult.species.first {
@@ -204,7 +212,10 @@ final class PipelineCoordinator {
             photo.speciesCnName = top.cnName
             photo.speciesPinyin = top.pinyin
             photo.speciesConfidence = top.confidence
-
+        }
+        // Persist the full top-5 for parity. UI never reads this.
+        if let top5 = identifyResult.top5 {
+            photo.speciesTop5JSON = Self.encodeJSON(top5)
         }
 
         // Load 1280px thumbnail for aesthetics/keypoints/flight (fast, small payload)
@@ -229,6 +240,10 @@ final class PipelineCoordinator {
         let (aesthetics, keypoints, flight) = try await (aestheticsResponse, keypointResult, flightResult)
 
         photo.aestheticsScore = aesthetics.score
+        // Persist full 10-bin AVA distribution for the parity harness.
+        if !aesthetics.distribution.isEmpty {
+            photo.aestheticsDistributionJSON = Self.encodeJSON(aesthetics.distribution)
+        }
         photo.leftEyeX = keypoints.leftEye.x
         photo.leftEyeY = keypoints.leftEye.y
         photo.leftEyeVis = keypoints.leftEye.visibility
@@ -319,5 +334,15 @@ final class PipelineCoordinator {
         guard let iso, iso > Int(isoBase) else { return 1.0 }
         let penalty = isoPenaltyFactor * log2(Float(iso) / isoBase)
         return max(isoMinFactor, 1.0 - penalty)
+    }
+
+    /// JSON-encode a value to a UTF-8 string for storage in the
+    /// parity-harness text columns. Returns nil on encoding failure.
+    static func encodeJSON<T: Encodable>(_ value: T) -> String? {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]  // deterministic for diffing
+        guard let data = try? encoder.encode(value),
+              let s = String(data: data, encoding: .utf8) else { return nil }
+        return s
     }
 }
