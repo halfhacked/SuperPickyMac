@@ -5,11 +5,12 @@ Native macOS app for AI-powered bird photo culling.
 ## Architecture
 
 - Swift/SwiftUI frontend (all UI + business logic)
-- CoreML inference in-process (native, no server required)
-  - Phase 1 ✅: Flight classifier (EfficientNet-B3, `FlightModel.swift`)
-  - Phase 2 ✅: Keypoint detector (ResNet50 PartLocalizer, `KeypointModel.swift`)
-  - Phase 3-5 pending: YOLO detect, OSEA species, TOPIQ aesthetics
-  - HTTP fallback (`HTTPInferenceClient`) available for Phases 3-5 during migration
+- CoreML inference in-process — all 5 endpoints native, no server required
+  - Flight classifier: EfficientNet-B3 (`FlightModel.swift`)
+  - Keypoint detector: ResNet50 PartLocalizer (`KeypointModel.swift`)
+  - Bird detection: YOLO11l-seg (`YOLOBirdDetector.swift`)
+  - Species ID: OSEA classifier (`OSEAClassifier.swift`)
+  - Aesthetics: CFANet/TOPIQ (`AestheticsModel.swift`)
 - GRDB for SQLite persistence
 - Vision/Accelerate/Core Image for image processing
 - Model conversion scripts: `tools/model-conversion/` (requires `~/projects/SuperPicky/models/`)
@@ -20,7 +21,7 @@ Native macOS app for AI-powered bird photo culling.
 |-------|------|---------|---------|
 | G1 Static | swift build + swiftlint | `scripts/pre-commit.sh` | pre-commit |
 | L1 Unit | Swift Testing | `scripts/pre-commit.sh` | pre-commit |
-| L2 Parity | CoreML ↔ HTTP parity (Phase 3+ stubs for now) | `scripts/run-l2.sh` | pre-push |
+| L2 Parity | CoreML parity harness (Swift) | `scripts/run-l2.sh` | pre-push |
 | G2 Security | gitleaks | `scripts/gate-security.sh` | pre-push |
 | L3 BDD | XCUITest full user flows (TEST_MODE=1) | `scripts/run-l3.sh` | on-demand |
 
@@ -36,14 +37,17 @@ cd apps/mac-client && swift test
 # Re-convert CoreML models (requires ~/projects/SuperPicky/models/)
 python3 tools/model-conversion/convert_flight.py
 python3 tools/model-conversion/convert_keypoint.py
+python3 tools/model-conversion/convert_yolo.py
+python3 tools/model-conversion/convert_osea.py
+python3 tools/model-conversion/convert_topiq.py
 ```
 
 ## Key Decisions
 
-- InferenceClient protocol allows native CoreML or HTTP backends (Settings toggle)
+- CoreML is the sole inference backend — no Python server, no HTTP client
 - One .report.db per processed folder
 - All business logic (rating, burst, exposure, sharpness) in Swift
-- CoreML models ship bundled in app bundle; loaded on first use
+- CoreML model weights download on first launch (~350 MB); subsequent launches are fully offline
 - CullingConfig is @MainActor @Observable (UI state)
 - Fixed minimums (sharpness 100, aesthetics 2.0) separate from configurable thresholds
 - Keyboard shortcuts use NSEvent.addLocalMonitorForEvents (not SwiftUI .onKeyPress which requires focus)
