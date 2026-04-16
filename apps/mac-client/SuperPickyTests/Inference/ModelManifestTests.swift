@@ -10,7 +10,7 @@ struct ModelManifestTests {
         #expect(manifest.version == 1)
     }
 
-    @Test("Bundled manifest lists one weight.bin per CoreML model")
+    @Test("Bundled manifest lists one weight.bin per CoreML model plus avonet.db")
     func bundledModels() throws {
         let manifest = try ModelManifest.loadBundled()
         let ids = Set(manifest.models.map(\.id))
@@ -20,17 +20,23 @@ struct ModelManifestTests {
             "yolo-bird-detector-weight",
             "osea-classifier-weight",
             "aesthetics-model-weight",
+            "avonet-db",
         ])
         // SpeciesDatabase is bundled with the app, so it must NOT be in the
         // download manifest.
         #expect(!ids.contains("bird-reference-db"))
-        // Every entry must have a non-empty sha256, a positive sizeBytes,
-        // and an installPath that lands inside a .mlmodelc/weights/ directory.
+        // Every entry must have a non-empty sha256 and a positive sizeBytes.
         for entry in manifest.models {
             #expect(entry.sha256.count == 64)
             #expect(entry.sizeBytes > 0)
+        }
+        // CoreML weight entries install under <Name>.mlmodelc/weights/weight.bin.
+        // avonet.db installs as a top-level file inside the cache dir.
+        for entry in manifest.models where entry.id.hasSuffix("-weight") {
             #expect(entry.installPath.hasSuffix("weights/weight.bin"))
         }
+        let avonet = manifest.models.first { $0.id == "avonet-db" }
+        #expect(avonet?.installPath == "avonet.db")
     }
 
     @Test("ModelEntry decodes from JSON with all required fields")

@@ -72,6 +72,19 @@ final class ReportDatabase: Sendable {
                 t.add(column: "eyeSharpnessScore", .double)
             }
         }
+        migrator.registerMigration("v5_parity_fields") { db in
+            // JSON-encoded payloads for the parity harness. All three are
+            // strictly additive — NULL on existing rows, populated on next
+            // reprocess. No schema surface in the UI path.
+            try db.alter(table: "photos") { t in
+                // Full top-5 species from OSEA as JSON array of SpeciesMatch.
+                t.add(column: "speciesTop5JSON", .text)
+                // Full 10-bin AVA distribution from CFANet as JSON array.
+                t.add(column: "aestheticsDistributionJSON", .text)
+                // Normalized YOLO bbox [x1, y1, x2, y2] as JSON array.
+                t.add(column: "birdBboxJSON", .text)
+            }
+        }
         try migrator.migrate(dbQueue)
     }
 
