@@ -112,6 +112,15 @@ final class ReportDatabase: Sendable {
         }
     }
 
+    /// One-shot set of every filePath already stored — used by the
+    /// pipeline to skip already-processed photos without an N+1 query.
+    func fetchAllFilePaths() throws -> Set<String> {
+        try dbQueue.read { db in
+            let paths = try String.fetchAll(db, sql: "SELECT filePath FROM photos")
+            return Set(paths)
+        }
+    }
+
     func fetchAllPhotos() throws -> [Photo] {
         try dbQueue.read { db in
             try Photo.fetchAll(db)

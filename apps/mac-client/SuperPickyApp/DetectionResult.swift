@@ -1,5 +1,6 @@
 import Foundation
 import CoreGraphics
+import SuperPickyInference
 
 struct BirdDetection: Codable, Sendable {
     let bbox: CGRect
@@ -53,7 +54,8 @@ struct KeypointResult: Codable, Sendable {
     }
 
     var allKeypointsHidden: Bool {
-        leftEye.visibility < 0.3 && rightEye.visibility < 0.3 && beak.visibility < 0.3
+        let t = InferenceConstants.keypointVisibilityThreshold
+        return leftEye.visibility < t && rightEye.visibility < t && beak.visibility < t
     }
 }
 

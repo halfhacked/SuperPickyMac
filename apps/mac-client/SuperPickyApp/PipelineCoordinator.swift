@@ -62,16 +62,16 @@ final class PipelineCoordinator {
             return
         }
 
+        // Batch skip-check: one SELECT up-front instead of N round-trips.
+        let existingPaths = (try? db.fetchAllFilePaths()) ?? []
+
         for fileURL in files {
             if Task.isCancelled { break }
 
             currentFilename = fileURL.lastPathComponent
 
             // Skip already-processed photos (preserve manual ratings)
-            if let existing = try? db.fetchByFilePath(fileURL.path) {
-                if existing.isManualRating {
-                    logger.info("Skipping \(fileURL.lastPathComponent): manual rating preserved")
-                }
+            if existingPaths.contains(fileURL.path) {
                 processedCount += 1
                 await onPhotoProcessed?()
                 continue

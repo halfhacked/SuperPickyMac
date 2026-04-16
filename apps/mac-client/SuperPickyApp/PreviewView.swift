@@ -91,9 +91,9 @@ struct AsyncPreviewImage: View {
             if zoomState.scale > 1.0 {
                 // Already zoomed in — load full-res directly (don't cache)
                 isFullRes = true
-                image = await loadImage(maxSize: nil)
+                image = await ImageLoader.load(path: filePath, maxPixelSize: nil)
             } else {
-                if let loaded = await loadImage(maxSize: 2000) {
+                if let loaded = await ImageLoader.load(path: filePath, maxPixelSize: 2000) {
                     PreviewCache.shared.set(filePath, image: loaded)
                     image = loaded
                 }
@@ -104,16 +104,12 @@ struct AsyncPreviewImage: View {
             if newScale > 1.0 && !isFullRes {
                 isFullRes = true
                 Task {
-                    if let fullRes = await loadImage(maxSize: nil) {
+                    if let fullRes = await ImageLoader.load(path: filePath, maxPixelSize: nil) {
                         image = fullRes
                     }
                 }
             }
         }
-    }
-
-    private func loadImage(maxSize: Int?) async -> NSImage? {
-        await ImageLoader.load(path: filePath, maxPixelSize: maxSize)
     }
 }
 

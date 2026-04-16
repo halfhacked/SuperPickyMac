@@ -66,10 +66,6 @@ enum SkillLevel: String, CaseIterable, Codable, Sendable {
     }
 }
 
-enum RawFormat: String, CaseIterable, Sendable {
-    case cr2, cr3, nef, arw, raf, orf, rw2, pef, dng, iiq, hif, heif, heic
-}
-
 @Observable
 final class CullingConfig {
     var sharpnessThreshold: Float { didSet { save() } }
