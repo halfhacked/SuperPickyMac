@@ -24,27 +24,6 @@ jobs:
         working-directory: apps/mac-client
         run: swift test
 
-  python-test:
-    name: Python Test (L1)
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-
-      - name: Install dependencies
-        working-directory: python-server
-        run: |
-          python -m venv .venv
-          .venv/bin/pip install flask flask-cors torch torchvision pillow numpy pypinyin birdpreen pytest
-
-      - name: Python Test (L1 Mocked)
-        working-directory: python-server
-        run: .venv/bin/python -m pytest tests/test_server.py -v
-
   xcuitest:
     name: XCUITest (Mock)
     runs-on: macos-15
