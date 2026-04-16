@@ -32,18 +32,41 @@ final class PipelineCoordinator {
         burstDetectionEnabled: Bool = true,
         pickedTopPercentage: Int = PickedFlagCalculator.defaultTopPercentage,
         databaseName: String = ".report.db",
-        onPhotoProcessed: (@Sendable () async -> Void)? = nil
+        onPhotoProcessed: (@Sendable (Photo?) async -> Void)? = nil
     ) async {
         isProcessing = true
         defer { isProcessing = false }
 
-        let files: [URL]
+        let scannedFiles: [URL]
         do {
-            files = try scanner.scan(folder: folder)
+            scannedFiles = try scanner.scan(folder: folder)
         } catch {
             logger.error("Failed to scan folder: \(error)")
             return
         }
+
+        // Sort files by EXIF timestamp so burst detection can run incrementally:
+        // with photos in timestamp order, each new photo only needs to be compared
+        // against the previous one to decide "extend burst vs start new". Files
+        // without a readable timestamp sink to the end (sorted by filename among
+        // themselves).
+        let filesWithTime: [(url: URL, timestamp: Double?)] = scannedFiles.map {
+            ($0, burstDetector.readPreciseTimestamp(filePath: $0.path))
+        }
+        let files = filesWithTime.sorted { a, b in
+            switch (a.timestamp, b.timestamp) {
+            case let (ta?, tb?): return ta < tb
+            case (_?, nil): return true
+            case (nil, _?): return false
+            case (nil, nil): return a.url.lastPathComponent < b.url.lastPathComponent
+            }
+        }.map(\.url)
+        let timestampByPath = Dictionary(uniqueKeysWithValues:
+            filesWithTime.compactMap { info in
+                info.timestamp.map { (info.url.path, $0) }
+            }
+        )
+
         totalCount = files.count
         processedCount = 0
 
@@ -65,15 +88,32 @@ final class PipelineCoordinator {
         // Batch skip-check: one SELECT up-front instead of N round-trips.
         let existingPaths = (try? db.fetchAllFilePaths()) ?? []
 
+        // Running burst state for incremental detection. Photos arrive in
+        // timestamp order, so a single comparison against the last photo in
+        // `burstPhotos` decides whether the new photo extends the candidate
+        // burst or starts a new one.
+        var burstPhotos: [Photo] = []
+        var burstID: UUID?
+        var lastTimestamp: Double?
+        var lastPHash: UInt64?
+        var sawSkipped = false
+
         for fileURL in files {
             if Task.isCancelled { break }
 
             currentFilename = fileURL.lastPathComponent
 
-            // Skip already-processed photos (preserve manual ratings)
+            // Skip already-processed photos (preserve manual ratings). Reset
+            // the running burst window — a final sweep below will reconcile
+            // bursts that span the skip boundary.
             if existingPaths.contains(fileURL.path) {
                 processedCount += 1
-                await onPhotoProcessed?()
+                sawSkipped = true
+                burstPhotos.removeAll(keepingCapacity: true)
+                burstID = nil
+                lastTimestamp = nil
+                lastPHash = nil
+                await onPhotoProcessed?(nil)
                 continue
             }
 
@@ -105,12 +145,62 @@ final class PipelineCoordinator {
             }
             processedCount += 1
 
-            // Run burst detection every 10 photos for incremental updates
-            if burstDetectionEnabled && processedCount % 10 == 0 {
-                await runBurstDetection(db: db)
+            // Incremental burst detection against the previous photo only.
+            if burstDetectionEnabled {
+                let ts = timestampByPath[fileURL.path]
+                let pHash: UInt64? = ts.flatMap { _ in
+                    burstDetector.computePHash(filePath: fileURL.path)
+                }
+
+                let extendsBurst: Bool = {
+                    guard let ts, let lt = lastTimestamp,
+                          let p = pHash, let lp = lastPHash else { return false }
+                    guard (ts - lt) * 1000 <= burstDetector.timeThresholdMs else { return false }
+                    return Float(BurstDetector.hammingDistance(lp, p)) <= burstDetector.similarityThreshold
+                }()
+
+                if !extendsBurst {
+                    burstPhotos.removeAll(keepingCapacity: true)
+                    burstID = nil
+                }
+                burstPhotos.append(photo)
+
+                if burstPhotos.count >= burstDetector.minBurstCount {
+                    let groupID = burstID ?? UUID()
+                    burstID = groupID
+                    let bestID = Self.selectBest(in: burstPhotos)
+
+                    var updated: [Photo] = []
+                    for i in burstPhotos.indices {
+                        let newBest = (burstPhotos[i].id == bestID)
+                        if burstPhotos[i].burstGroupID != groupID || burstPhotos[i].isBurstBest != newBest {
+                            burstPhotos[i].burstGroupID = groupID
+                            burstPhotos[i].isBurstBest = newBest
+                            do {
+                                try db.save(&burstPhotos[i])
+                                updated.append(burstPhotos[i])
+                            } catch {
+                                logger.error("Failed to save burst update: \(error)")
+                            }
+                        }
+                    }
+
+                    // The newly-processed photo's burst state may have changed.
+                    // Refresh `photo` before the common emission below.
+                    if let idx = burstPhotos.firstIndex(where: { $0.id == photo.id }) {
+                        photo = burstPhotos[idx]
+                    }
+                    // Emit OTHER photos whose state changed (new photo is emitted below).
+                    for p in updated where p.id != photo.id {
+                        await onPhotoProcessed?(p)
+                    }
+                }
+
+                if ts != nil { lastTimestamp = ts }
+                if pHash != nil { lastPHash = pHash }
             }
 
-            await onPhotoProcessed?()
+            await onPhotoProcessed?(photo)
 
             // Yield once per iteration so ARC can release any temporaries
             // allocated by processOnePhoto before the next photo starts.
@@ -118,13 +208,25 @@ final class PipelineCoordinator {
             await Task.yield()
         }
 
-        // Final burst detection (catches remaining photos)
-        if burstDetectionEnabled {
+        // If we skipped existing photos, the running burst window was reset
+        // at each skip. Run a full reconciliation so bursts spanning the
+        // skip boundary are correct. Fresh-processing runs don't need this.
+        if burstDetectionEnabled && sawSkipped {
             await runBurstDetection(db: db)
         }
 
         // Picked flag calculation (intersection of top aesthetics & sharpness among 5-star)
         await runPickedFlagCalculation(db: db, topPercentage: pickedTopPercentage)
+    }
+
+    /// Best photo in a burst: highest combined sharpness + aesthetics score.
+    /// Matches BurstDetector.selectBest so the incremental and batch paths agree.
+    private static func selectBest(in photos: [Photo]) -> UUID? {
+        photos.max(by: { burstScore($0) < burstScore($1) })?.id
+    }
+
+    private static func burstScore(_ photo: Photo) -> Float {
+        (photo.sharpnessScore ?? 0) * 0.5 + (photo.aestheticsScore ?? 0) * 0.5
     }
 
     private func runBurstDetection(db: ReportDatabase) async {

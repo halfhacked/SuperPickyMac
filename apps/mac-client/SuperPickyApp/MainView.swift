@@ -278,6 +278,10 @@ struct MainView: View {
         appState.sidebarSelection = .folder(folder)
         appState.processingFolder = folder
         appState.processingProgress = 0
+        // Seed allPhotos from the DB so any already-processed photos (skipped
+        // by the pipeline) appear immediately, and so incremental append can
+        // update-in-place by ID.
+        appState.loadPhotos(for: folder)
 
         processingTask = Task {
             await pipeline.process(
@@ -288,23 +292,19 @@ struct MainView: View {
                 flightDetectionEnabled: config.flightDetectionEnabled,
                 burstDetectionEnabled: config.burstDetectionEnabled,
                 pickedTopPercentage: config.pickedTopPercentage,
-                onPhotoProcessed: {
+                onPhotoProcessed: { photo in
                     await MainActor.run {
                         if pipeline.totalCount > 0 {
                             appState.processingProgress = Double(pipeline.processedCount) / Double(pipeline.totalCount)
                         }
-                        // Reload UI every 5 photos. The species-hierarchy rebuild
-                        // is O(n) over allPhotos and cheap enough to run live so
-                        // the sidebar reflects newly-identified species as they
-                        // come in instead of only at the end of processing.
-                        if pipeline.processedCount % 5 == 0 {
-                            appState.loadPhotos(for: folder)
+                        if let photo {
+                            appState.appendProcessedPhoto(photo)
                         }
                     }
                 }
             )
 
-            // Final reload (includes burst detection results)
+            // Final reload (picks up picked-flag calculation + any skip-reconciliation burst sweep)
             await MainActor.run {
                 appState.processingFolder = nil
                 appState.processingProgress = 0
