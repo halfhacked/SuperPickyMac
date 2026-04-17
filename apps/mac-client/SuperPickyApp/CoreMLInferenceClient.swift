@@ -127,11 +127,14 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
         //     nil → no filter (either no GPS in file, or the filter
         //     isn't installed, or the region has no data — all fall
         //     through to the existing global-top-1 behavior).
+        let gpsStart = DispatchTime.now()
         let allowedIDs: Set<Int>? = {
             guard let filter = speciesFilter,
                   let gps = GPSExtractor.gps(for: fileURL) else { return nil }
             return filter.allowedClassIDs(lat: gps.lat, lon: gps.lon)
         }()
+        let gpsMs = Self.elapsedMs(since: gpsStart)
+        logger.debug("identify.gps \(gpsMs, privacy: .public)ms")
 
         // 2. YOLO detect — operates on the 1280 thumbnail. Its bbox output
         //    is normalized (0–1); passing the same thumbnail to OSEA below

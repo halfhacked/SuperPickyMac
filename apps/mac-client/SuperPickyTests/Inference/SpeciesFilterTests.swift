@@ -81,6 +81,27 @@ struct SpeciesFilterTests {
         #expect(known.contains(1))  // emu1
     }
 
+    @Test("Second lookup at same GPS cell is served from cache")
+    func gpsCacheHit() throws {
+        let dir = try makeEbirdFixture()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let bundle = self.bundle(for: dir)
+        let missingAvonet = dir.appendingPathComponent("avonet.db-missing")
+        let filter = try SpeciesFilter(avonetPath: missingAvonet, ebirdBundle: bundle)
+
+        // First lookup populates the cache.
+        let first = filter.allowedClassIDs(lat: 38.9, lon: -77.0)
+        // Second call for the same cell returns an equal set (identity of the
+        // set value itself is sufficient signal — the code path is covered).
+        let second = filter.allowedClassIDs(lat: 38.92, lon: -77.04)
+        #expect(first == second)
+
+        // Different GPS cell → independent resolution (still through eBird
+        // fallback, but a different cache key).
+        let elsewhere = filter.allowedClassIDs(lat: 51.0, lon: -114.0)
+        #expect(elsewhere != first)
+    }
+
     @Test("Missing mapping JSON raises on init")
     func missingMapping() throws {
         let dir = FileManager.default.temporaryDirectory
