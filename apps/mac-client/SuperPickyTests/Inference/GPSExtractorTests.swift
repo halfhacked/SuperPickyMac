@@ -94,4 +94,55 @@ struct GPSExtractorTests {
         let missing = URL(fileURLWithPath: "/tmp/does-not-exist-\(UUID().uuidString).jpg")
         #expect(GPSExtractor.gps(for: missing) == nil)
     }
+
+    // MARK: - gps(fromProperties:) overload
+
+    @Test("fromProperties reads NE coords")
+    func fromPropertiesNE() throws {
+        let props: [String: Any] = [
+            kCGImagePropertyGPSDictionary as String: [
+                kCGImagePropertyGPSLatitude as String: 47.6,
+                kCGImagePropertyGPSLatitudeRef as String: "N",
+                kCGImagePropertyGPSLongitude as String: 122.3,
+                kCGImagePropertyGPSLongitudeRef as String: "E",
+            ]
+        ]
+        let gps = try #require(GPSExtractor.gps(fromProperties: props))
+        #expect(abs(gps.lat - 47.6) < 1e-4)
+        #expect(abs(gps.lon - 122.3) < 1e-4)
+    }
+
+    @Test("fromProperties negates S/W refs")
+    func fromPropertiesSW() throws {
+        let props: [String: Any] = [
+            kCGImagePropertyGPSDictionary as String: [
+                kCGImagePropertyGPSLatitude as String: 33.8,
+                kCGImagePropertyGPSLatitudeRef as String: "S",
+                kCGImagePropertyGPSLongitude as String: 151.2,
+                kCGImagePropertyGPSLongitudeRef as String: "W",
+            ]
+        ]
+        let gps = try #require(GPSExtractor.gps(fromProperties: props))
+        #expect(abs(gps.lat - (-33.8)) < 1e-4)
+        #expect(abs(gps.lon - (-151.2)) < 1e-4)
+    }
+
+    @Test("fromProperties returns nil with no GPS dict")
+    func fromPropertiesNoDict() {
+        let props: [String: Any] = [
+            kCGImagePropertyPixelWidth as String: 100
+        ]
+        #expect(GPSExtractor.gps(fromProperties: props) == nil)
+    }
+
+    @Test("fromProperties rejects (0,0)")
+    func fromPropertiesZeroZero() {
+        let props: [String: Any] = [
+            kCGImagePropertyGPSDictionary as String: [
+                kCGImagePropertyGPSLatitude as String: 0.0,
+                kCGImagePropertyGPSLongitude as String: 0.0,
+            ]
+        ]
+        #expect(GPSExtractor.gps(fromProperties: props) == nil)
+    }
 }

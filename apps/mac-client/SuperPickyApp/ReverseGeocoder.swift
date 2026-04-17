@@ -21,6 +21,7 @@
 
 import Foundation
 import CoreLocation
+import SuperPickyInference
 
 public struct LocationInfo: Sendable, Equatable {
     public let city: String?
@@ -44,15 +45,8 @@ public actor ReverseGeocoder {
 
     public init() {}
 
-    private static func cellKey(lat: Double, lon: Double) -> UInt64 {
-        let latK = Int32((lat * 10).rounded())
-        let lonK = Int32((lon * 10).rounded())
-        return (UInt64(bitPattern: Int64(latK)) & 0xFFFFFFFF) << 32
-            | (UInt64(bitPattern: Int64(lonK)) & 0xFFFFFFFF)
-    }
-
     public func resolve(lat: Double, lon: Double) async -> LocationInfo? {
-        let key = Self.cellKey(lat: lat, lon: lon)
+        let key = GPSCell.key(lat: lat, lon: lon)
         if let cached = cache[key] { return cached }
         if let task = inflight[key] { return await task.value }
         let task = Task { await Self.runCLGeocoder(lat: lat, lon: lon) }
