@@ -2,7 +2,7 @@ import Foundation
 
 /// Pure computation: groups photos into species hierarchy entries.
 struct SpeciesHierarchyBuilder {
-    static func build(from photos: [Photo]) -> [SpeciesEntry] {
+    static func build(from photos: [Photo], sortOrder: SpeciesSortOrder = .name) -> [SpeciesEntry] {
         // Assign each burst to its dominant species by highest confidence ID.
         // A burst spanning multiple species classifications appears only once.
         var burstToSpecies: [UUID: String] = [:]
@@ -38,7 +38,7 @@ struct SpeciesHierarchyBuilder {
             bySpecies[name] = entry
         }
 
-        return bySpecies.map { name, entry in
+        let entries = bySpecies.map { name, entry -> SpeciesEntry in
             // Only include burst groups whose dominant species matches this entry
             var burstGroupIDs: Set<UUID> = []
             var singleCount = 0
@@ -71,10 +71,21 @@ struct SpeciesHierarchyBuilder {
                 singlePhotos: singleCount,
                 isUnidentified: entry.isUnidentified
             )
-        }.sorted {
-            // Unidentified always first, then by count
-            if $0.isUnidentified != $1.isUnidentified { return $0.isUnidentified }
-            return $0.count > $1.count
+        }
+        return sorted(entries: entries, by: sortOrder)
+    }
+
+    /// Unidentified always first, then by the chosen sort order.
+    /// Alphabetical uses `localizedStandardCompare` for natural ordering.
+    static func sorted(entries: [SpeciesEntry], by order: SpeciesSortOrder) -> [SpeciesEntry] {
+        entries.sorted { a, b in
+            if a.isUnidentified != b.isUnidentified { return a.isUnidentified }
+            switch order {
+            case .name:
+                return a.name.localizedStandardCompare(b.name) == .orderedAscending
+            case .count:
+                return a.count > b.count
+            }
         }
     }
 }

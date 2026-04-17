@@ -214,6 +214,49 @@ import Foundation
         #expect(appState.photos.allSatisfy { $0.speciesScientificName == nil && $0.burstGroupID == nil })
     }
 
+    // MARK: - Sort order
+
+    @Test func defaultSortIsAlphabeticalByName() throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        // Zebra has higher count than Albatross — alphabetical still puts Albatross first.
+        let photos = [
+            makePhoto(folder: folder, speciesCommonName: "Zebra Finch", speciesScientificName: "Taeniopygia"),
+            makePhoto(folder: folder, speciesCommonName: "Zebra Finch", speciesScientificName: "Taeniopygia"),
+            makePhoto(folder: folder, speciesCommonName: "Zebra Finch", speciesScientificName: "Taeniopygia"),
+            makePhoto(folder: folder, speciesCommonName: "Albatross", speciesScientificName: "Diomedea"),
+            makePhoto(folder: folder, speciesCommonName: "Mockingbird", speciesScientificName: "Mimus"),
+        ]
+        try setupDB(folder: folder, photos: photos)
+
+        let appState = AppState()
+        appState.loadPhotos(for: folder)
+
+        let identified = appState.speciesEntries.filter { !$0.isUnidentified }.map(\.name)
+        #expect(identified == ["Albatross", "Mockingbird", "Zebra Finch"])
+    }
+
+    @Test func countSortPutsLargestFirst() throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let photos = [
+            makePhoto(folder: folder, speciesCommonName: "Albatross", speciesScientificName: "Diomedea"),
+            makePhoto(folder: folder, speciesCommonName: "Zebra Finch", speciesScientificName: "Taeniopygia"),
+            makePhoto(folder: folder, speciesCommonName: "Zebra Finch", speciesScientificName: "Taeniopygia"),
+            makePhoto(folder: folder, speciesCommonName: "Zebra Finch", speciesScientificName: "Taeniopygia"),
+        ]
+        try setupDB(folder: folder, photos: photos)
+
+        let appState = AppState()
+        appState.speciesSortOrder = .count
+        appState.loadPhotos(for: folder)
+
+        let identified = appState.speciesEntries.filter { !$0.isUnidentified }.map(\.name)
+        #expect(identified == ["Zebra Finch", "Albatross"])
+    }
+
     // MARK: - Unidentified sorted first
 
     @Test func unidentifiedSpeciesSortedFirst() throws {

@@ -18,6 +18,7 @@ struct SourceListView: View {
     var onRefreshFolder: ((URL) -> Void)?
 
     var body: some View {
+        @Bindable var config = config
         List(selection: $selection) {
             Section {
                 ForEach(folders, id: \.self) { folder in
@@ -113,7 +114,7 @@ struct SourceListView: View {
             }
 
             if !speciesEntries.isEmpty {
-                Section(config.localized("Species")) {
+                Section {
                     ForEach(speciesEntries) { species in
                         if species.burstGroups.isEmpty {
                             // No bursts — flat selectable row
@@ -175,6 +176,27 @@ struct SourceListView: View {
                             }
                             .tag(SidebarSelection.species(species.name))
                         }
+                    }
+                } header: {
+                    HStack {
+                        Text(config.localized("Species"))
+                        Spacer()
+                        Menu {
+                            Picker("", selection: $config.speciesSortOrder) {
+                                Text(config.localized("Sort by name")).tag(SpeciesSortOrder.name)
+                                Text(config.localized("Sort by count")).tag(SpeciesSortOrder.count)
+                            }
+                        } label: {
+                            Image(systemName: "arrow.up.arrow.down")
+                                .font(.body)
+                                .foregroundStyle(.secondary)
+                        }
+                        .menuStyle(.borderlessButton)
+                        .menuIndicator(.hidden)
+                        .fixedSize()
+                        .help(config.localized("Sort species"))
+                        .accessibilityIdentifier("SpeciesSortMenu")
+                        .padding(.trailing, 12)
                     }
                 }
             }

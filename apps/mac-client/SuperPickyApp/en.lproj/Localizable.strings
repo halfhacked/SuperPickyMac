@@ -161,6 +161,9 @@
 "Move to Trash?" = "Move to Trash?";
 "Export All Visible" = "Export All Visible";
 "Sort photos" = "Sort photos";
+"Sort species" = "Sort species";
+"Sort by name" = "Sort by name";
+"Sort by count" = "Sort by count";
 "Export photos (⌘E for picks)" = "Export photos (⌘E for picks)";
 "Calibrate thresholds against this photo" = "Calibrate thresholds against this photo";
 "Reprocess Folder" = "Reprocess Folder";

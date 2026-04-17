@@ -28,6 +28,11 @@ enum AppLanguage: String, CaseIterable, Codable, Sendable {
     }
 }
 
+enum SpeciesSortOrder: String, CaseIterable, Codable, Sendable {
+    case name
+    case count
+}
+
 enum AppTheme: String, CaseIterable, Codable, Sendable {
     case system
     case dark
@@ -90,6 +95,7 @@ final class CullingConfig {
     var burstHashTolerance: Int { didSet { save() } }
     var birdIdConfidence: Int { didSet { save() } }
     var flightDetectionEnabled: Bool { didSet { save() } }
+    var speciesSortOrder: SpeciesSortOrder { didSet { save() } }
 
     init() {
         let defaults = UserDefaults.standard
@@ -111,6 +117,7 @@ final class CullingConfig {
         self.burstHashTolerance = defaults.object(forKey: "burstHashTolerance") as? Int ?? 12
         self.birdIdConfidence = defaults.object(forKey: "birdIdConfidence") as? Int ?? 70
         self.flightDetectionEnabled = defaults.object(forKey: "flightDetectionEnabled") as? Bool ?? true
+        self.speciesSortOrder = SpeciesSortOrder(rawValue: defaults.string(forKey: "speciesSortOrder") ?? "") ?? .name
     }
 
     /// Apply a skill level preset. For beginner/intermediate/master, updates thresholds.
@@ -145,6 +152,7 @@ final class CullingConfig {
         defaults.set(burstHashTolerance, forKey: "burstHashTolerance")
         defaults.set(birdIdConfidence, forKey: "birdIdConfidence")
         defaults.set(flightDetectionEnabled, forKey: "flightDetectionEnabled")
+        defaults.set(speciesSortOrder.rawValue, forKey: "speciesSortOrder")
     }
 
     /// Look up a localized string. Reading `appLanguage` makes SwiftUI
