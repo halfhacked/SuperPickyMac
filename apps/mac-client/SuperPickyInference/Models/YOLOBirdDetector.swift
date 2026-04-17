@@ -71,16 +71,20 @@ public final class YOLOBirdDetector: @unchecked Sendable {
         let targetSize = Self.imageSize
 
         // 1. Letterbox
+        let letterboxStart = DispatchTime.now()
         let (scale, padLeft, padTop) = Self.letterboxParams(origW: origW, origH: origH,
                                                              targetSize: Float(targetSize))
         let pixelBuffer = try Self.renderLetterboxed(image: image, targetSize: targetSize,
                                                       scale: scale, padLeft: padLeft, padTop: padTop)
+        let letterboxMs = Self.elapsedMs(since: letterboxStart)
 
         // 2. Inference
+        let inferStart = DispatchTime.now()
         let input = try MLDictionaryFeatureProvider(
             dictionary: ["image": MLFeatureValue(pixelBuffer: pixelBuffer)]
         )
         let output = try autoreleasepool { try model.prediction(from: input) }
+        let inferMs = Self.elapsedMs(since: inferStart)
 
         guard let boxesMLA = output.featureValue(for: Self.outputBoxesName)?.multiArrayValue,
               let masksMLA = output.featureValue(for: Self.outputMasksName)?.multiArrayValue else {
@@ -89,6 +93,7 @@ public final class YOLOBirdDetector: @unchecked Sendable {
         }
 
         // 3. Parse candidates using strides for correct memory layout handling
+        let parseStart = DispatchTime.now()
         let channelStride = boxesMLA.strides[1].intValue  // stride from channel j to j+1
         let anchorStride  = boxesMLA.strides[2].intValue  // stride from anchor i to i+1 (usually 1)
 
@@ -129,7 +134,10 @@ public final class YOLOBirdDetector: @unchecked Sendable {
             candidates.append(Candidate(cx: cx, cy: cy, w: w, h: h, conf: birdScore, coefs: coefs))
         }
 
+        let parseMs = Self.elapsedMs(since: parseStart)
+
         // 4. NMS
+        let nmsStart = DispatchTime.now()
         candidates.sort { $0.conf > $1.conf }
         var kept = [Candidate]()
         for c in candidates {
@@ -142,8 +150,11 @@ public final class YOLOBirdDetector: @unchecked Sendable {
             if !suppress { kept.append(c) }
         }
 
+        let nmsMs = Self.elapsedMs(since: nmsStart)
+
         // 5. Un-letterbox + decode masks
-        return kept.map { c in
+        let maskStart2 = DispatchTime.now()
+        let result = kept.map { c in
             let x1 = clamp01((c.cx - c.w/2 - padLeft) / scale / origW)
             let y1 = clamp01((c.cy - c.h/2 - padTop)  / scale / origH)
             let x2 = clamp01((c.cx + c.w/2 - padLeft) / scale / origW)
@@ -151,6 +162,13 @@ public final class YOLOBirdDetector: @unchecked Sendable {
             let mask = Self.decodeMask(coefs: c.coefs, protos: protos)
             return Detection(x1: x1, y1: y1, x2: x2, y2: y2, confidence: c.conf, maskData: mask)
         }
+        let maskMs = Self.elapsedMs(since: maskStart2)
+        logger.debug("yolo.predict letterbox=\(letterboxMs, privacy: .public)ms infer=\(inferMs, privacy: .public)ms parse=\(parseMs, privacy: .public)ms nms=\(nmsMs, privacy: .public)ms mask=\(maskMs, privacy: .public)ms candidates=\(candidates.count, privacy: .public) kept=\(result.count, privacy: .public)")
+        return result
+    }
+
+    private static func elapsedMs(since start: DispatchTime) -> Double {
+        Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000
     }
 
     // MARK: - Private helpers
