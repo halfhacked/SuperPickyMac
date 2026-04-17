@@ -88,23 +88,28 @@ final class PipelineCoordinator: @unchecked Sendable {
         // Parallelize the EXIF reads — each is ~5–10 ms of CGImageSource open
         // + property parse, independent per file, and easily overlaps across
         // CPU cores. 877 photos × 8 ms serial ≈ 7 s of startup; pool width
-        // of `ProcessInfo.activeProcessorCount` cuts this to <1 s.
-        let filesWithTime: [(url: URL, timestamp: Double?)] = await withTaskGroup(
-            of: (Int, URL, Double?).self,
-            returning: [(url: URL, timestamp: Double?)].self
+        // of `ProcessInfo.activeProcessorCount` cuts this to <1 s. We also
+        // extract GPS lat/lon from the same open so we can pre-warm the
+        // reverse-geocoder for every unique cell before the ML pipeline
+        // starts — without the pre-warm, the first few ML tasks all suspend
+        // on the same in-flight CLGeocoder call and stall the pipeline for
+        // the round-trip.
+        let filesWithTime: [(url: URL, timestamp: Double?, lat: Double?, lon: Double?)] = await withTaskGroup(
+            of: (Int, URL, Double?, Double?, Double?).self,
+            returning: [(url: URL, timestamp: Double?, lat: Double?, lon: Double?)].self
         ) { group in
-            let detector = burstDetector
             for (idx, url) in scannedFiles.enumerated() {
                 group.addTask {
-                    (idx, url, detector.readPreciseTimestamp(filePath: url.path))
+                    let result = BurstDetector.readPreciseTimestampAndGPS(filePath: url.path)
+                    return (idx, url, result.timestamp, result.lat, result.lon)
                 }
             }
-            var results = Array<(url: URL, timestamp: Double?)>(
-                repeating: (URL(fileURLWithPath: ""), nil),
+            var results = Array<(url: URL, timestamp: Double?, lat: Double?, lon: Double?)>(
+                repeating: (URL(fileURLWithPath: ""), nil, nil, nil),
                 count: scannedFiles.count
             )
-            for await (idx, url, ts) in group {
-                results[idx] = (url, ts)
+            for await (idx, url, ts, lat, lon) in group {
+                results[idx] = (url, ts, lat, lon)
             }
             return results
         }
@@ -119,6 +124,20 @@ final class PipelineCoordinator: @unchecked Sendable {
         let timestampByPath = Dictionary(uniqueKeysWithValues:
             filesWithTime.compactMap { info in
                 info.timestamp.map { (info.url.path, $0) }
+            }
+        )
+
+        // Per-path GPS lat/lon captured in the pre-pass, consumed lazily by
+        // the write-behind chain to populate the photo's location fields
+        // without stalling the main ML loop. The reverse-geocoder is an
+        // actor with cell-keyed caching + in-flight coalescing, so even
+        // though N photos call `resolve` in the write-behind chain, only
+        // ~1 CLGeocoder round-trip per unique 0.1° cell actually hits the
+        // network.
+        let gpsByPath: [String: (lat: Double, lon: Double)] = Dictionary(uniqueKeysWithValues:
+            filesWithTime.compactMap { info in
+                guard let lat = info.lat, let lon = info.lon else { return nil }
+                return (info.url.path, (lat, lon))
             }
         )
 
@@ -161,11 +180,11 @@ final class PipelineCoordinator: @unchecked Sendable {
         // reads from the DB).
         var writeBehindChain: Task<Void, Never> = Task {}
         @Sendable
-        func writeBehind(_ work: @escaping @Sendable () -> Void) {
+        func writeBehind(_ work: @escaping @Sendable () async -> Void) {
             let prev = writeBehindChain
             writeBehindChain = Task.detached(priority: .utility) {
                 _ = await prev.value
-                work()
+                await work()
             }
         }
 
@@ -192,12 +211,21 @@ final class PipelineCoordinator: @unchecked Sendable {
             }
 
             let snapshot = photo
-            writeBehind { [logger] in
+            let gpsCoord = gpsByPath[url.path]
+            writeBehind { [logger, reverseGeocoder = self.reverseGeocoder] in
                 var p = snapshot
+                if let gps = gpsCoord,
+                   let loc = await reverseGeocoder.resolve(lat: gps.lat, lon: gps.lon) {
+                    p.locationCity = loc.city
+                    p.locationState = loc.state
+                    p.locationCountry = loc.country
+                    p.locationCountryCode = loc.countryCode
+                    p.locationSublocation = loc.sublocation
+                }
                 do { try db.save(&p) } catch {
                     logger.error("Failed to save photo: \(error)")
                 }
-                try? XMPWriter.write(photo: snapshot)
+                try? XMPWriter.write(photo: p)
             }
             processedCount += 1
             let elapsedMs = Double(DispatchTime.now().uptimeNanoseconds - startedAt.uptimeNanoseconds) / 1_000_000
@@ -242,8 +270,24 @@ final class PipelineCoordinator: @unchecked Sendable {
                             burstPhotos[i].burstGroupID = groupID
                             burstPhotos[i].isBurstBest = newBest
                             let toSave = burstPhotos[i]
-                            writeBehind { [logger] in
+                            let burstGPS = gpsByPath[toSave.filePath]
+                            writeBehind { [logger, reverseGeocoder = self.reverseGeocoder] in
                                 var p = toSave
+                                // `db.save` via GRDB's PersistableRecord does a full
+                                // REPLACE, so without re-attaching the location
+                                // fields the nil ones on `toSave` would clobber the
+                                // values saved by this photo's initial write-behind.
+                                // The resolve call is a cache hit here because the
+                                // initial write-behind (chained before us) has
+                                // already populated the cell.
+                                if let gps = burstGPS,
+                                   let loc = await reverseGeocoder.resolve(lat: gps.lat, lon: gps.lon) {
+                                    p.locationCity = loc.city
+                                    p.locationState = loc.state
+                                    p.locationCountry = loc.country
+                                    p.locationCountryCode = loc.countryCode
+                                    p.locationSublocation = loc.sublocation
+                                }
                                 do { try db.save(&p) } catch {
                                     logger.error("Failed to save burst update: \(error)")
                                 }
@@ -614,23 +658,13 @@ final class PipelineCoordinator: @unchecked Sendable {
         )
         photo.starRating = ratingResult.rating
 
-        // Reverse-geocode GPS → city/state/country/code/sublocation for the
-        // XMP sidecar. `resolve` is an actor call keyed by GPS cell
-        // (0.1° ≈ 11 km). On cache hit (every photo in the same cell after
-        // the first) it's essentially free; on cache miss it waits ~100–500
-        // ms for CLGeocoder. The miss blocks *this* photo's task slot but
-        // not the other five concurrent slots, so per-folder the whole
-        // reverse-geocoding step costs ~1 × one CLGeocoder round-trip per
-        // distinct GPS cell — typically 1 for a bird shoot.
-        if let props = imageProps,
-           let gps = GPSExtractor.gps(fromProperties: props),
-           let loc = await reverseGeocoder.resolve(lat: gps.lat, lon: gps.lon) {
-            photo.locationCity = loc.city
-            photo.locationState = loc.state
-            photo.locationCountry = loc.country
-            photo.locationCountryCode = loc.countryCode
-            photo.locationSublocation = loc.sublocation
-        }
+        // Reverse-geocoding (GPS → city/state/country) is not called here
+        // anymore — it runs on the write-behind chain (see
+        // PipelineCoordinator.process, `writeBehind` closure). Awaiting
+        // CLGeocoder on this per-photo Task would suspend the ML slot for
+        // the round-trip and stall the entire 6-way pipeline during a
+        // cache miss; moving it to write-behind keeps the ML loop
+        // unblocked and hides the latency under per-photo DB/XMP writes.
 
         let photoMs = Self.elapsedMs(since: photoStart)
         logger.debug("photo.ml decode=\(decodeMs, privacy: .public)ms pHash=\(pHashMs, privacy: .public)ms postMl=\(postMlMs, privacy: .public)ms total=\(photoMs, privacy: .public)ms")
