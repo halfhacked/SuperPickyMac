@@ -189,6 +189,12 @@ final class PipelineCoordinator: @unchecked Sendable {
         // actually complete.
         @Sendable
         func finalize(url: URL, workTask: Task<MLWorkResult, Error>) async {
+            // Cancellation: drop the ML task immediately so the main
+            // loop can unwind fast. No DB write, no UI callback.
+            if Task.isCancelled {
+                workTask.cancel()
+                return
+            }
             let startedAt = DispatchTime.now()
             var photo: Photo
             var pHashFromDecoded: UInt64?
@@ -356,18 +362,30 @@ final class PipelineCoordinator: @unchecked Sendable {
             inflight.append((fileURL, task))
         }
 
-        // Drain any tasks still in flight when the loop exits.
+        // Cancellation: return as quickly as possible so the UI's Stop
+        // button feels instant. Cancel all in-flight ML tasks, skip the
+        // final drain + picked-flag phase. The write-behind chain keeps
+        // running in the background as an unstructured Task chain; any
+        // photo already finalized will still be saved, we just don't
+        // await it here.
+        if Task.isCancelled {
+            for (_, task) in inflight { task.cancel() }
+            inflight.removeAll()
+            let count = self.processedCount
+            logger.notice("pipeline.cancelled after=\(String(format: "%.0f", Double(DispatchTime.now().uptimeNanoseconds - pipelineStart.uptimeNanoseconds) / 1_000_000), privacy: .public)ms processed=\(count, privacy: .public)")
+            return
+        }
+
+        // Normal completion: drain everything in order.
         while let first = inflight.first {
             inflight.removeFirst()
             await finalize(url: first.0, workTask: first.1)
         }
         let mlEnd = DispatchTime.now()
 
-        // Drain the write-behind chain before any phase that reads from the DB.
         await writeBehindChain.value
         let wbEnd = DispatchTime.now()
 
-        // Picked flag calculation (intersection of top aesthetics & sharpness among 5-star)
         await runPickedFlagCalculation(db: db, topPercentage: pickedTopPercentage)
         let allEnd = DispatchTime.now()
         let mlMs = Double(mlEnd.uptimeNanoseconds - pipelineStart.uptimeNanoseconds) / 1_000_000
