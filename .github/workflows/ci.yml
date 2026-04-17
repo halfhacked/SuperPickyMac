@@ -34,16 +34,32 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          echo "### Swift Build failure" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          grep -nE 'error:|warning:' /tmp/swift-build.log | head -80 >> "$GITHUB_STEP_SUMMARY" || true
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          # Extract only hard errors (strip warnings which dominate the log).
+          grep -nE ': error:' /tmp/swift-build.log | head -200 > /tmp/swift-errors.log || true
+          # Also capture context around the final "Compiling" step that broke.
+          tail -200 /tmp/swift-build.log > /tmp/swift-build-tail.log || true
+          {
+            echo "### Swift Build failure — errors"
+            echo '```'
+            cat /tmp/swift-errors.log
+            echo '```'
+            echo '### Tail of build log (last 200 lines)'
+            echo '```'
+            cat /tmp/swift-build-tail.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
           if [ -n "$PR_NUMBER" ]; then
             {
-              echo "**Swift Build failure — first 80 error/warning lines**"
+              echo "**Swift Build failure — errors only**"
               echo ''
               echo '```'
-              grep -nE 'error:|warning:' /tmp/swift-build.log | head -80 || true
+              cat /tmp/swift-errors.log
+              echo '```'
+              echo ''
+              echo '**Last 200 lines of build log**'
+              echo ''
+              echo '```'
+              cat /tmp/swift-build-tail.log
               echo '```'
             } > /tmp/swift-build-comment.md
             gh pr comment "$PR_NUMBER" --body-file /tmp/swift-build-comment.md \
