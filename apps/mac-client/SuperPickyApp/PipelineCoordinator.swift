@@ -24,7 +24,13 @@ final class PipelineCoordinator: @unchecked Sendable {
     /// Aesthetics to GPU and OSEA/Keypoint/Flight to ANE so several photos'
     /// work can truly overlap across engines. Post-processing (DB, burst
     /// state, UI callback) still runs strictly in timestamp order.
-    private static let maxConcurrentMLWork = 3
+    ///
+    /// 6 is the sweet spot on an M3 Max / 64 GB machine: swept 3→4→5→6→8
+    /// against the full `~/photo` bench and measured 46 / 39 / 39 / 36 / 37 s
+    /// respectively. The ANE has enough internal parallelism that stepping
+    /// past 3 helps once the SpeciesFilter GPS serialization is removed
+    /// (commit 9e38fe2); 8 regresses slightly on memory pressure.
+    private static let maxConcurrentMLWork = 6
 
     init(inferenceClient: InferenceClient) {
         self.inferenceClient = inferenceClient
@@ -412,24 +418,31 @@ final class PipelineCoordinator: @unchecked Sendable {
         pHashOut: inout UInt64?,
         imageSizeOut: inout (width: Int, height: Int)?
     ) async throws {
+        let photoStart = DispatchTime.now()
         // Single-read EXIF: one CGImageSource open powers the original
         // image dimensions (logged for perf correlation), the ISO sharpness
         // factor, and the focus-point weighting below.
+        let exifStart = DispatchTime.now()
         let imageProps = ImageProperties.load(filePath: fileURL.path)
         if let props = imageProps,
            let w = props[kCGImagePropertyPixelWidth as String] as? Int,
            let h = props[kCGImagePropertyPixelHeight as String] as? Int {
             imageSizeOut = (w, h)
         }
+        let exifMs = Self.elapsedMs(since: exifStart)
 
         // Decode the 1280 thumbnail up front — identify, OSEA crop,
         // aesthetics / keypoints / flight, and the burst pHash all
         // consume the same pixels; we used to decode twice (once
         // inside identify, once here) which doubled the decode cost.
+        let decodeStart = DispatchTime.now()
         let image = try rawConverter.convert(fileURL: fileURL)
+        let decodeMs = Self.elapsedMs(since: decodeStart)
         // Perceptual hash for the burst-similarity check — reuse the already
         // decoded image instead of reopening the file for a 64px thumbnail.
+        let pHashStart = DispatchTime.now()
         pHashOut = BurstDetector.pHash(from: image)
+        let pHashMs = Self.elapsedMs(since: pHashStart)
 
         // YOLO detect + OSEA species identify, reusing `image` as the
         // source so identify skips its own thumbnail decode.
@@ -468,6 +481,7 @@ final class PipelineCoordinator: @unchecked Sendable {
             return
         }
 
+        let postMlStart = DispatchTime.now()
         async let aestheticsResponse = inferenceClient.aesthetics(image: image)
         async let keypointResult = inferenceClient.keypoints(image: birdCrop)
         async let flightResult = flightDetectionEnabled
@@ -475,6 +489,7 @@ final class PipelineCoordinator: @unchecked Sendable {
             : FlightResult(isFlying: false, confidence: 0)
 
         let (aesthetics, keypoints, flight) = try await (aestheticsResponse, keypointResult, flightResult)
+        let postMlMs = Self.elapsedMs(since: postMlStart)
 
         photo.aestheticsScore = aesthetics.score
         // Persist full 10-bin AVA distribution for the parity harness.
@@ -576,6 +591,13 @@ final class PipelineCoordinator: @unchecked Sendable {
             config: ratingConfig
         )
         photo.starRating = ratingResult.rating
+        let photoMs = Self.elapsedMs(since: photoStart)
+        logger.debug("photo.ml exif=\(exifMs, privacy: .public)ms decode=\(decodeMs, privacy: .public)ms pHash=\(pHashMs, privacy: .public)ms postMl=\(postMlMs, privacy: .public)ms total=\(photoMs, privacy: .public)ms")
+    }
+
+    private static func elapsedMs(since start: DispatchTime) -> String {
+        let ns = DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds
+        return String(format: "%.1f", Double(ns) / 1_000_000)
     }
 
     /// ISO sharpness normalization: 5% penalty per ISO doubling above 800.
