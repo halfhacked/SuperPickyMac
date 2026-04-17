@@ -40,7 +40,7 @@ struct MockInferenceClientForUI: InferenceClient {
         "DSC00169": ("Cepphus columba", "Pigeon Guillemot", 1.0, "海鸽", "haige"),
     ]
 
-    func identify(filePath: String, topK: Int) async throws -> IdentifyResponse {
+    func identify(filePath: String, topK: Int, preDecodedImage: CGImage?) async throws -> IdentifyResponse {
         let filename = (filePath as NSString).lastPathComponent
         let stem = (filename as NSString).deletingPathExtension
 
