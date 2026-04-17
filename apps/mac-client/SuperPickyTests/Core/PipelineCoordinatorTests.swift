@@ -20,7 +20,7 @@ struct MockInferenceClient: InferenceClient {
     func aesthetics(image: CGImage) async throws -> AestheticsResponse { aestheticsResult }
     func keypoints(image: CGImage) async throws -> KeypointResult { keypointResult }
     func flight(image: CGImage) async throws -> FlightResult { flightResult }
-    func identify(filePath: String, topK: Int) async throws -> IdentifyResponse {
+    func identify(filePath: String, topK: Int, preDecodedImage: CGImage?) async throws -> IdentifyResponse {
         IdentifyResponse(species: [], birds: identifyBirds, totalDetected: identifyBirds.count)
     }
 }

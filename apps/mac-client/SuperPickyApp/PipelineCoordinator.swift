@@ -76,8 +76,29 @@ final class PipelineCoordinator: @unchecked Sendable {
         // against the previous one to decide "extend burst vs start new". Files
         // without a readable timestamp sink to the end (sorted by filename among
         // themselves).
-        let filesWithTime: [(url: URL, timestamp: Double?)] = scannedFiles.map {
-            ($0, burstDetector.readPreciseTimestamp(filePath: $0.path))
+        //
+        // Parallelize the EXIF reads — each is ~5–10 ms of CGImageSource open
+        // + property parse, independent per file, and easily overlaps across
+        // CPU cores. 877 photos × 8 ms serial ≈ 7 s of startup; pool width
+        // of `ProcessInfo.activeProcessorCount` cuts this to <1 s.
+        let filesWithTime: [(url: URL, timestamp: Double?)] = await withTaskGroup(
+            of: (Int, URL, Double?).self,
+            returning: [(url: URL, timestamp: Double?)].self
+        ) { group in
+            let detector = burstDetector
+            for (idx, url) in scannedFiles.enumerated() {
+                group.addTask {
+                    (idx, url, detector.readPreciseTimestamp(filePath: url.path))
+                }
+            }
+            var results = Array<(url: URL, timestamp: Double?)>(
+                repeating: (URL(fileURLWithPath: ""), nil),
+                count: scannedFiles.count
+            )
+            for await (idx, url, ts) in group {
+                results[idx] = (url, ts)
+            }
+            return results
         }
         let files = filesWithTime.sorted { a, b in
             switch (a.timestamp, b.timestamp) {
@@ -401,24 +422,31 @@ final class PipelineCoordinator: @unchecked Sendable {
             imageSizeOut = (w, h)
         }
 
-        // Single call: YOLO detect + OSEA species identify (with GPS/eBird
-        // filtering if the filter is loaded). We ask for top-5 so the parity
-        // harness can compare full top-5 overlap, not just top-1.
-        let identifyResult = try await inferenceClient.identify(filePath: fileURL.path, topK: 5)
+        // Decode the 1280 thumbnail up front — identify, OSEA crop,
+        // aesthetics / keypoints / flight, and the burst pHash all
+        // consume the same pixels; we used to decode twice (once
+        // inside identify, once here) which doubled the decode cost.
+        let image = try rawConverter.convert(fileURL: fileURL)
+        // Perceptual hash for the burst-similarity check — reuse the already
+        // decoded image instead of reopening the file for a 64px thumbnail.
+        pHashOut = BurstDetector.pHash(from: image)
+
+        // YOLO detect + OSEA species identify, reusing `image` as the
+        // source so identify skips its own thumbnail decode.
+        let identifyResult = try await inferenceClient.identify(
+            filePath: fileURL.path, topK: 5, preDecodedImage: image
+        )
 
         guard let bird = identifyResult.birds?.first else {
             photo.starRating = 0
             return
         }
         photo.birdConfidence = bird.confidence
-        // Persist YOLO bbox (normalized [x1, y1, x2, y2]) so the parity
-        // harness can compute IoU against the Python reference.
         photo.birdBboxJSON = Self.encodeJSON([
             Float(bird.bbox.minX), Float(bird.bbox.minY),
             Float(bird.bbox.maxX), Float(bird.bbox.maxY),
         ])
 
-        // Save species
         if let top = identifyResult.species.first {
             photo.speciesScientificName = top.scientificName
             photo.speciesCommonName = top.commonName
@@ -426,16 +454,9 @@ final class PipelineCoordinator: @unchecked Sendable {
             photo.speciesPinyin = top.pinyin
             photo.speciesConfidence = top.confidence
         }
-        // Persist the full top-5 for parity. UI never reads this.
         if let top5 = identifyResult.top5 {
             photo.speciesTop5JSON = Self.encodeJSON(top5)
         }
-
-        // Load 1280px thumbnail for aesthetics/keypoints/flight (fast, small payload)
-        let image = try rawConverter.convert(fileURL: fileURL)
-        // Perceptual hash for the burst-similarity check — reuse the already
-        // decoded image instead of reopening the file for a 64px thumbnail.
-        pHashOut = BurstDetector.pHash(from: image)
 
         // Smart square crop with 15% padding + letterboxing, matching preen's
         // YOLOBirdDetector.detect_and_crop_bird. The flight / keypoint / OSEA
