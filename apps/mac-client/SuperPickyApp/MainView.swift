@@ -161,6 +161,11 @@ struct MainView: View {
     private func cancelProcessing() {
         processingTask?.cancel()
         processingTask = nil
+        // Flip UI state immediately so the Stop button feels responsive
+        // even if the pipeline's graceful unwind still takes a moment.
+        // `pipeline.process` won't touch these after cancellation.
+        appState.processingFolder = nil
+        appState.processingProgress = 0
     }
 
     private func exportAllVisible(_ photos: [Photo]) {
