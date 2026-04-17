@@ -40,7 +40,9 @@ public final class OSEAClassifier: @unchecked Sendable {
     // MARK: - Init
 
     public init(url: URL, configuration: MLModelConfiguration = .init()) throws {
-        configuration.computeUnits = .all
+        // Pin to ANE — ResNet34 is a native ANE fit, and pinning avoids the
+        // CoreML runtime silently routing to GPU when the ANE is busy.
+        configuration.computeUnits = .cpuAndNeuralEngine
         self.model = try MLModel(contentsOf: url, configuration: configuration)
     }
 

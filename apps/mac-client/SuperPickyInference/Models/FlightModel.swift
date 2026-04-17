@@ -24,7 +24,7 @@ public final class FlightModel: @unchecked Sendable {
 
     /// Load a compiled FlightDetector.mlmodelc from a given URL.
     public init(url: URL, configuration: MLModelConfiguration = .init()) throws {
-        configuration.computeUnits = .all
+        configuration.computeUnits = .cpuAndNeuralEngine
         self.model = try MLModel(contentsOf: url, configuration: configuration)
     }
 

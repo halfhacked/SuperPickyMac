@@ -59,6 +59,10 @@ public final class YOLOBirdDetector: @unchecked Sendable {
     // MARK: - Init
 
     public init(url: URL, configuration: MLModelConfiguration = .init()) throws {
+        // YOLO11l-seg contains ops the MPSGraph backend can't lower
+        // (MLIR pass manager assertion in MetalPerformanceShadersGraph on
+        // macOS 26). `.cpuAndGPU` crashes at load. `.all` lets CoreML
+        // pick the backend that works — in practice ANE.
         configuration.computeUnits = .all
         self.model = try MLModel(contentsOf: url, configuration: configuration)
     }
