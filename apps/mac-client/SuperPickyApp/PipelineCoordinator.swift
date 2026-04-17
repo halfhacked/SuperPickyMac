@@ -189,8 +189,6 @@ final class PipelineCoordinator: @unchecked Sendable {
         // actually complete.
         @Sendable
         func finalize(url: URL, workTask: Task<MLWorkResult, Error>) async {
-            // Cancellation: drop the ML task immediately so the main
-            // loop can unwind fast. No DB write, no UI callback.
             if Task.isCancelled {
                 workTask.cancel()
                 return
@@ -277,6 +275,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                             }
                             let toSave = burstPhotos[i]
                             let burstGPS = gpsByPath[toSave.filePath]
+                            let rewriteXMP = shouldInherit
                             writeBehind { [logger, reverseGeocoder = self.reverseGeocoder] in
                                 var p = toSave
                                 // GRDB save is a full REPLACE; re-apply location so
@@ -288,7 +287,10 @@ final class PipelineCoordinator: @unchecked Sendable {
                                 do { try db.save(&p) } catch {
                                     logger.error("Failed to save burst update: \(error)")
                                 }
-                                try? XMPWriter.write(photo: p)
+                                // Only rewrite the sidecar when species
+                                // actually changed — burst-flag-only
+                                // updates don't surface in XMP.
+                                if rewriteXMP { try? XMPWriter.write(photo: p) }
                             }
                             updated.append(burstPhotos[i])
                         }
@@ -362,12 +364,9 @@ final class PipelineCoordinator: @unchecked Sendable {
             inflight.append((fileURL, task))
         }
 
-        // Cancellation: return as quickly as possible so the UI's Stop
-        // button feels instant. Cancel all in-flight ML tasks, skip the
-        // final drain + picked-flag phase. The write-behind chain keeps
-        // running in the background as an unstructured Task chain; any
-        // photo already finalized will still be saved, we just don't
-        // await it here.
+        // Cancellation: cancel inflight, skip final drain + picked-flag.
+        // Write-behind chain keeps running in the background so already-
+        // finalized photos still save.
         if Task.isCancelled {
             for (_, task) in inflight { task.cancel() }
             inflight.removeAll()
