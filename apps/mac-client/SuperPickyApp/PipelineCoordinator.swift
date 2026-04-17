@@ -80,37 +80,31 @@ final class PipelineCoordinator: @unchecked Sendable {
             return
         }
 
-        // Sort files by EXIF timestamp so burst detection can run incrementally:
-        // with photos in timestamp order, each new photo only needs to be compared
-        // against the previous one to decide "extend burst vs start new". Files
-        // without a readable timestamp sink to the end (sorted by filename among
-        // themselves).
-        //
-        // Parallelize the EXIF reads — each is ~5–10 ms of CGImageSource open
-        // + property parse, independent per file, and easily overlaps across
-        // CPU cores. 877 photos × 8 ms serial ≈ 7 s of startup; pool width
-        // of `ProcessInfo.activeProcessorCount` cuts this to <1 s. We also
-        // extract GPS lat/lon from the same open so we can pre-warm the
-        // reverse-geocoder for every unique cell before the ML pipeline
-        // starts — without the pre-warm, the first few ML tasks all suspend
-        // on the same in-flight CLGeocoder call and stall the pipeline for
-        // the round-trip.
-        let filesWithTime: [(url: URL, timestamp: Double?, lat: Double?, lon: Double?)] = await withTaskGroup(
-            of: (Int, URL, Double?, Double?, Double?).self,
-            returning: [(url: URL, timestamp: Double?, lat: Double?, lon: Double?)].self
+        // Pre-pass: read timestamp + GPS per file in parallel. Sort by
+        // timestamp so burst detection can run incrementally (each photo
+        // compared only against the previous); files without timestamps
+        // sort to the end by filename.
+        struct PrePassInfo: Sendable {
+            let url: URL
+            let timestamp: Double?
+            let gps: (lat: Double, lon: Double)?
+        }
+        let filesWithTime: [PrePassInfo] = await withTaskGroup(
+            of: (Int, PrePassInfo).self,
+            returning: [PrePassInfo].self
         ) { group in
             for (idx, url) in scannedFiles.enumerated() {
                 group.addTask {
                     let result = BurstDetector.readPreciseTimestampAndGPS(filePath: url.path)
-                    return (idx, url, result.timestamp, result.lat, result.lon)
+                    return (idx, PrePassInfo(url: url, timestamp: result.timestamp, gps: result.gps))
                 }
             }
-            var results = Array<(url: URL, timestamp: Double?, lat: Double?, lon: Double?)>(
-                repeating: (URL(fileURLWithPath: ""), nil, nil, nil),
+            var results = [PrePassInfo](
+                repeating: PrePassInfo(url: URL(fileURLWithPath: ""), timestamp: nil, gps: nil),
                 count: scannedFiles.count
             )
-            for await (idx, url, ts, lat, lon) in group {
-                results[idx] = (url, ts, lat, lon)
+            for await (idx, info) in group {
+                results[idx] = info
             }
             return results
         }
@@ -122,42 +116,23 @@ final class PipelineCoordinator: @unchecked Sendable {
             case (nil, nil): return a.url.lastPathComponent < b.url.lastPathComponent
             }
         }.map(\.url)
-        let timestampByPath = Dictionary(uniqueKeysWithValues:
-            filesWithTime.compactMap { info in
-                info.timestamp.map { (info.url.path, $0) }
-            }
-        )
 
-        // Per-path GPS lat/lon captured in the pre-pass, consumed lazily by
-        // the write-behind chain to populate the photo's location fields
-        // without stalling the main ML loop. The reverse-geocoder is an
-        // actor with cell-keyed caching + in-flight coalescing, so even
-        // though N photos call `resolve` in the write-behind chain, only
-        // ~1 CLGeocoder round-trip per unique 0.1° cell actually hits the
-        // network.
-        let gpsByPath: [String: (lat: Double, lon: Double)] = Dictionary(uniqueKeysWithValues:
-            filesWithTime.compactMap { info in
-                guard let lat = info.lat, let lon = info.lon else { return nil }
-                return (info.url.path, (lat, lon))
-            }
-        )
-
-        // Pre-warm SpeciesFilter's Avonet cache for every unique 0.1° GPS
-        // cell concurrently. Without this, the first six in-flight ML
-        // tasks all cache-miss at once and serialize on the SQLite
-        // FULLMUTEX lock, stretching `identify.gps` from <1 ms to 400–
-        // 1300 ms per photo (measured on a cold 877-photo bench). Warming
-        // here runs in parallel with the ML startup (model ready, first
-        // decode) and is absorbed entirely by that latency.
-        var seenCells = Set<Int64>()
+        // One pass: timestampByPath + gpsByPath + unique-cells dedup for
+        // the SpeciesFilter pre-warm. Without pre-warming, the first six
+        // concurrent identifies all cache-miss the Avonet SQLite lookup
+        // simultaneously and serialize on the FULLMUTEX lock.
+        var timestampByPath: [String: Double] = [:]
+        var gpsByPath: [String: (lat: Double, lon: Double)] = [:]
+        var seenCells = Set<UInt64>()
         var uniqueCells: [(lat: Double, lon: Double)] = []
+        timestampByPath.reserveCapacity(filesWithTime.count)
+        gpsByPath.reserveCapacity(filesWithTime.count)
         for info in filesWithTime {
-            guard let lat = info.lat, let lon = info.lon else { continue }
-            let latK = Int64((lat * 10).rounded())
-            let lonK = Int64((lon * 10).rounded())
-            let key = (latK << 32) | (lonK & 0xFFFFFFFF)
-            if seenCells.insert(key).inserted {
-                uniqueCells.append((lat, lon))
+            if let ts = info.timestamp { timestampByPath[info.url.path] = ts }
+            guard let gps = info.gps else { continue }
+            gpsByPath[info.url.path] = gps
+            if seenCells.insert(GPSCell.key(lat: gps.lat, lon: gps.lon)).inserted {
+                uniqueCells.append(gps)
             }
         }
         await inferenceClient.prewarmGPSCells(uniqueCells)
@@ -237,11 +212,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                 var p = snapshot
                 if let gps = gpsCoord,
                    let loc = await reverseGeocoder.resolve(lat: gps.lat, lon: gps.lon) {
-                    p.locationCity = loc.city
-                    p.locationState = loc.state
-                    p.locationCountry = loc.country
-                    p.locationCountryCode = loc.countryCode
-                    p.locationSublocation = loc.sublocation
+                    p.applyLocation(loc)
                 }
                 do { try db.save(&p) } catch {
                     logger.error("Failed to save photo: \(error)")
@@ -294,20 +265,11 @@ final class PipelineCoordinator: @unchecked Sendable {
                             let burstGPS = gpsByPath[toSave.filePath]
                             writeBehind { [logger, reverseGeocoder = self.reverseGeocoder] in
                                 var p = toSave
-                                // `db.save` via GRDB's PersistableRecord does a full
-                                // REPLACE, so without re-attaching the location
-                                // fields the nil ones on `toSave` would clobber the
-                                // values saved by this photo's initial write-behind.
-                                // The resolve call is a cache hit here because the
-                                // initial write-behind (chained before us) has
-                                // already populated the cell.
+                                // GRDB save is a full REPLACE; re-apply location so
+                                // the burst update doesn't clobber it.
                                 if let gps = burstGPS,
                                    let loc = await reverseGeocoder.resolve(lat: gps.lat, lon: gps.lon) {
-                                    p.locationCity = loc.city
-                                    p.locationState = loc.state
-                                    p.locationCountry = loc.country
-                                    p.locationCountryCode = loc.countryCode
-                                    p.locationSublocation = loc.sublocation
+                                    p.applyLocation(loc)
                                 }
                                 do { try db.save(&p) } catch {
                                     logger.error("Failed to save burst update: \(error)")
@@ -366,6 +328,7 @@ final class PipelineCoordinator: @unchecked Sendable {
             }
 
             let capturedFolder = folder.path
+            let preGPS = gpsByPath[fileURL.path]
             let task = Task.detached(priority: .userInitiated) { [self] in
                 try await self.processMLWork(
                     fileURL: fileURL,
@@ -373,7 +336,8 @@ final class PipelineCoordinator: @unchecked Sendable {
                     ratingConfig: ratingConfig,
                     exposureEnabled: exposureEnabled,
                     exposureThreshold: exposureThreshold,
-                    flightDetectionEnabled: flightDetectionEnabled
+                    flightDetectionEnabled: flightDetectionEnabled,
+                    preGPS: preGPS
                 )
             }
             inflight.append((fileURL, task))
@@ -483,7 +447,8 @@ final class PipelineCoordinator: @unchecked Sendable {
         ratingConfig: RatingEngine.Config,
         exposureEnabled: Bool,
         exposureThreshold: Float,
-        flightDetectionEnabled: Bool
+        flightDetectionEnabled: Bool,
+        preGPS: (lat: Double, lon: Double)? = nil
     ) async throws -> MLWorkResult {
         var photo = Photo(
             filename: fileURL.lastPathComponent,
@@ -499,6 +464,7 @@ final class PipelineCoordinator: @unchecked Sendable {
             exposureEnabled: exposureEnabled,
             exposureThreshold: exposureThreshold,
             flightDetectionEnabled: flightDetectionEnabled,
+            preGPS: preGPS,
             pHashOut: &pHash,
             imageSizeOut: &imageSize
         )
@@ -512,6 +478,7 @@ final class PipelineCoordinator: @unchecked Sendable {
         exposureEnabled: Bool,
         exposureThreshold: Float,
         flightDetectionEnabled: Bool,
+        preGPS: (lat: Double, lon: Double)?,
         pHashOut: inout UInt64?,
         imageSizeOut: inout (width: Int, height: Int)?
     ) async throws {
@@ -538,11 +505,9 @@ final class PipelineCoordinator: @unchecked Sendable {
         pHashOut = BurstDetector.pHash(from: image)
         let pHashMs = Self.elapsedMs(since: pHashStart)
 
-        // YOLO detect + OSEA species identify, reusing `image` as the
-        // source so identify skips its own thumbnail decode, and
-        // threading GPS through from the already-loaded `imageProps` so
-        // SpeciesFilter doesn't reopen the file to read the GPS IFD.
-        let preGPS = imageProps.flatMap { GPSExtractor.gps(fromProperties: $0) }
+        // YOLO detect + OSEA species identify, reusing `image` and the
+        // pre-pass GPS so identify skips its thumbnail decode AND its
+        // second CGImageSource open for the GPS IFD.
         let identifyResult = try await inferenceClient.identify(
             filePath: fileURL.path, topK: 5,
             preDecodedImage: image, preGPS: preGPS
@@ -689,14 +654,6 @@ final class PipelineCoordinator: @unchecked Sendable {
             config: ratingConfig
         )
         photo.starRating = ratingResult.rating
-
-        // Reverse-geocoding (GPS → city/state/country) is not called here
-        // anymore — it runs on the write-behind chain (see
-        // PipelineCoordinator.process, `writeBehind` closure). Awaiting
-        // CLGeocoder on this per-photo Task would suspend the ML slot for
-        // the round-trip and stall the entire 6-way pipeline during a
-        // cache miss; moving it to write-behind keeps the ML loop
-        // unblocked and hides the latency under per-photo DB/XMP writes.
 
         let photoMs = Self.elapsedMs(since: photoStart)
         logger.debug("photo.ml decode=\(decodeMs, privacy: .public)ms pHash=\(pHashMs, privacy: .public)ms postMl=\(postMlMs, privacy: .public)ms total=\(photoMs, privacy: .public)ms")

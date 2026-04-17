@@ -64,4 +64,12 @@ struct Photo: Identifiable, Codable, Sendable, FetchableRecord, PersistableRecor
         self.isBurstBest = false
         self.isManualRating = false
     }
+
+    mutating func applyLocation(_ loc: LocationInfo) {
+        locationCity = loc.city
+        locationState = loc.state
+        locationCountry = loc.country
+        locationCountryCode = loc.countryCode
+        locationSublocation = loc.sublocation
+    }
 }

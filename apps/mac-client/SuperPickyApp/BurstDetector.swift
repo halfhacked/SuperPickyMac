@@ -3,6 +3,7 @@ import CoreGraphics
 import ImageIO
 import Vision
 import Accelerate
+import SuperPickyInference
 
 /// Which algorithm to use for burst similarity verification.
 enum BurstSimilarityMethod: Sendable {
@@ -79,70 +80,31 @@ struct BurstDetector: Sendable {
 
     /// Read DateTimeOriginal + SubSecTimeOriginal from EXIF for millisecond precision.
     func readPreciseTimestamp(filePath: String) -> Double? {
-        let url = URL(fileURLWithPath: filePath)
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any],
-              let exif = properties["{Exif}"] as? [String: Any],
-              let dateStr = exif["DateTimeOriginal"] as? String else {
-            return nil
-        }
-
-        let formatter = Self.exifDateFormatter
-
-        guard let date = formatter.date(from: dateStr) else { return nil }
-        var timestamp = date.timeIntervalSince1970
-
-        // Add subsecond precision if available
-        if let subsec = (exif["SubsecTimeOriginal"] ?? exif["SubSecTimeOriginal"]) as? String,
-           let subsecFloat = Double("0.\(subsec)") {
-            timestamp += subsecFloat
-        }
-
-        return timestamp
+        ImageProperties.load(filePath: filePath).flatMap(Self.parseTimestamp(from:))
     }
 
-    /// Read EXIF `{Exif}` sub-dict + GPS sub-dict from a single CGImageSource
-    /// open. Used by the pipeline's pre-pass to get both the precise
-    /// timestamp (for burst ordering) and the GPS coord (for geocoder
-    /// pre-warm) without opening the file twice.
+    /// Read timestamp + GPS from a single CGImageSource open. Composes the
+    /// standard `ImageProperties` + `GPSExtractor` utilities, so there's
+    /// only one file read and one canonical GPS parser.
     static func readPreciseTimestampAndGPS(
         filePath: String
-    ) -> (timestamp: Double?, lat: Double?, lon: Double?) {
-        let url = URL(fileURLWithPath: filePath)
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any] else {
-            return (nil, nil, nil)
+    ) -> (timestamp: Double?, gps: (lat: Double, lon: Double)?) {
+        guard let props = ImageProperties.load(filePath: filePath) else {
+            return (nil, nil)
         }
+        return (parseTimestamp(from: props), GPSExtractor.gps(fromProperties: props))
+    }
 
-        var timestamp: Double?
-        if let exif = properties["{Exif}"] as? [String: Any],
-           let dateStr = exif["DateTimeOriginal"] as? String,
-           let date = exifDateFormatter.date(from: dateStr) {
-            var ts = date.timeIntervalSince1970
-            if let subsec = (exif["SubsecTimeOriginal"] ?? exif["SubSecTimeOriginal"]) as? String,
-               let subsecFloat = Double("0.\(subsec)") {
-                ts += subsecFloat
-            }
-            timestamp = ts
+    private static func parseTimestamp(from props: [String: Any]) -> Double? {
+        guard let exif = props["{Exif}"] as? [String: Any],
+              let dateStr = exif["DateTimeOriginal"] as? String,
+              let date = exifDateFormatter.date(from: dateStr) else { return nil }
+        var ts = date.timeIntervalSince1970
+        if let subsec = (exif["SubsecTimeOriginal"] ?? exif["SubSecTimeOriginal"]) as? String,
+           let subsecFloat = Double("0.\(subsec)") {
+            ts += subsecFloat
         }
-
-        var lat: Double?
-        var lon: Double?
-        if let gpsKey = properties[kCGImagePropertyGPSDictionary as String] as? [String: Any],
-           var latVal = gpsKey[kCGImagePropertyGPSLatitude as String] as? Double,
-           var lonVal = gpsKey[kCGImagePropertyGPSLongitude as String] as? Double {
-            if let latRef = gpsKey[kCGImagePropertyGPSLatitudeRef as String] as? String,
-               latRef.uppercased() == "S" { latVal = -latVal }
-            if let lonRef = gpsKey[kCGImagePropertyGPSLongitudeRef as String] as? String,
-               lonRef.uppercased() == "W" { lonVal = -lonVal }
-            if (-90.0...90.0).contains(latVal), (-180.0...180.0).contains(lonVal),
-               !(abs(latVal) < 1e-6 && abs(lonVal) < 1e-6) {
-                lat = latVal
-                lon = lonVal
-            }
-        }
-
-        return (timestamp, lat, lon)
+        return ts
     }
 
     // MARK: - Phase 2: Time-based grouping
