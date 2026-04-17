@@ -53,6 +53,25 @@ final class AppState {
     var pickedPhotos: [Photo] { allPhotos.filter { $0.isPick } }
     // Filtered photos shown in the UI
     var photos: [Photo] = []
+    // O(1) lookup from photo.id → index in allPhotos and photos. Keeping
+    // these in sync with the arrays turns `appendProcessedPhoto` from
+    // O(N) per call into O(1); on a 9 000-photo import the main thread
+    // was otherwise spending O(N²) total doing linear scans per update,
+    // which is what made scrolling and clicks feel frozen during a run.
+    private var allPhotoIndex: [UUID: Int] = [:]
+    private var filteredPhotoIndex: [UUID: Int] = [:]
+
+    private func rebuildAllPhotoIndex() {
+        allPhotoIndex.removeAll(keepingCapacity: true)
+        allPhotoIndex.reserveCapacity(allPhotos.count)
+        for (i, p) in allPhotos.enumerated() { allPhotoIndex[p.id] = i }
+    }
+
+    private func rebuildFilteredPhotoIndex() {
+        filteredPhotoIndex.removeAll(keepingCapacity: true)
+        filteredPhotoIndex.reserveCapacity(photos.count)
+        for (i, p) in photos.enumerated() { filteredPhotoIndex[p.id] = i }
+    }
     private var undoStack: [UndoAction] = []
     private static let maxUndoDepth = 20
     var canUndo: Bool { !undoStack.isEmpty }
@@ -94,6 +113,7 @@ final class AppState {
             let database = try ReportDatabase(folderPath: folder)
             cachedDB = database
             allPhotos = try database.fetchAllPhotos()
+            rebuildAllPhotoIndex()
             ratingCounts = try database.ratingCounts()
             flyingCount = allPhotos.filter { $0.isFlying }.count
             picksCount = allPhotos.filter { $0.isPick }.count
@@ -114,6 +134,8 @@ final class AppState {
             logger.error("loadPhotos failed: \(error)")
             allPhotos = []
             photos = []
+            allPhotoIndex = [:]
+            filteredPhotoIndex = [:]
             ratingCounts = [:]
             speciesEntries = []
         }
@@ -124,13 +146,13 @@ final class AppState {
         speciesEntries = SpeciesHierarchyBuilder.build(from: allPhotos)
     }
 
-    /// Incrementally append or replace a single processed photo. Incremental
-    /// species-hierarchy update keeps this O(k) (k = number of species seen
-    /// so far, typically 1–5) instead of the O(n) full rebuild that the
-    /// naive path used to run on every photo.
+    /// Incrementally append or replace a single processed photo. Hot
+    /// path during folder processing — runs in O(1) in the common case
+    /// (photo updates in place) via the two index dicts. Leaving the
+    /// current filter is the only path that does an O(M) index fix-up.
     func appendProcessedPhoto(_ photo: Photo) {
         let oldPhoto: Photo?
-        if let idx = allPhotos.firstIndex(where: { $0.id == photo.id }) {
+        if let idx = allPhotoIndex[photo.id] {
             let old = allPhotos[idx]
             oldPhoto = old
             allPhotos[idx] = photo
@@ -138,9 +160,9 @@ final class AppState {
             if ratingCounts[old.starRating] == 0 { ratingCounts.removeValue(forKey: old.starRating) }
             if old.isFlying { flyingCount -= 1 }
             if old.isPick { picksCount -= 1 }
-            photos.removeAll { $0.id == photo.id }
         } else {
             oldPhoto = nil
+            allPhotoIndex[photo.id] = allPhotos.count
             allPhotos.append(photo)
         }
 
@@ -150,7 +172,20 @@ final class AppState {
 
         updateSpeciesHierarchy(removing: oldPhoto, adding: photo)
 
-        if photoMatchesCurrentFilter(photo) {
+        let matches = photoMatchesCurrentFilter(photo)
+        if let fIdx = filteredPhotoIndex[photo.id] {
+            if matches {
+                photos[fIdx] = photo
+            } else {
+                // Leaving filter — remove and reindex the rest.
+                photos.remove(at: fIdx)
+                filteredPhotoIndex.removeValue(forKey: photo.id)
+                for (id, i) in filteredPhotoIndex where i > fIdx {
+                    filteredPhotoIndex[id] = i - 1
+                }
+            }
+        } else if matches {
+            filteredPhotoIndex[photo.id] = photos.count
             photos.append(photo)
         }
     }
@@ -251,6 +286,8 @@ final class AppState {
     func clearPhotos() {
         allPhotos = []
         photos = []
+        allPhotoIndex = [:]
+        filteredPhotoIndex = [:]
         ratingCounts = [:]
         speciesEntries = []
         selectedPhotoID = nil
@@ -281,12 +318,12 @@ final class AppState {
             try database.save(&photo)      // DB write FIRST
             try? XMPWriter.write(photo: photo)
             // Only update in-memory state after successful DB write:
-            if let idx = allPhotos.firstIndex(where: { $0.id == id }) {
+            if let idx = allPhotoIndex[id] {
                 allPhotos[idx] = photo
             }
             if let update = updateView {
                 update(photo)
-            } else if let idx = photos.firstIndex(where: { $0.id == id }) {
+            } else if let idx = filteredPhotoIndex[id] {
                 photos[idx] = photo
             }
 
@@ -324,6 +361,8 @@ final class AppState {
         // Remove from memory
         allPhotos.removeAll { $0.id == id }
         photos.removeAll { $0.id == id }
+        rebuildAllPhotoIndex()
+        rebuildFilteredPhotoIndex()
         undoStack.removeAll { $0.photoID == id }
 
         ratingCounts = (try? database.ratingCounts()) ?? ratingCounts
@@ -347,6 +386,7 @@ final class AppState {
             photo.isManualRating = true
         }, updateView: { [self] _ in
             self.photos.removeAll { $0.id == id }
+            self.rebuildFilteredPhotoIndex()
         })
     }
 
@@ -361,13 +401,14 @@ final class AppState {
             try database.save(&photo)
             try? XMPWriter.write(photo: photo)
 
-            if let idx = allPhotos.firstIndex(where: { $0.id == action.photoID }) {
+            if let idx = allPhotoIndex[action.photoID] {
                 allPhotos[idx] = photo
             }
 
             if action.wasHidden {
+                filteredPhotoIndex[photo.id] = photos.count
                 photos.append(photo)
-            } else if let idx = photos.firstIndex(where: { $0.id == action.photoID }) {
+            } else if let idx = filteredPhotoIndex[action.photoID] {
                 photos[idx] = photo
             }
 
@@ -412,8 +453,9 @@ final class AppState {
         case nil:
             photos = allPhotos
         }
+        rebuildFilteredPhotoIndex()
         // Update selection
-        if let id = selectedPhotoID, !photos.contains(where: { $0.id == id }) {
+        if let id = selectedPhotoID, filteredPhotoIndex[id] == nil {
             selectedPhotoID = photos.first?.id
         }
     }
