@@ -90,6 +90,27 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
 
     // MARK: - Native species identification
 
+    /// Populates SpeciesFilter's Avonet cache for every unique GPS cell
+    /// concurrently *before* the main ML loop runs. Without this, the
+    /// first six photos all cache-miss at once, serialize on the SQLite
+    /// FULLMUTEX lock, and each `identify.gps` call stretches to 400–
+    /// 1300 ms (measured). With pre-warm, the cache is hot before any
+    /// photo's `identify` runs, so per-photo GPS lookup is a single dict
+    /// read (~1 µs).
+    func prewarmGPSCells(_ cells: [(lat: Double, lon: Double)]) async {
+        guard let filter = speciesFilter, !cells.isEmpty else { return }
+        await withTaskGroup(of: Void.self) { group in
+            for cell in cells {
+                let lat = cell.lat
+                let lon = cell.lon
+                group.addTask {
+                    _ = filter.allowedClassIDs(lat: lat, lon: lon)
+                }
+            }
+            for await _ in group {}
+        }
+    }
+
     func identify(
         filePath: String, topK: Int,
         preDecodedImage: CGImage?, preGPS: (lat: Double, lon: Double)?
