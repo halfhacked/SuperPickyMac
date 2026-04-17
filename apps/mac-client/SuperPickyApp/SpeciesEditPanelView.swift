@@ -212,7 +212,7 @@ struct SpeciesEditPanelView: View {
             } label: {
                 Image(systemName: "plus.circle.fill")
                     .font(.system(size: 13))
-                    .foregroundStyle(.accentColor)
+                    .foregroundStyle(Color.accentColor)
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("SpeciesEditPanel_Add_\(match.speciesID)")
@@ -242,7 +242,7 @@ struct SpeciesEditPanelView: View {
                 Spacer()
                 Image(systemName: "plus.circle")
                     .font(.system(size: 12))
-                    .foregroundStyle(.accentColor)
+                    .foregroundStyle(Color.accentColor)
             }
             .contentShape(Rectangle())
         }
