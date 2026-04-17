@@ -18,7 +18,6 @@
 // Thread safety: @unchecked Sendable. MLModel is thread-safe per Apple docs.
 // Each logits() call allocates a fresh MLMultiArray.
 
-import Accelerate
 import CoreML
 import CoreGraphics
 import Foundation
@@ -67,15 +66,13 @@ public final class OSEAClassifier: @unchecked Sendable {
 
         if useTTA {
             let ttaStart = DispatchTime.now()
-            // Flip the already-preprocessed tensor along its W axis instead
-            // of re-rendering the source CGImage and re-normalizing it. Saves
-            // one CGContext draw + one full normalize pass per photo.
-            let flipped = try ImagePreprocessor.horizontalFlipNCHW(preprocessed)
-            let output2 = try runModel(inputArray: flipped)
-            var merged = [Float](repeating: 0, count: output1.count)
-            vDSP_vadd(output1, 1, output2, 1, &merged, 1, vDSP_Length(output1.count))
-            var half: Float = 0.5
-            vDSP_vsmul(merged, 1, &half, &merged, 1, vDSP_Length(merged.count))
+            guard let flipped = Self.flipHorizontal(image: image) else {
+                logger.debug("osea.logits preprocess=\(preMs, privacy: .public)ms infer=\(runMs, privacy: .public)ms tta=skip")
+                return output1
+            }
+            let preprocessed2 = try Self.preprocess(image: flipped, isYOLOCropped: isYOLOCropped)
+            let output2 = try runModel(inputArray: preprocessed2)
+            let merged = zip(output1, output2).map { ($0 + $1) / 2 }
             let ttaMs = Self.elapsedMs(since: ttaStart)
             logger.debug("osea.logits preprocess=\(preMs, privacy: .public)ms infer=\(runMs, privacy: .public)ms tta=\(ttaMs, privacy: .public)ms")
             return merged
@@ -114,7 +111,7 @@ public final class OSEAClassifier: @unchecked Sendable {
             let resized = try resizeShorterSide(image: image, targetShortSide: resizeSize)
             cropped = try centerCrop(image: resized, cropSize: cropSize)
         }
-        return try ImagePreprocessor.normalizedNCHW(image: cropped, size: cropSize)
+        return try normalizeToMLMultiArray(image: cropped)
     }
 
     /// Resize the image so the shorter side equals `targetShortSide`, maintaining aspect ratio.
@@ -153,6 +150,52 @@ public final class OSEAClassifier: @unchecked Sendable {
         return cropped
     }
 
+    /// Render a 224×224 CGImage to an NCHW MLMultiArray with ImageNet normalization.
+    private static func normalizeToMLMultiArray(image: CGImage) throws -> MLMultiArray {
+        let size = cropSize
+        var pixels = [UInt8](repeating: 0, count: size * size * 4)  // RGBA
+
+        guard let ctx = CGContext(
+            data: &pixels, width: size, height: size,
+            bitsPerComponent: 8, bytesPerRow: size * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { throw OSEAError.preprocessingFailed }
+
+        ctx.draw(image, in: CGRect(x: 0, y: 0, width: size, height: size))
+
+        let array = try MLMultiArray(shape: [1, 3, NSNumber(value: size), NSNumber(value: size)],
+                                     dataType: .float32)
+        let ptr = array.dataPointer.bindMemory(to: Float.self, capacity: 3 * size * size)
+        let channelStride = size * size
+        let mean = InferenceConstants.imageNetMean
+        let std = InferenceConstants.imageNetStd
+
+        for i in 0..<(size * size) {
+            let r = Float(pixels[i * 4 + 0]) / 255.0
+            let g = Float(pixels[i * 4 + 1]) / 255.0
+            let b = Float(pixels[i * 4 + 2]) / 255.0
+            ptr[0 * channelStride + i] = (r - mean.x) / std.x
+            ptr[1 * channelStride + i] = (g - mean.y) / std.y
+            ptr[2 * channelStride + i] = (b - mean.z) / std.z
+        }
+        return array
+    }
+
+    /// Horizontal flip of a CGImage (for TTA).
+    private static func flipHorizontal(image: CGImage) -> CGImage? {
+        guard let ctx = CGContext(
+            data: nil, width: image.width, height: image.height,
+            bitsPerComponent: 8, bytesPerRow: image.width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+
+        ctx.translateBy(x: CGFloat(image.width), y: 0)
+        ctx.scaleBy(x: -1, y: 1)
+        ctx.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        return ctx.makeImage()
+    }
 }
 
 // MARK: - Errors

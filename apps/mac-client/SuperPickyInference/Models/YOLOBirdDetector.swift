@@ -17,7 +17,6 @@
 // Thread safety: @unchecked Sendable. MLModel is thread-safe per Apple docs.
 // Each predict() call allocates fresh pixel buffers and intermediate arrays.
 
-import Accelerate
 import CoreML
 import CoreGraphics
 import Foundation
@@ -236,28 +235,19 @@ public final class YOLOBirdDetector: @unchecked Sendable {
 
     /// Decode per-detection mask: mask_coefs (32) × prototypes (32×160×160) → sigmoid → threshold.
     /// Returns 160×160 uint8 array (0=background, 1=bird).
-    ///
-    /// Math: `logits[p] = Σ_k coefs[k] * protos[k][p]`. In matrix form that
-    /// is `logits = protos^T · coefs` where `protos` is [K=32, P=25600]
-    /// row-major — expressible as a BLAS SGEMV. `sigmoid(x) > 0.5 ⇔ x > 0`
-    /// lets us drop the exp entirely; the final mask is just `logits > 0`.
     private static func decodeMask(coefs: [Float], protos: UnsafePointer<Float>) -> Data {
-        let hw = maskH * maskW
-        var logits = [Float](repeating: 0, count: hw)
-        coefs.withUnsafeBufferPointer { coefsBuf in
-            logits.withUnsafeMutableBufferPointer { logitsBuf in
-                cblas_sgemv(
-                    CblasRowMajor, CblasTrans,
-                    Int32(numMaskCoefs), Int32(hw),
-                    1.0, protos, Int32(hw),
-                    coefsBuf.baseAddress!, 1,
-                    0.0, logitsBuf.baseAddress!, 1
-                )
+        let h = maskH, w = maskW
+        var result = [UInt8](repeating: 0, count: h * w)
+        let hw = h * w
+        for y in 0..<h {
+            for x in 0..<w {
+                var val: Float = 0
+                let pixel = y * w + x
+                for k in 0..<numMaskCoefs {
+                    val += coefs[k] * protos[k * hw + pixel]
+                }
+                result[pixel] = (1.0 / (1.0 + exp(-val))) > 0.5 ? 1 : 0
             }
-        }
-        var result = [UInt8](repeating: 0, count: hw)
-        for i in 0..<hw {
-            result[i] = logits[i] > 0 ? 1 : 0
         }
         return Data(result)
     }
