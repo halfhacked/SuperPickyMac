@@ -291,6 +291,9 @@ struct MainView: View {
                 exposureThreshold: exposureThreshold,
                 flightDetectionEnabled: config.flightDetectionEnabled,
                 burstDetectionEnabled: config.burstDetectionEnabled,
+                burstFps: config.burstFps,
+                burstMinCount: config.burstMinCount,
+                burstHashTolerance: config.burstHashTolerance,
                 pickedTopPercentage: config.pickedTopPercentage,
                 onPhotoProcessed: { photo in
                     await MainActor.run {

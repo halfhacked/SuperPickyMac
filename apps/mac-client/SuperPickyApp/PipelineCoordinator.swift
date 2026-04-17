@@ -20,12 +20,11 @@ final class PipelineCoordinator: @unchecked Sendable {
     var isProcessing = false
 
     /// Max photos whose ML work (decode + YOLO + OSEA + aesthetics/keypoints/
-    /// flight) may be in flight simultaneously. With the compute-unit split
-    /// (YOLO + Aesthetics on GPU, OSEA/Keypoint/Flight pinned to ANE), two
-    /// photos' ML work can truly overlap on different engines instead of
-    /// serializing through ANE. Post-processing (DB save, burst state, UI
-    /// callback) still runs strictly in timestamp order.
-    private static let maxConcurrentMLWork = 2
+    /// flight) may be in flight simultaneously. Compute-unit split pins
+    /// Aesthetics to GPU and OSEA/Keypoint/Flight to ANE so several photos'
+    /// work can truly overlap across engines. Post-processing (DB, burst
+    /// state, UI callback) still runs strictly in timestamp order.
+    private static let maxConcurrentMLWork = 3
 
     init(inferenceClient: InferenceClient) {
         self.inferenceClient = inferenceClient
@@ -38,12 +37,31 @@ final class PipelineCoordinator: @unchecked Sendable {
         exposureThreshold: Float,
         flightDetectionEnabled: Bool = true,
         burstDetectionEnabled: Bool = true,
+        burstFps: Int = 10,
+        burstMinCount: Int = 2,
+        burstHashTolerance: Int = 12,
         pickedTopPercentage: Int = PickedFlagCalculator.defaultTopPercentage,
         databaseName: String = ".report.db",
         onPhotoProcessed: (@Sendable (Photo?) async -> Void)? = nil
     ) async {
         isProcessing = true
         defer { isProcessing = false }
+
+        // Build a local BurstDetector with the user-configured thresholds.
+        // Default init on the class-level `burstDetector` only supplied
+        // hardcoded 500 ms / min 2 / hash 12; wiring it here lets the
+        // Advanced Settings sliders (burstFps / burstMinCount /
+        // burstHashTolerance) actually influence processing.
+        //
+        // Time threshold derives from the configured burst FPS plus a 1.5×
+        // tolerance — at 20 fps this gives 75 ms (tight), at 10 fps this
+        // gives 150 ms, and a floor of 50 ms prevents divide-by-zero.
+        let burstTimeThresholdMs = max(50.0, 1000.0 / Double(max(1, burstFps)) * 1.5)
+        let burstDetector = BurstDetector(
+            timeThresholdMs: burstTimeThresholdMs,
+            minBurstCount: burstMinCount,
+            similarityThreshold: Float(burstHashTolerance)
+        )
 
         let scannedFiles: [URL]
         do {
@@ -146,9 +164,16 @@ final class PipelineCoordinator: @unchecked Sendable {
                 let pHash: UInt64? = ts != nil ? pHashFromDecoded : nil
 
                 let extendsBurst: Bool = {
-                    guard let ts, let lt = lastTimestamp,
-                          let p = pHash, let lp = lastPHash else { return false }
-                    guard (ts - lt) * 1000 <= burstDetector.timeThresholdMs else { return false }
+                    guard let ts, let lt = lastTimestamp else { return false }
+                    let gapMs = (ts - lt) * 1000
+                    guard gapMs <= burstDetector.timeThresholdMs else { return false }
+                    // Short-circuit: two frames arriving within one-ish
+                    // shutter interval (≤100 ms) are treated as same burst
+                    // regardless of pHash — at 20 fps a wing flap between
+                    // consecutive shots can push hamming above threshold
+                    // even though the scene obviously hasn't changed.
+                    if gapMs <= 100 { return true }
+                    guard let p = pHash, let lp = lastPHash else { return false }
                     return Float(BurstDetector.hammingDistance(lp, p)) <= burstDetector.similarityThreshold
                 }()
 
@@ -250,7 +275,7 @@ final class PipelineCoordinator: @unchecked Sendable {
         // at each skip. Run a full reconciliation so bursts spanning the
         // skip boundary are correct. Fresh-processing runs don't need this.
         if burstDetectionEnabled && sawSkipped {
-            await runBurstDetection(db: db)
+            await runBurstDetection(db: db, detector: burstDetector)
         }
 
         // Picked flag calculation (intersection of top aesthetics & sharpness among 5-star)
@@ -267,10 +292,9 @@ final class PipelineCoordinator: @unchecked Sendable {
         (photo.sharpnessScore ?? 0) * 0.5 + (photo.aestheticsScore ?? 0) * 0.5
     }
 
-    private func runBurstDetection(db: ReportDatabase) async {
+    private func runBurstDetection(db: ReportDatabase, detector: BurstDetector) async {
         do {
             let allPhotos = try db.fetchAllPhotos()
-            let detector = burstDetector  // capture value, not self
             // Move blocking Vision CPU work off the cooperative thread pool
             let burstGroups = await Task.detached(priority: .utility) {
                 detector.detect(photos: allPhotos)

@@ -83,6 +83,11 @@ final class CullingConfig {
     var pickedTopPercentage: Int { didSet { save() } }
     var burstFps: Int { didSet { save() } }
     var burstMinCount: Int { didSet { save() } }
+    /// Max pHash hamming distance (0–64) between consecutive frames still
+    /// considered "same burst". Lower = stricter, more splits; higher =
+    /// more tolerant of fast motion (e.g. wing-flap 20 fps hummingbirds).
+    /// 12 matches imagehash's default; 20 is typical for fast subjects.
+    var burstHashTolerance: Int { didSet { save() } }
     var birdIdConfidence: Int { didSet { save() } }
     var flightDetectionEnabled: Bool { didSet { save() } }
 
@@ -103,6 +108,7 @@ final class CullingConfig {
         self.pickedTopPercentage = defaults.object(forKey: "pickedTopPercentage") as? Int ?? 25
         self.burstFps = defaults.object(forKey: "burstFps") as? Int ?? 10
         self.burstMinCount = defaults.object(forKey: "burstMinCount") as? Int ?? 4
+        self.burstHashTolerance = defaults.object(forKey: "burstHashTolerance") as? Int ?? 12
         self.birdIdConfidence = defaults.object(forKey: "birdIdConfidence") as? Int ?? 70
         self.flightDetectionEnabled = defaults.object(forKey: "flightDetectionEnabled") as? Bool ?? true
     }
@@ -136,6 +142,7 @@ final class CullingConfig {
         defaults.set(pickedTopPercentage, forKey: "pickedTopPercentage")
         defaults.set(burstFps, forKey: "burstFps")
         defaults.set(burstMinCount, forKey: "burstMinCount")
+        defaults.set(burstHashTolerance, forKey: "burstHashTolerance")
         defaults.set(birdIdConfidence, forKey: "birdIdConfidence")
         defaults.set(flightDetectionEnabled, forKey: "flightDetectionEnabled")
     }
