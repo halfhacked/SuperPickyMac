@@ -57,8 +57,8 @@ struct SpeciesEditPanelView: View {
                 .accessibilityIdentifier("SpeciesEditPanel_EmptyAssigned")
         } else {
             VStack(alignment: .leading, spacing: 4) {
-                ForEach(Array(assigned.enumerated()), id: \.element.speciesID) { index, match in
-                    assignedRow(match: match, isPrimary: index == 0, index: index)
+                ForEach(assigned.indices, id: \.self) { index in
+                    assignedRow(match: assigned[index], isPrimary: index == 0, index: index)
                 }
             }
             .padding(.horizontal, 12)
