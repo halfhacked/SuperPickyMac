@@ -55,18 +55,32 @@ public final class OSEAClassifier: @unchecked Sendable {
     public func logits(image: CGImage,
                        isYOLOCropped: Bool = false,
                        useTTA: Bool = true) throws -> [Float] {
+        let preStart = DispatchTime.now()
         let preprocessed = try Self.preprocess(image: image, isYOLOCropped: isYOLOCropped)
+        let preMs = Self.elapsedMs(since: preStart)
+        let runStart = DispatchTime.now()
         let output1 = try runModel(inputArray: preprocessed)
+        let runMs = Self.elapsedMs(since: runStart)
 
         if useTTA {
+            let ttaStart = DispatchTime.now()
             guard let flipped = Self.flipHorizontal(image: image) else {
+                logger.debug("osea.logits preprocess=\(preMs, privacy: .public)ms infer=\(runMs, privacy: .public)ms tta=skip")
                 return output1
             }
             let preprocessed2 = try Self.preprocess(image: flipped, isYOLOCropped: isYOLOCropped)
             let output2 = try runModel(inputArray: preprocessed2)
-            return zip(output1, output2).map { ($0 + $1) / 2 }
+            let merged = zip(output1, output2).map { ($0 + $1) / 2 }
+            let ttaMs = Self.elapsedMs(since: ttaStart)
+            logger.debug("osea.logits preprocess=\(preMs, privacy: .public)ms infer=\(runMs, privacy: .public)ms tta=\(ttaMs, privacy: .public)ms")
+            return merged
         }
+        logger.debug("osea.logits preprocess=\(preMs, privacy: .public)ms infer=\(runMs, privacy: .public)ms tta=off")
         return output1
+    }
+
+    private static func elapsedMs(since start: DispatchTime) -> Double {
+        Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000
     }
 
     // MARK: - Private

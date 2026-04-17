@@ -94,27 +94,28 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
         guard let yolo = yoloModel, let osea = oseaModel, let db = speciesDB else {
             return IdentifyResponse(species: [], birds: nil, totalDetected: 0)
         }
-        // The body is fully synchronous — ImageIO + CoreML are sync APIs.
-        // Wrap in an explicit autoreleasepool so the CGImageSource, CGImage
-        // and MLMultiArray temporaries don't pile up on the Swift concurrency
-        // thread between photos. Without this, per-photo time on a large
-        // run degrades from ~800ms to >4s as the pool grows.
-        return try autoreleasepool {
-            try identifySync(yolo: yolo, osea: osea, db: db,
-                             filePath: filePath, topK: topK)
-        }
-    }
-
-    private func identifySync(yolo: YOLOBirdDetector, osea: OSEAClassifier,
-                              db: SpeciesDatabase, filePath: String, topK: Int) throws -> IdentifyResponse {
         let identifyStart = DispatchTime.now()
 
-        // 1. Load image from file path (CGImageSource handles RAW, JPEG, etc.)
+        // 1. Load the image from the file as a 1280 thumbnail. YOLO and OSEA
+        //    both consume the same thumbnail: YOLO letterboxes to 640×640
+        //    anyway, and the OSEA bird crop at 1280 source gives a crop size
+        //    comparable to or larger than its own 224×224 input — no benefit
+        //    to hauling the full 21 MP JPEG through. Previously the full-res
+        //    CGContext.draw inside YOLO and inside OSEA.preprocess dominated
+        //    per-photo wall time at ~600 ms and ~130 ms respectively.
         let decodeStart = DispatchTime.now()
         let fileURL = URL(fileURLWithPath: filePath)
-        guard let source = CGImageSourceCreateWithURL(fileURL as CFURL, nil),
-              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
-            logger.error("OSEA identify: failed to load image at \(filePath)")
+        guard let source = CGImageSourceCreateWithURL(fileURL as CFURL, nil) else {
+            logger.error("OSEA identify: failed to open image at \(filePath)")
+            return IdentifyResponse(species: [], birds: nil, totalDetected: 0)
+        }
+        let thumb: CGImage? = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+            kCGImageSourceThumbnailMaxPixelSize: 1280,
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+        ] as CFDictionary)
+        guard let image = thumb ?? CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            logger.error("OSEA identify: failed to decode image at \(filePath)")
             return IdentifyResponse(species: [], birds: nil, totalDetected: 0)
         }
         let decodeMs = Self.elapsedMs(since: decodeStart)
@@ -129,7 +130,9 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
             return filter.allowedClassIDs(lat: gps.lat, lon: gps.lon)
         }()
 
-        // 2. YOLO detect
+        // 2. YOLO detect — operates on the 1280 thumbnail. Its bbox output
+        //    is normalized (0–1); passing the same thumbnail to OSEA below
+        //    keeps coordinates consistent.
         let yoloStart = DispatchTime.now()
         let detections = try yolo.predict(image: image)
         let yoloMs = Self.elapsedMs(since: yoloStart)
@@ -142,13 +145,16 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
         // harness. UI still reads `species` (top-1 per detection).
         var bestTop5: [SpeciesMatch]? = nil
         let oseaStart = DispatchTime.now()
+        var cropMs: Double = 0
 
         for det in detections {
             let normalizedBBox = CGRect(
                 x: CGFloat(det.x1), y: CGFloat(det.y1),
                 width: CGFloat(det.x2 - det.x1), height: CGFloat(det.y2 - det.y1)
             )
+            let cropT = DispatchTime.now()
             guard let crop = image.smartSquareBirdCrop(bbox: normalizedBBox) else { continue }
+            cropMs += Double(DispatchTime.now().uptimeNanoseconds - cropT.uptimeNanoseconds) / 1_000_000
             guard crop.width > 10, crop.height > 10 else { continue }
 
             // 4. OSEA logits with YOLO-crop preprocessing (direct resize, not center crop)
@@ -229,7 +235,7 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
         }
 
         let oseaMs = Self.elapsedMs(since: oseaStart)
-        logger.debug("identify \(Self.elapsedMs(since: identifyStart), privacy: .public)ms decode=\(decodeMs, privacy: .public)ms yolo=\(yoloMs, privacy: .public)ms osea=\(oseaMs, privacy: .public)ms detections=\(detections.count, privacy: .public) top1=\(speciesMatches.first?.commonName ?? "-", privacy: .public)")
+        logger.debug("identify \(Self.elapsedMs(since: identifyStart), privacy: .public)ms decode=\(decodeMs, privacy: .public)ms yolo=\(yoloMs, privacy: .public)ms osea=\(oseaMs, privacy: .public)ms crop=\(String(format: "%.0f", cropMs), privacy: .public)ms detections=\(detections.count, privacy: .public) top1=\(speciesMatches.first?.commonName ?? "-", privacy: .public)")
         return IdentifyResponse(
             species: Array(speciesMatches.prefix(topK)),
             birds: birds,
