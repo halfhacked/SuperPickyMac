@@ -30,6 +30,8 @@ struct MainView: View {
                 speciesEntries: appState.speciesEntries,
                 processingFolder: appState.processingFolder,
                 processingProgress: appState.processingProgress,
+                processingProcessed: appState.processingProcessed,
+                processingTotal: appState.processingTotal,
                 onAddFolder: { pickAndProcess() },
                 onRemoveFolder: { folder in
                     if appState.currentFolder == folder {
@@ -83,6 +85,10 @@ struct MainView: View {
             appState.speciesSortOrder = newValue
             appState.resortSpeciesEntries()
         }
+        .onChange(of: config.appLanguage) { _, _ in
+            syncSpeciesDisplay()
+            appState.resortSpeciesEntries()
+        }
         .onChange(of: appState.sidebarSelection) { _, newValue in
             switch newValue {
             case .folder(let url):
@@ -95,6 +101,7 @@ struct MainView: View {
         }
         .onAppear {
             appState.speciesSortOrder = config.speciesSortOrder
+            syncSpeciesDisplay()
             if let testFolder = ProcessInfo.processInfo.environment["TEST_FOLDER"] {
                 let folder = URL(fileURLWithPath: testFolder)
                 Task {
@@ -137,6 +144,17 @@ struct MainView: View {
         }
     }
 
+    /// Mirror the current config's display-name + locale into AppState so
+    /// the species sidebar sorts by whatever the user sees.
+    private func syncSpeciesDisplay() {
+        let snapshot = config
+        appState.speciesDisplayName = { entry in
+            if entry.isUnidentified { return entry.name }
+            return snapshot.localizedName(en: entry.name, cn: entry.cnName)
+        }
+        appState.speciesSortLocale = config.appLanguage.locale
+    }
+
     private func saveFolders() {
         let paths = appState.folders.map { $0.path }
         UserDefaults.standard.set(paths, forKey: Self.foldersKey)
@@ -168,6 +186,8 @@ struct MainView: View {
         processingTask = nil
         appState.processingFolder = nil
         appState.processingProgress = 0
+        appState.processingProcessed = 0
+        appState.processingTotal = 0
     }
 
     private func exportAllVisible(_ photos: [Photo]) {
@@ -307,6 +327,8 @@ struct MainView: View {
         appState.sidebarSelection = .folder(folder)
         appState.processingFolder = folder
         appState.processingProgress = 0
+        appState.processingProcessed = 0
+        appState.processingTotal = 0
         // Seed allPhotos from the DB so any already-processed photos (skipped
         // by the pipeline) appear immediately, and so incremental append can
         // update-in-place by ID.
@@ -326,6 +348,8 @@ struct MainView: View {
                 pickedTopPercentage: config.pickedTopPercentage,
                 onPhotoProcessed: { photo in
                     await MainActor.run {
+                        appState.processingProcessed = pipeline.processedCount
+                        appState.processingTotal = pipeline.totalCount
                         if pipeline.totalCount > 0 {
                             appState.processingProgress = Double(pipeline.processedCount) / Double(pipeline.totalCount)
                         }
@@ -342,6 +366,8 @@ struct MainView: View {
             await MainActor.run {
                 appState.processingFolder = nil
                 appState.processingProgress = 0
+                appState.processingProcessed = 0
+                appState.processingTotal = 0
                 appState.loadPhotos(for: folder)
             }
             if !isTestMode { NSSound.beep() }
