@@ -46,22 +46,40 @@ while [ ! -f "$DB_PATH" ]; do
     sleep 1
 done
 
-# Wait for processing to finish (check row count stabilizes)
+# Wait for processing to finish. We're done when row count reaches EXPECTED,
+# or when there's been no progress for a long time (stall → likely crash).
+# Checking for stall on a shorter window falsely fires when DB writes come
+# in bursts (concurrent decode + serial post-processing means flat stretches
+# happen even under healthy load).
+EXPECTED=$(ls "$FOLDER"/*.ARW "$FOLDER"/*.arw "$FOLDER"/*.jpg "$FOLDER"/*.JPG 2>/dev/null | wc -l | tr -d ' ')
 PREV_COUNT=0
-STABLE=0
-while [ $STABLE -lt 3 ]; do
-    sleep 2
+STALL=0
+MAX_STALL=120  # 2 min of zero progress → abort
+MAX_TOTAL=1800 # 30 min hard cap
+T0=$(date +%s)
+while true; do
+    sleep 3
     COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM photos;" 2>/dev/null || echo "0")
-    EXPECTED=$(ls "$FOLDER"/*.ARW "$FOLDER"/*.arw "$FOLDER"/*.jpg "$FOLDER"/*.JPG 2>/dev/null | wc -l | tr -d ' ')
-    echo "  Processed: $COUNT / $EXPECTED"
-    if [ "$COUNT" = "$EXPECTED" ]; then
-        STABLE=$((STABLE + 1))
-    elif [ "$COUNT" = "$PREV_COUNT" ] && [ "$COUNT" -gt 0 ]; then
-        STABLE=$((STABLE + 1))
+    NOW=$(date +%s)
+    ELAPSED=$((NOW - T0))
+    echo "  Processed: $COUNT / $EXPECTED  (${ELAPSED}s)"
+    if [ "$COUNT" -ge "$EXPECTED" ]; then
+        break
+    fi
+    if [ "$COUNT" = "$PREV_COUNT" ]; then
+        STALL=$((STALL + 3))
     else
-        STABLE=0
+        STALL=0
     fi
     PREV_COUNT=$COUNT
+    if [ $STALL -ge $MAX_STALL ]; then
+        echo "  STALL: no progress for ${STALL}s → aborting"
+        break
+    fi
+    if [ $ELAPSED -ge $MAX_TOTAL ]; then
+        echo "  TIMEOUT: ${MAX_TOTAL}s hard cap reached"
+        break
+    fi
 done
 
 END_TIME=$(date +%s)
