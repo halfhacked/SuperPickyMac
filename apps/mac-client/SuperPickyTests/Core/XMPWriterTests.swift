@@ -205,6 +205,43 @@ import Foundation
         #expect(xml.contains("<rdf:li>Bird|Red-tailed Hawk</rdf:li>"))
     }
 
+    @Test func xmpMultipleSpeciesPlusFlyingEmitsAllKeywords() {
+        var photo = makePhoto(starRating: 4, isFlying: true)
+        photo.assignedSpecies = [
+            SpeciesMatch(scientificName: "A", commonName: "First",
+                         confidence: 0.9, cnName: nil, pinyin: nil,
+                         thresholdUsed: "gps", ebirdCode: "a"),
+            SpeciesMatch(scientificName: "B", commonName: "Second",
+                         confidence: 0.5, cnName: nil, pinyin: nil,
+                         thresholdUsed: "country", ebirdCode: "b"),
+        ]
+        let xml = XMPWriter.generate(photo: photo)
+        #expect(xml.contains("<rdf:li>First</rdf:li>"))
+        #expect(xml.contains("<rdf:li>Second</rdf:li>"))
+        #expect(xml.contains("<rdf:li>In Flight</rdf:li>"))
+        #expect(xml.contains("<rdf:li>Bird|First</rdf:li>"))
+        #expect(xml.contains("<rdf:li>Bird|Second</rdf:li>"))
+        #expect(xml.contains("<rdf:li>Behavior|In Flight</rdf:li>"))
+    }
+
+    @Test func xmpEmptyAssignedListWithFlyingStillEmitsFlightKeyword() {
+        var photo = makePhoto(starRating: 3, isFlying: true)
+        photo.assignedSpecies = []
+        let xml = XMPWriter.generate(photo: photo)
+        // Flight section present even when the photo has no species.
+        #expect(xml.contains("dc:subject"))
+        #expect(xml.contains("<rdf:li>In Flight</rdf:li>"))
+        #expect(xml.contains("<rdf:li>Behavior|In Flight</rdf:li>"))
+    }
+
+    @Test func xmpEmptyAssignedListAndNotFlyingOmitsKeywordSections() {
+        var photo = makePhoto(starRating: 2)
+        photo.assignedSpecies = []
+        let xml = XMPWriter.generate(photo: photo)
+        #expect(!xml.contains("dc:subject"))
+        #expect(!xml.contains("lr:hierarchicalSubject"))
+    }
+
     @Test func xmpDedupesKeywordsThatCollideAcrossSpecies() {
         // Two matches sharing the same common name — rare but possible for
         // renamed OSEA classes. Only one rdf:li per unique string.

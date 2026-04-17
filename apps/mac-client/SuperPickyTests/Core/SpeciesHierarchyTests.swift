@@ -357,6 +357,46 @@ import Foundation
         #expect(appState.photos.count == 1)
     }
 
+    @Test func multiSpeciesPhotoInBurstAppearsOnceUnderDominantSpeciesBucket() throws {
+        // Burst members each tagged primary=Eagle; one of them also carries
+        // a secondary Hawk tag. The burst bucket assignment should stick
+        // with Eagle (driven by PRIMARY species confidence, not the union)
+        // so the same burst doesn't show up under both Eagle and Hawk.
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let burstID = UUID()
+        var a = makePhoto(folder: folder, filename: "A.CR3", burstGroupID: burstID)
+        a.assignedSpecies = [
+            SpeciesMatch(scientificName: "Aquila", commonName: "Eagle",
+                         confidence: 0.95, cnName: nil, pinyin: nil,
+                         thresholdUsed: "gps", ebirdCode: "eagle"),
+        ]
+        var b = makePhoto(folder: folder, filename: "B.CR3", burstGroupID: burstID)
+        b.assignedSpecies = [
+            SpeciesMatch(scientificName: "Aquila", commonName: "Eagle",
+                         confidence: 0.92, cnName: nil, pinyin: nil,
+                         thresholdUsed: "gps", ebirdCode: "eagle"),
+            SpeciesMatch(scientificName: "Accipiter", commonName: "Hawk",
+                         confidence: 0.30, cnName: nil, pinyin: nil,
+                         thresholdUsed: "country", ebirdCode: "hawk"),
+        ]
+        try setupDB(folder: folder, photos: [a, b])
+
+        let appState = AppState()
+        appState.loadPhotos(for: folder)
+
+        let eagle = appState.speciesEntries.first { $0.speciesID == "eagle" }
+        let hawk = appState.speciesEntries.first { $0.speciesID == "hawk" }
+
+        // Eagle owns the burst; Hawk still has the one photo as a single
+        // contribution (count=1) but no burst under its bucket.
+        #expect(eagle?.burstGroups.count == 1)
+        #expect(eagle?.burstGroups.first?.count == 2)
+        #expect(hawk?.burstGroups.isEmpty == true)
+        #expect(hawk?.count == 1)
+    }
+
     @Test func twoSpeciesWithSameDisplayNameStayDistinct() throws {
         // Safety net for the "never key by display name" rule: two species
         // sharing the same common name but different eBird codes must show
