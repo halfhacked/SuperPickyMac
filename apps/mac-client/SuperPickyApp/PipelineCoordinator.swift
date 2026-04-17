@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 import os
 
 @Observable
-final class PipelineCoordinator {
+final class PipelineCoordinator: @unchecked Sendable {
     private let inferenceClient: InferenceClient
     private let ratingEngine = RatingEngine()
     private let exposureDetector = ExposureDetector()
@@ -18,6 +18,14 @@ final class PipelineCoordinator {
     var processedCount = 0
     var currentFilename = ""
     var isProcessing = false
+
+    /// Max photos whose ML work (decode + YOLO + OSEA + aesthetics/keypoints/
+    /// flight) may be in flight simultaneously. With the compute-unit split
+    /// (YOLO + Aesthetics on GPU, OSEA/Keypoint/Flight pinned to ANE), two
+    /// photos' ML work can truly overlap on different engines instead of
+    /// serializing through ANE. Post-processing (DB save, burst state, UI
+    /// callback) still runs strictly in timestamp order.
+    private static let maxConcurrentMLWork = 2
 
     init(inferenceClient: InferenceClient) {
         self.inferenceClient = inferenceClient
@@ -98,47 +106,25 @@ final class PipelineCoordinator {
         var lastPHash: UInt64?
         var sawSkipped = false
 
-        for fileURL in files {
-            if Task.isCancelled { break }
-
-            currentFilename = fileURL.lastPathComponent
-
-            // Skip already-processed photos (preserve manual ratings). Reset
-            // the running burst window — a final sweep below will reconcile
-            // bursts that span the skip boundary.
-            if existingPaths.contains(fileURL.path) {
-                processedCount += 1
-                sawSkipped = true
-                burstPhotos.removeAll(keepingCapacity: true)
-                burstID = nil
-                lastTimestamp = nil
-                lastPHash = nil
-                await onPhotoProcessed?(nil)
-                continue
-            }
-
-            var photo = Photo(
-                filename: fileURL.lastPathComponent,
-                filePath: fileURL.path,
-                folderPath: folder.path
-            )
-
+        // Finalizer for one photo. Runs serially in timestamp order (one at
+        // a time) so the incremental burst state, DB writes, and UI callback
+        // stay coherent regardless of which order the concurrent ML tasks
+        // actually complete.
+        @Sendable
+        func finalize(url: URL, workTask: Task<MLWorkResult, Error>) async {
             let startedAt = DispatchTime.now()
+            var photo: Photo
             var pHashFromDecoded: UInt64?
             var imageSize: (width: Int, height: Int)?
             do {
-                try await processOnePhoto(
-                    &photo,
-                    fileURL: fileURL,
-                    ratingConfig: ratingConfig,
-                    exposureEnabled: exposureEnabled,
-                    exposureThreshold: exposureThreshold,
-                    flightDetectionEnabled: flightDetectionEnabled,
-                    pHashOut: &pHashFromDecoded,
-                    imageSizeOut: &imageSize
-                )
+                let result = try await workTask.value
+                photo = result.photo
+                pHashFromDecoded = result.pHash
+                imageSize = result.imageSize
             } catch {
-                logger.error("Failed to process \(fileURL.lastPathComponent): \(error)")
+                logger.error("Failed to process \(url.lastPathComponent): \(error)")
+                photo = Photo(filename: url.lastPathComponent,
+                              filePath: url.path, folderPath: folder.path)
                 photo.starRating = 0
             }
 
@@ -153,14 +139,10 @@ final class PipelineCoordinator {
             let species = photo.speciesCommonName ?? "unidentified"
             let conf = photo.speciesConfidence.map { String(format: "%.2f", $0) } ?? "-"
             let sizeStr = imageSize.map { "\($0.width)x\($0.height)" } ?? "-"
-            logger.info("processed \(fileURL.lastPathComponent, privacy: .public) size=\(sizeStr, privacy: .public) elapsed=\(String(format: "%.0f", elapsedMs), privacy: .public)ms stars=\(photo.starRating, privacy: .public) species=\(species, privacy: .public) conf=\(conf, privacy: .public)")
+            logger.info("processed \(url.lastPathComponent, privacy: .public) size=\(sizeStr, privacy: .public) elapsed=\(String(format: "%.0f", elapsedMs), privacy: .public)ms stars=\(photo.starRating, privacy: .public) species=\(species, privacy: .public) conf=\(conf, privacy: .public)")
 
-            // Incremental burst detection against the previous photo only.
             if burstDetectionEnabled {
-                let ts = timestampByPath[fileURL.path]
-                // processOnePhoto computed pHash from the already-decoded
-                // RAW — no second CGImageSource open here. Only honour it
-                // when we also have a timestamp to compare against.
+                let ts = timestampByPath[url.path]
                 let pHash: UInt64? = ts != nil ? pHashFromDecoded : nil
 
                 let extendsBurst: Bool = {
@@ -196,12 +178,9 @@ final class PipelineCoordinator {
                         }
                     }
 
-                    // The newly-processed photo's burst state may have changed.
-                    // Refresh `photo` before the common emission below.
                     if let idx = burstPhotos.firstIndex(where: { $0.id == photo.id }) {
                         photo = burstPhotos[idx]
                     }
-                    // Emit OTHER photos whose state changed (new photo is emitted below).
                     for p in updated where p.id != photo.id {
                         await onPhotoProcessed?(p)
                     }
@@ -212,11 +191,59 @@ final class PipelineCoordinator {
             }
 
             await onPhotoProcessed?(photo)
+        }
 
-            // Yield once per iteration so ARC can release any temporaries
-            // allocated by processOnePhoto before the next photo starts.
-            // See memory-budget note above.
-            await Task.yield()
+        // Bounded queue of in-flight ML tasks. Tasks run concurrently (up to
+        // `maxConcurrentMLWork`); `finalize` awaits them strictly in the
+        // submission order, so the serial post-processing phase sees photos
+        // in timestamp order.
+        var inflight: [(URL, Task<MLWorkResult, Error>)] = []
+
+        for fileURL in files {
+            if Task.isCancelled { break }
+
+            currentFilename = fileURL.lastPathComponent
+
+            if existingPaths.contains(fileURL.path) {
+                // Drain in-flight before the skip so the skip's burst reset
+                // applies to the true sequential position.
+                while let first = inflight.first {
+                    inflight.removeFirst()
+                    await finalize(url: first.0, workTask: first.1)
+                }
+                processedCount += 1
+                sawSkipped = true
+                burstPhotos.removeAll(keepingCapacity: true)
+                burstID = nil
+                lastTimestamp = nil
+                lastPHash = nil
+                await onPhotoProcessed?(nil)
+                continue
+            }
+
+            while inflight.count >= Self.maxConcurrentMLWork {
+                let first = inflight.removeFirst()
+                await finalize(url: first.0, workTask: first.1)
+            }
+
+            let capturedFolder = folder.path
+            let task = Task.detached(priority: .userInitiated) { [self] in
+                try await self.processMLWork(
+                    fileURL: fileURL,
+                    folderPath: capturedFolder,
+                    ratingConfig: ratingConfig,
+                    exposureEnabled: exposureEnabled,
+                    exposureThreshold: exposureThreshold,
+                    flightDetectionEnabled: flightDetectionEnabled
+                )
+            }
+            inflight.append((fileURL, task))
+        }
+
+        // Drain any tasks still in flight when the loop exits.
+        while let first = inflight.first {
+            inflight.removeFirst()
+            await finalize(url: first.0, workTask: first.1)
         }
 
         // If we skipped existing photos, the running burst window was reset
@@ -289,6 +316,45 @@ final class PipelineCoordinator {
         } catch {
             logger.error("Picked flag calculation failed: \(error)")
         }
+    }
+
+    /// Sendable result of the async ML work for one photo — lets the outer
+    /// loop overlap photo N+1's ML with photo N's serial post-processing.
+    struct MLWorkResult: Sendable {
+        var photo: Photo
+        var pHash: UInt64?
+        var imageSize: (width: Int, height: Int)?
+    }
+
+    /// Pure async ML work: decode + identify + aesthetics / keypoints /
+    /// flight + sharpness / rating. No burst-state, DB, or UI side effects.
+    /// Safe to run concurrently from a detached prefetch Task.
+    func processMLWork(
+        fileURL: URL,
+        folderPath: String,
+        ratingConfig: RatingEngine.Config,
+        exposureEnabled: Bool,
+        exposureThreshold: Float,
+        flightDetectionEnabled: Bool
+    ) async throws -> MLWorkResult {
+        var photo = Photo(
+            filename: fileURL.lastPathComponent,
+            filePath: fileURL.path,
+            folderPath: folderPath
+        )
+        var pHash: UInt64?
+        var imageSize: (width: Int, height: Int)?
+        try await processOnePhoto(
+            &photo,
+            fileURL: fileURL,
+            ratingConfig: ratingConfig,
+            exposureEnabled: exposureEnabled,
+            exposureThreshold: exposureThreshold,
+            flightDetectionEnabled: flightDetectionEnabled,
+            pHashOut: &pHash,
+            imageSizeOut: &imageSize
+        )
+        return MLWorkResult(photo: photo, pHash: pHash, imageSize: imageSize)
     }
 
     private func processOnePhoto(
