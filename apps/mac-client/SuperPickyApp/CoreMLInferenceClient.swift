@@ -90,33 +90,36 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
 
     // MARK: - Native species identification
 
-    func identify(filePath: String, topK: Int) async throws -> IdentifyResponse {
+    func identify(filePath: String, topK: Int, preDecodedImage: CGImage?) async throws -> IdentifyResponse {
         guard let yolo = yoloModel, let osea = oseaModel, let db = speciesDB else {
             return IdentifyResponse(species: [], birds: nil, totalDetected: 0)
         }
         let identifyStart = DispatchTime.now()
 
-        // 1. Load the image from the file as a 1280 thumbnail. YOLO and OSEA
-        //    both consume the same thumbnail: YOLO letterboxes to 640×640
-        //    anyway, and the OSEA bird crop at 1280 source gives a crop size
-        //    comparable to or larger than its own 224×224 input — no benefit
-        //    to hauling the full 21 MP JPEG through. Previously the full-res
-        //    CGContext.draw inside YOLO and inside OSEA.preprocess dominated
-        //    per-photo wall time at ~600 ms and ~130 ms respectively.
+        // 1. Use the caller-supplied thumbnail when provided (avoids a
+        //    redundant ImageIO decode — upstream rawConverter.convert
+        //    already produces the same 1280-edge thumbnail). Fall back
+        //    to a local decode when it's nil.
         let decodeStart = DispatchTime.now()
         let fileURL = URL(fileURLWithPath: filePath)
-        guard let source = CGImageSourceCreateWithURL(fileURL as CFURL, nil) else {
-            logger.error("OSEA identify: failed to open image at \(filePath)")
-            return IdentifyResponse(species: [], birds: nil, totalDetected: 0)
-        }
-        let thumb: CGImage? = CGImageSourceCreateThumbnailAtIndex(source, 0, [
-            kCGImageSourceThumbnailMaxPixelSize: 1280,
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-        ] as CFDictionary)
-        guard let image = thumb ?? CGImageSourceCreateImageAtIndex(source, 0, nil) else {
-            logger.error("OSEA identify: failed to decode image at \(filePath)")
-            return IdentifyResponse(species: [], birds: nil, totalDetected: 0)
+        let image: CGImage
+        if let preDecodedImage {
+            image = preDecodedImage
+        } else {
+            guard let source = CGImageSourceCreateWithURL(fileURL as CFURL, nil) else {
+                logger.error("OSEA identify: failed to open image at \(filePath)")
+                return IdentifyResponse(species: [], birds: nil, totalDetected: 0)
+            }
+            let thumb: CGImage? = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                kCGImageSourceThumbnailMaxPixelSize: 1280,
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+            ] as CFDictionary)
+            guard let decoded = thumb ?? CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+                logger.error("OSEA identify: failed to decode image at \(filePath)")
+                return IdentifyResponse(species: [], birds: nil, totalDetected: 0)
+            }
+            image = decoded
         }
         let decodeMs = Self.elapsedMs(since: decodeStart)
 
