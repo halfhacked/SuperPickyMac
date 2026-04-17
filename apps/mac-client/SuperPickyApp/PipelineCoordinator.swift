@@ -1,6 +1,7 @@
 import Foundation
 import CoreGraphics
 import ImageIO
+import SuperPickyInference
 import UniformTypeIdentifiers
 import os
 
@@ -12,6 +13,7 @@ final class PipelineCoordinator: @unchecked Sendable {
     private let burstDetector = BurstDetector()
     private let rawConverter = RAWConverter()
     private let scanner = DirectoryScanner()
+    private let reverseGeocoder = ReverseGeocoder()
     private let logger = Logger(subsystem: "com.superpicky.mac", category: "Pipeline")
 
     var totalCount = 0
@@ -611,6 +613,25 @@ final class PipelineCoordinator: @unchecked Sendable {
             config: ratingConfig
         )
         photo.starRating = ratingResult.rating
+
+        // Reverse-geocode GPS → city/state/country/code/sublocation for the
+        // XMP sidecar. `resolve` is an actor call keyed by GPS cell
+        // (0.1° ≈ 11 km). On cache hit (every photo in the same cell after
+        // the first) it's essentially free; on cache miss it waits ~100–500
+        // ms for CLGeocoder. The miss blocks *this* photo's task slot but
+        // not the other five concurrent slots, so per-folder the whole
+        // reverse-geocoding step costs ~1 × one CLGeocoder round-trip per
+        // distinct GPS cell — typically 1 for a bird shoot.
+        if let props = imageProps,
+           let gps = GPSExtractor.gps(fromProperties: props),
+           let loc = await reverseGeocoder.resolve(lat: gps.lat, lon: gps.lon) {
+            photo.locationCity = loc.city
+            photo.locationState = loc.state
+            photo.locationCountry = loc.country
+            photo.locationCountryCode = loc.countryCode
+            photo.locationSublocation = loc.sublocation
+        }
+
         let photoMs = Self.elapsedMs(since: photoStart)
         logger.debug("photo.ml decode=\(decodeMs, privacy: .public)ms pHash=\(pHashMs, privacy: .public)ms postMl=\(postMlMs, privacy: .public)ms total=\(photoMs, privacy: .public)ms")
     }

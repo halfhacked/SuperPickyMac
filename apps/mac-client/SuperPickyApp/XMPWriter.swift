@@ -11,6 +11,9 @@ struct XMPWriter {
     /// Generate XMP string for a photo
     static func generate(photo: Photo) -> String {
         let hasKeywords = photo.speciesCommonName != nil || photo.speciesCnName != nil || photo.isFlying
+        let hasLocation = photo.locationCity != nil || photo.locationState != nil
+            || photo.locationCountry != nil || photo.locationCountryCode != nil
+            || photo.locationSublocation != nil
 
         var xml = """
         <?xml version="1.0" encoding="UTF-8"?>
@@ -20,6 +23,8 @@ struct XMPWriter {
               xmlns:xmp="http://ns.adobe.com/xap/1.0/"
               xmlns:dc="http://purl.org/dc/elements/1.1/"
               xmlns:lr="http://ns.adobe.com/lightroom/1.0/"
+              xmlns:photoshop="http://ns.adobe.com/photoshop/1.0/"
+              xmlns:Iptc4xmpCore="http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/"
               xmp:Rating="\(photo.starRating)"
               xmp:PickStatus="\(photo.isPick ? 1 : 0)">\n
         """
@@ -55,6 +60,24 @@ struct XMPWriter {
             }
             xml += "        </rdf:Bag>\n"
             xml += "      </lr:hierarchicalSubject>\n"
+        }
+
+        if hasLocation {
+            if let city = photo.locationCity {
+                xml += "      <photoshop:City>\(xmlEscape(city))</photoshop:City>\n"
+            }
+            if let state = photo.locationState {
+                xml += "      <photoshop:State>\(xmlEscape(state))</photoshop:State>\n"
+            }
+            if let country = photo.locationCountry {
+                xml += "      <photoshop:Country>\(xmlEscape(country))</photoshop:Country>\n"
+            }
+            if let code = photo.locationCountryCode {
+                xml += "      <Iptc4xmpCore:CountryCode>\(xmlEscape(code))</Iptc4xmpCore:CountryCode>\n"
+            }
+            if let sub = photo.locationSublocation {
+                xml += "      <Iptc4xmpCore:Location>\(xmlEscape(sub))</Iptc4xmpCore:Location>\n"
+            }
         }
 
         xml += """
