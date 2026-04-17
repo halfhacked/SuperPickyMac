@@ -35,11 +35,16 @@ final class AppState {
     var sidebarSelection: SidebarSelection?
     var selectedPhotoID: UUID?
     var folders: [URL] = []
-    var ratingCounts: [Int: Int] = [:]
-    var flyingCount: Int = 0
-    var picksCount: Int = 0
     var speciesEntries: [SpeciesEntry] = []
     var speciesSortOrder: SpeciesSortOrder = .name
+
+    var ratingCounts: [Int: Int] {
+        var counts: [Int: Int] = [:]
+        for p in allPhotos { counts[p.starRating, default: 0] += 1 }
+        return counts
+    }
+    var flyingCount: Int { allPhotos.lazy.filter(\.isFlying).count }
+    var picksCount: Int { allPhotos.lazy.filter(\.isPick).count }
 
     struct UndoAction {
         let photoID: UUID
@@ -115,9 +120,6 @@ final class AppState {
             cachedDB = database
             allPhotos = try database.fetchAllPhotos()
             rebuildAllPhotoIndex()
-            ratingCounts = try database.ratingCounts()
-            flyingCount = allPhotos.filter { $0.isFlying }.count
-            picksCount = allPhotos.filter { $0.isPick }.count
             if !skipHierarchy {
                 buildSpeciesHierarchy()
             }
@@ -137,7 +139,6 @@ final class AppState {
             photos = []
             allPhotoIndex = [:]
             filteredPhotoIndex = [:]
-            ratingCounts = [:]
             speciesEntries = []
         }
     }
@@ -159,22 +160,13 @@ final class AppState {
     func appendProcessedPhoto(_ photo: Photo) {
         let oldPhoto: Photo?
         if let idx = allPhotoIndex[photo.id] {
-            let old = allPhotos[idx]
-            oldPhoto = old
+            oldPhoto = allPhotos[idx]
             allPhotos[idx] = photo
-            ratingCounts[old.starRating, default: 0] -= 1
-            if ratingCounts[old.starRating] == 0 { ratingCounts.removeValue(forKey: old.starRating) }
-            if old.isFlying { flyingCount -= 1 }
-            if old.isPick { picksCount -= 1 }
         } else {
             oldPhoto = nil
             allPhotoIndex[photo.id] = allPhotos.count
             allPhotos.append(photo)
         }
-
-        ratingCounts[photo.starRating, default: 0] += 1
-        if photo.isFlying { flyingCount += 1 }
-        if photo.isPick { picksCount += 1 }
 
         updateSpeciesHierarchy(removing: oldPhoto, adding: photo)
 
@@ -291,7 +283,6 @@ final class AppState {
         photos = []
         allPhotoIndex = [:]
         filteredPhotoIndex = [:]
-        ratingCounts = [:]
         speciesEntries = []
         selectedPhotoID = nil
         currentFolder = nil
@@ -329,9 +320,6 @@ final class AppState {
             } else if let idx = filteredPhotoIndex[id] {
                 photos[idx] = photo
             }
-
-            ratingCounts = (try? database.ratingCounts()) ?? ratingCounts
-            picksCount = allPhotos.filter { $0.isPick }.count
         } catch {
             logger.error("mutatePhoto failed: \(error)")
         }
@@ -367,9 +355,6 @@ final class AppState {
         rebuildAllPhotoIndex()
         rebuildFilteredPhotoIndex()
         undoStack.removeAll { $0.photoID == id }
-
-        ratingCounts = (try? database.ratingCounts()) ?? ratingCounts
-        picksCount = allPhotos.filter { $0.isPick }.count
 
         logger.info("Deleted photo: \(photo.filename)")
     }
@@ -416,8 +401,6 @@ final class AppState {
             }
 
             selectedPhotoID = action.photoID
-            ratingCounts = (try? database.ratingCounts()) ?? ratingCounts
-            picksCount = allPhotos.filter { $0.isPick }.count
         } catch {
             logger.error("undoLastAction failed: \(error)")
         }
