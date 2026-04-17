@@ -40,6 +40,16 @@ struct Photo: Identifiable, Codable, Sendable, FetchableRecord, PersistableRecor
     var aestheticsDistributionJSON: String?
     var birdBboxJSON: String?
 
+    // Reverse-geocoded location from the photo's GPS EXIF (resolved via
+    // CLGeocoder + cell-keyed cache in ReverseGeocoder). Written to the
+    // XMP sidecar as photoshop:City / State / Country / Iptc4xmpCore:
+    // CountryCode / Location so Lightroom, Bridge, and Photos pick them up.
+    var locationCity: String?
+    var locationState: String?
+    var locationCountry: String?
+    var locationCountryCode: String?
+    var locationSublocation: String?
+
     static let databaseTableName = "photos"
 
     init(id: UUID = UUID(), filename: String, filePath: String, folderPath: String, dateCreated: Date = Date()) {
