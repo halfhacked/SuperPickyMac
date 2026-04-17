@@ -19,6 +19,14 @@ protocol InferenceClient: Sendable {
         filePath: String, topK: Int,
         preDecodedImage: CGImage?, preGPS: (lat: Double, lon: Double)?
     ) async throws -> IdentifyResponse
+
+    /// Prewarm any per-GPS caches (SpeciesFilter's Avonet lookup) for the
+    /// given cells before the main ML loop starts. Without this, the first
+    /// six concurrent `identify` calls all cache-miss simultaneously and
+    /// serialize on the Avonet SQLite mutex — adding ~1 s per cold cell
+    /// to ML wall time. Calling this once after the EXIF pre-pass turns
+    /// every per-photo `identify.gps` into a cache hit.
+    func prewarmGPSCells(_ cells: [(lat: Double, lon: Double)]) async
 }
 
 extension InferenceClient {
@@ -29,4 +37,6 @@ extension InferenceClient {
     func identify(filePath: String, topK: Int, preDecodedImage: CGImage?) async throws -> IdentifyResponse {
         try await identify(filePath: filePath, topK: topK, preDecodedImage: preDecodedImage, preGPS: nil)
     }
+
+    func prewarmGPSCells(_ cells: [(lat: Double, lon: Double)]) async {}
 }
