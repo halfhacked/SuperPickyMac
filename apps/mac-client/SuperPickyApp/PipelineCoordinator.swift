@@ -254,13 +254,22 @@ final class PipelineCoordinator: @unchecked Sendable {
                     let groupID = burstID ?? UUID()
                     burstID = groupID
                     let bestID = Self.selectBest(in: burstPhotos)
+                    let donor = Self.speciesDonor(in: burstPhotos)
 
                     var updated: [Photo] = []
                     for i in burstPhotos.indices {
                         let newBest = (burstPhotos[i].id == bestID)
-                        if burstPhotos[i].burstGroupID != groupID || burstPhotos[i].isBurstBest != newBest {
+                        let shouldInherit = donor != nil
+                            && !burstPhotos[i].hasSpecies
+                            && burstPhotos[i].id != donor!.id
+                        let flagsChanged = burstPhotos[i].burstGroupID != groupID
+                            || burstPhotos[i].isBurstBest != newBest
+                        if flagsChanged || shouldInherit {
                             burstPhotos[i].burstGroupID = groupID
                             burstPhotos[i].isBurstBest = newBest
+                            if shouldInherit, let donor {
+                                burstPhotos[i].inheritSpecies(from: donor)
+                            }
                             let toSave = burstPhotos[i]
                             let burstGPS = gpsByPath[toSave.filePath]
                             writeBehind { [logger, reverseGeocoder = self.reverseGeocoder] in
@@ -274,6 +283,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                                 do { try db.save(&p) } catch {
                                     logger.error("Failed to save burst update: \(error)")
                                 }
+                                try? XMPWriter.write(photo: p)
                             }
                             updated.append(burstPhotos[i])
                         }
@@ -380,18 +390,30 @@ final class PipelineCoordinator: @unchecked Sendable {
         (photo.sharpnessScore ?? 0) * 0.5 + (photo.aestheticsScore ?? 0) * 0.5
     }
 
+    /// The member whose species label we'll copy into any unidentified
+    /// sibling — the highest-confidence ID in the burst.
+    private static func speciesDonor(in photos: [Photo]) -> Photo? {
+        photos
+            .filter { $0.hasSpecies }
+            .max { ($0.speciesConfidence ?? 0) < ($1.speciesConfidence ?? 0) }
+    }
+
     private func runBurstDetection(db: ReportDatabase, detector: BurstDetector) async {
         do {
             let allPhotos = try db.fetchAllPhotos()
-            // Move blocking Vision CPU work off the cooperative thread pool
             let burstGroups = await Task.detached(priority: .utility) {
                 detector.detect(photos: allPhotos)
             }.value
             for group in burstGroups {
+                let donor = Self.speciesDonor(in: group.photos)
                 for photo in group.photos {
                     var updated = photo
                     updated.burstGroupID = group.id
                     updated.isBurstBest = (photo.id == group.bestPhotoID)
+                    if let donor, !updated.hasSpecies, updated.id != donor.id {
+                        updated.inheritSpecies(from: donor)
+                        try? XMPWriter.write(photo: updated)
+                    }
                     try db.save(&updated)
                 }
             }
