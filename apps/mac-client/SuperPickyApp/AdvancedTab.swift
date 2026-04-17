@@ -62,10 +62,24 @@ struct AdvancedTab: View {
                                 get: { Double(config.burstMinCount) },
                                 set: { config.burstMinCount = Int($0) }
                             ),
-                            in: 3...10,
+                            in: 2...10,
                             step: 1
                         )
                         Text("\(config.burstMinCount)")
+                            .monospacedDigit()
+                            .frame(width: 30)
+                    }
+                    HStack {
+                        Text(config.localized("Hash Tolerance"))
+                        Slider(
+                            value: Binding(
+                                get: { Double(config.burstHashTolerance) },
+                                set: { config.burstHashTolerance = Int($0) }
+                            ),
+                            in: 4...30,
+                            step: 1
+                        )
+                        Text("\(config.burstHashTolerance)")
                             .monospacedDigit()
                             .frame(width: 30)
                     }

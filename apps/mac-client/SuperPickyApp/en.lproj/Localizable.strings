@@ -131,6 +131,7 @@
 "Min Aesthetics" = "Min Aesthetics";
 "Burst FPS" = "Burst FPS";
 "Min Burst Count" = "Min Burst Count";
+"Hash Tolerance" = "Hash Tolerance";
 "Confidence" = "Confidence";
 "Bird ID Confidence" = "Bird ID Confidence";
 "Species below this confidence will not be written to EXIF." = "Species below this confidence will not be written to EXIF.";

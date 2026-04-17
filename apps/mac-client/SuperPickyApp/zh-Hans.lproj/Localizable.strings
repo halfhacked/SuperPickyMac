@@ -131,6 +131,7 @@
 "Min Aesthetics" = "最低美学分";
 "Burst FPS" = "连拍帧率";
 "Min Burst Count" = "最少连拍张数";
+"Hash Tolerance" = "哈希容差";
 "Confidence" = "置信度";
 "Bird ID Confidence" = "鸟种识别置信度";
 "Species below this confidence will not be written to EXIF." = "低于此置信度的鸟种不会写入 EXIF。";
