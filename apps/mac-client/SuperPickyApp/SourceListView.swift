@@ -15,6 +15,7 @@ struct SourceListView: View {
     let onRemoveFolder: (URL) -> Void
     var onCancelProcessing: (() -> Void)?
     var onReprocessFolder: ((URL) -> Void)?
+    var onRefreshFolder: ((URL) -> Void)?
 
     var body: some View {
         List(selection: $selection) {
@@ -28,6 +29,12 @@ struct SourceListView: View {
                     )
                     .tag(SidebarSelection.folder(folder))
                     .contextMenu {
+                        Button {
+                            onRefreshFolder?(folder)
+                        } label: {
+                            Label(config.localized("Refresh Folder"), systemImage: "arrow.clockwise")
+                        }
+
                         Button {
                             onReprocessFolder?(folder)
                         } label: {

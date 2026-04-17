@@ -164,6 +164,7 @@
 "Export photos (⌘E for picks)" = "Export photos (⌘E for picks)";
 "Calibrate thresholds against this photo" = "Calibrate thresholds against this photo";
 "Reprocess Folder" = "Reprocess Folder";
+"Refresh Folder" = "Refresh Folder";
 "Cancel processing" = "Cancel processing";
 "Exporting..." = "Exporting...";
 "No photos in the current view" = "No photos in the current view";
