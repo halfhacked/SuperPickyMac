@@ -143,20 +143,28 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
         }
         let decodeMs = Self.elapsedMs(since: decodeStart)
 
-        // 1a. Resolve an allowed species set from GPS. nil means no filter
-        //     (no GPS, no DB, or no regional data) and we fall through to
-        //     the global-top-1 behavior.
+        // 1a. Build the species-filter cascade [gps → country → global].
+        //     Each level carries its own threshold (regional vs global);
+        //     the identify step walks them in order and stops at the
+        //     first whose top-1 clears the gate — same logic as
+        //     `preen/detector.py::detect_and_identify`. A folder without
+        //     GPS or with SpeciesFilter disabled gets a single `.global`
+        //     level and the full 10 964-class softmax.
         let gpsStart = DispatchTime.now()
-        let allowedIDs: Set<Int>? = {
-            guard let filter = speciesFilter else { return nil }
+        let filterChain: [SpeciesFilterLevel] = {
+            guard let filter = speciesFilter else {
+                return [SpeciesFilterLevel(kind: .global, classIDs: nil)]
+            }
             let gps: (lat: Double, lon: Double)?
             if let preGPS { gps = preGPS }
             else { gps = GPSExtractor.gps(for: fileURL) }
-            guard let gps else { return nil }
-            return filter.allowedClassIDs(lat: gps.lat, lon: gps.lon)
+            guard let gps else {
+                return [SpeciesFilterLevel(kind: .global, classIDs: nil)]
+            }
+            return filter.allowedSpeciesChain(lat: gps.lat, lon: gps.lon)
         }()
         let gpsMs = Self.elapsedMs(since: gpsStart)
-        logger.debug("identify.gps \(gpsMs, privacy: .public)ms")
+        logger.debug("identify.gps \(gpsMs, privacy: .public)ms levels=\(filterChain.count, privacy: .public)")
 
         // 2. YOLO detect — operates on the 1280 thumbnail. Its bbox output
         //    is normalized (0–1); passing the same thumbnail to OSEA below
@@ -189,39 +197,41 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
             let logits = try osea.logits(image: crop, isYOLOCropped: true, useTTA: true)
             let validLogits = Array(logits.prefix(OSEAClassifier.numClasses))
 
-            // 5. Apply the regional (GPS/eBird) mask to the logits before
-            //    softmax. If every mask-allowed class has probability under
-            //    the floor, fall through to the global (unmasked) softmax —
-            //    matches Python identify_bird's cascade.
-            var usedRegional = false
-            let probs: [Float] = {
-                if let allowed = allowedIDs, !allowed.isEmpty {
+            // 5. Walk the filter cascade. For each level compute softmax
+            //    (masked for gps/country, unmasked for global) and accept
+            //    the first level whose top-1 clears that level's
+            //    threshold. Matches `preen/detector.py` exactly.
+            var acceptedProbs: [Float]?
+            var acceptedLevel: SpeciesFilterLevel.Kind = .global
+            var lastProbs: [Float] = []
+            var lastLevel: SpeciesFilterLevel.Kind = .global
+            for level in filterChain {
+                let probs: [Float]
+                if let allowed = level.classIDs, !allowed.isEmpty {
                     let masked: [Float] = validLogits.enumerated().map { idx, v in
                         allowed.contains(idx) ? v : -.infinity
                     }
-                    let maskedProbs = Self.softmax(logits: masked, temperature: Self.oseaTemperature)
-                    if (maskedProbs.max() ?? 0) >= Self.oseaFloorProbability {
-                        usedRegional = true
-                        return maskedProbs
-                    }
-                    // Regional mask killed everything — fall back to global.
-                    logger.info("Regional mask wiped OSEA candidates; falling back to global for \(filePath, privacy: .public)")
+                    probs = Self.softmax(logits: masked, temperature: Self.oseaTemperature)
+                } else {
+                    probs = Self.softmax(logits: validLogits, temperature: Self.oseaTemperature)
                 }
-                return Self.softmax(logits: validLogits, temperature: Self.oseaTemperature)
-            }()
+                lastProbs = probs
+                lastLevel = level.kind
+                let threshold = Self.top1ConfidenceThreshold(level: level.kind)
+                if (probs.max() ?? 0) >= threshold {
+                    acceptedProbs = probs
+                    acceptedLevel = level.kind
+                    break
+                }
+            }
 
-            // 6. Confidence threshold gate. Python reference keeps the
-            //    top-1 as a genuine identification only when it clears a
-            //    cascade threshold: `regionalSpeciesThreshold` (lower) when
-            //    the regional mask produced the distribution, otherwise
-            //    `globalSpeciesThreshold` (higher).
-            let top1Threshold = Self.top1ConfidenceThreshold(usedRegional: usedRegional)
-
-            // 7. Walk the top-5 probabilities; collect ALL DB-resolvable hits
-            //    into top5 (for the harness). The top-1 that the UI consumes
-            //    is only appended when the highest probability clears
-            //    `top1Threshold`; everything below leaves the photo
-            //    unidentified instead of confidently mislabelled.
+            // 6. Build top-5 from the accepted level (or the last level
+            //    tried, for debugging parity). If no level cleared, the
+            //    top-1 is NOT appended — photo stays unidentified, but
+            //    top-5 still surfaces the best guesses for the parity
+            //    harness + diagnostics.
+            let probs = acceptedProbs ?? lastProbs
+            let topLevel = acceptedProbs != nil ? acceptedLevel : lastLevel
             let topFive = probs.enumerated()
                 .sorted { $0.element > $1.element }
                 .prefix(max(5, topK))
@@ -237,17 +247,15 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
                     confidence: prob,
                     cnName: entry.chineseName,
                     pinyin: entry.pinyin,
-                    thresholdUsed: usedRegional ? "regional" : "global"
+                    thresholdUsed: topLevel.rawValue
                 )
-                if !top1AppendedForThisCrop && prob >= top1Threshold {
+                if !top1AppendedForThisCrop && acceptedProbs != nil {
                     speciesMatches.append(match)
                     top1AppendedForThisCrop = true
                 }
                 thisCropTop5.append(match)
                 if thisCropTop5.count >= 5 { break }
             }
-            // Capture top-5 from the first detection that produced any matches
-            // (that's the highest-confidence bird YOLO found).
             if bestTop5 == nil && !thisCropTop5.isEmpty {
                 bestTop5 = thisCropTop5
             }
@@ -286,15 +294,23 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
 
     // MARK: - Threshold helper (exposed for tests)
 
-    /// Map the 0–100 percent thresholds in `InferenceConstants` to the
-    /// 0–1 softmax-probability scale the gate actually compares against.
-    /// Picks regional (lower) when an eBird/GPS mask produced the
-    /// distribution, otherwise global (higher).
-    static func top1ConfidenceThreshold(usedRegional: Bool) -> Float {
-        let percent = usedRegional
-            ? InferenceConstants.regionalSpeciesThreshold
-            : InferenceConstants.globalSpeciesThreshold
+    /// Maps the percent threshold in `InferenceConstants` to the 0–1
+    /// softmax-probability scale the gate compares against. GPS-masked
+    /// and country-masked levels both use the regional threshold; the
+    /// unfiltered global level uses the higher global threshold.
+    static func top1ConfidenceThreshold(level: SpeciesFilterLevel.Kind) -> Float {
+        let percent: Float
+        switch level {
+        case .gps, .country: percent = InferenceConstants.regionalSpeciesThreshold
+        case .global:        percent = InferenceConstants.globalSpeciesThreshold
+        }
         return percent / 100
+    }
+
+    /// Back-compat shim used by existing tests; the `usedRegional` flag
+    /// maps to the regional threshold when true, global when false.
+    static func top1ConfidenceThreshold(usedRegional: Bool) -> Float {
+        top1ConfidenceThreshold(level: usedRegional ? .gps : .global)
     }
 
     // MARK: - Timing helper

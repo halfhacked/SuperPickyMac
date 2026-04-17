@@ -47,6 +47,7 @@ public final class SpeciesFilter: @unchecked Sendable {
     /// dominating the whole identify() wall time.
     private let allowedCacheLock = NSLock()
     private var allowedCache: [UInt64: Set<Int>?] = [:]
+    private var chainCache: [UInt64: [SpeciesFilterLevel]] = [:]
 
     /// - Parameters:
     ///   - avonetPath: Path to the Avonet SQLite DB (downloaded via
@@ -103,6 +104,39 @@ public final class SpeciesFilter: @unchecked Sendable {
         allowedCache[key] = resolved
         allowedCacheLock.unlock()
         return resolved
+    }
+
+    /// Return the progressive filter chain `[gps, country, global]` — each
+    /// narrower than the next — that preen's `detect_and_identify` walks
+    /// with a threshold. The caller softmaxes once per level and stops at
+    /// the first level whose top-1 clears its threshold, exactly matching
+    /// `preen/detector.py::_get_species_filter_chain`.
+    public func allowedSpeciesChain(lat: Double, lon: Double) -> [SpeciesFilterLevel] {
+        let key = GPSCell.key(lat: lat, lon: lon)
+        allowedCacheLock.lock()
+        if let cached = chainCache[key] {
+            allowedCacheLock.unlock()
+            return cached
+        }
+        allowedCacheLock.unlock()
+
+        var chain: [SpeciesFilterLevel] = []
+        let gps = queryAvonet(lat: lat, lon: lon)
+        if let gps, !gps.isEmpty {
+            chain.append(.init(kind: .gps, classIDs: gps))
+        }
+        if let country = RegionBounds.smallestContaining(lat: lat, lon: lon),
+           let countrySet = loadEbirdSpecies(regionCode: country),
+           !countrySet.isEmpty,
+           countrySet != gps {
+            chain.append(.init(kind: .country, classIDs: countrySet))
+        }
+        chain.append(.init(kind: .global, classIDs: nil))
+
+        allowedCacheLock.lock()
+        chainCache[key] = chain
+        allowedCacheLock.unlock()
+        return chain
     }
 
     // MARK: - Avonet SQLite query
@@ -218,4 +252,19 @@ public final class SpeciesFilter: @unchecked Sendable {
 
 public enum SpeciesFilterError: Error {
     case missingMappingJSON
+}
+
+/// One level of the species filter cascade. `kind` is which data source
+/// filled it (Avonet GPS grid, eBird country list, or unfiltered global);
+/// `classIDs` is the allowed set, or `nil` for the global level.
+public struct SpeciesFilterLevel: Sendable {
+    public enum Kind: String, Sendable {
+        case gps, country, global
+    }
+    public let kind: Kind
+    public let classIDs: Set<Int>?
+    public init(kind: Kind, classIDs: Set<Int>?) {
+        self.kind = kind
+        self.classIDs = classIDs
+    }
 }
