@@ -39,7 +39,7 @@ struct MainView: View {
                 },
                 onCancelProcessing: { cancelProcessing() },
                 onReprocessFolder: { folder in reprocessFolder(folder) },
-                onRefreshFolder: { folder in refreshFolder(folder) }
+                onRefreshFolder: { folder in startProcessing(folder: folder) }
             )
             .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 300)
         } detail: {
@@ -161,9 +161,6 @@ struct MainView: View {
     private func cancelProcessing() {
         processingTask?.cancel()
         processingTask = nil
-        // Flip UI state immediately so the Stop button feels responsive
-        // even if the pipeline's graceful unwind still takes a moment.
-        // `pipeline.process` won't touch these after cancellation.
         appState.processingFolder = nil
         appState.processingProgress = 0
     }
@@ -185,14 +182,6 @@ struct MainView: View {
             try? db.deleteNonManualPhotos()
         }
 
-        startProcessing(folder: folder)
-    }
-
-    /// Scan the folder for new/un-processed photos and kick processing
-    /// without clearing the DB. Already-processed photos stay as-is
-    /// (skipped by the pipeline); only the gap files get ML'd.
-    private func refreshFolder(_ folder: URL) {
-        guard !appState.isProcessing else { return }
         startProcessing(folder: folder)
     }
 
@@ -261,16 +250,18 @@ struct MainView: View {
 
     private let logger = Logger(subsystem: "com.superpicky.mac", category: "MainView")
 
-    /// If the folder has more files on disk than the DB has rows, a
-    /// previous run was interrupted (crash, force-quit, or the user
-    /// dropped in new photos). Auto-kick processing so the remaining
-    /// photos are picked up without a manual click. Scanning the disk
-    /// is I/O-bound on an external drive, so do it off the main actor.
+    /// Auto-resume if the folder has more files than the DB has rows
+    /// (crash-interrupted run or user dropped in new photos).
     private func maybeResumeProcessing(folder: URL) {
         guard !appState.isProcessing, !isTestMode else { return }
         Task.detached(priority: .utility) {
-            let scanned = (try? DirectoryScanner().scan(folder: folder))?.count ?? 0
+            // Cheap signals first: never-processed folders have no DB —
+            // no point walking the drive recursively to find that out.
+            let dbPath = folder.appendingPathComponent(".report.db").path
+            guard FileManager.default.fileExists(atPath: dbPath) else { return }
             let inDB = (try? ReportDatabase(folderPath: folder).fetchAllFilePaths().count) ?? 0
+            guard inDB > 0 else { return }
+            let scanned = (try? DirectoryScanner().scan(folder: folder))?.count ?? 0
             guard scanned > inDB else { return }
             await MainActor.run {
                 logger.info("Auto-resuming \(folder.lastPathComponent, privacy: .public): \(scanned - inDB) of \(scanned) un-processed")
@@ -340,7 +331,9 @@ struct MainView: View {
                 }
             )
 
-            // Final reload (picks up picked-flag calculation + any skip-reconciliation burst sweep)
+            // On cancel, `cancelProcessing()` already cleared UI state —
+            // don't rebuild the species hierarchy for a partial run.
+            if Task.isCancelled { return }
             await MainActor.run {
                 appState.processingFolder = nil
                 appState.processingProgress = 0
