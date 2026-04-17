@@ -30,7 +30,10 @@ public final class AestheticsModel: @unchecked Sendable {
     private let logger = Logger(subsystem: "com.superpicky.mac", category: "AestheticsModel")
 
     public init(url: URL, configuration: MLModelConfiguration = .init()) throws {
-        configuration.computeUnits = .all
+        // CFANet/TOPIQ uses transformer attention layers — GPU beats ANE
+        // here, and pinning off ANE leaves that queue free for the three
+        // classical CNN models running alongside.
+        configuration.computeUnits = .cpuAndGPU
         self.model = try MLModel(contentsOf: url, configuration: configuration)
     }
 
