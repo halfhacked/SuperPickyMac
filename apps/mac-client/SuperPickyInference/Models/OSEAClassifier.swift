@@ -40,9 +40,14 @@ public final class OSEAClassifier: @unchecked Sendable {
     // MARK: - Init
 
     public init(url: URL, configuration: MLModelConfiguration = .init()) throws {
-        // Pin to ANE — ResNet34 is a native ANE fit, and pinning avoids the
-        // CoreML runtime silently routing to GPU when the ANE is busy.
-        configuration.computeUnits = .cpuAndNeuralEngine
+        // ResNet34 was originally pinned to ANE, but once KP + Aesthetics
+        // already lived on the GPU and the GPS mutex was gone (9e38fe2),
+        // the ANE was the gating engine. Moving OSEA to GPU makes a single
+        // OSEA inference ~3 ms (down from ~11 ms) and — together with the
+        // Flight move in the same commit — drops the full-folder bench
+        // 30 s → 27 s by redistributing work across ANE (YOLO only) and GPU
+        // (everything else). See project_perf_baseline_2026-04-16.md.
+        configuration.computeUnits = .cpuAndGPU
         self.model = try MLModel(contentsOf: url, configuration: configuration)
     }
 
