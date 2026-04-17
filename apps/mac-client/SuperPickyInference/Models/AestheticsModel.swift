@@ -62,34 +62,17 @@ public final class AestheticsModel: @unchecked Sendable {
     // MARK: - Preprocessing
 
     /// Resize to 384×384 and pack into [1,3,384,384] float32 in [0,1] range.
-    /// CFANet applies its own ImageNet normalization internally.
+    /// CFANet applies its own ImageNet normalization internally, so we pass
+    /// zero mean / unit std and let the shared helper produce pixel/255.
     static func preprocess(image: CGImage) throws -> MLMultiArray {
-        let size = imageSize
-        var pixels = [UInt8](repeating: 0, count: size * size * 4)  // RGBA
-
-        guard let ctx = CGContext(
-            data: &pixels, width: size, height: size,
-            bitsPerComponent: 8, bytesPerRow: size * 4,
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else { throw AestheticsModelError.preprocessingFailed }
-
-        ctx.interpolationQuality = CGInterpolationQuality.high
-        ctx.draw(image, in: CGRect(x: 0, y: 0, width: size, height: size))
-
-        let array = try MLMultiArray(
-            shape: [1, 3, NSNumber(value: size), NSNumber(value: size)],
-            dataType: .float32
-        )
-        let ptr = array.dataPointer.bindMemory(to: Float.self, capacity: 3 * size * size)
-        let stride = size * size
-
-        for i in 0..<(size * size) {
-            ptr[0 * stride + i] = Float(pixels[i * 4 + 0]) / 255.0  // R
-            ptr[1 * stride + i] = Float(pixels[i * 4 + 1]) / 255.0  // G
-            ptr[2 * stride + i] = Float(pixels[i * 4 + 2]) / 255.0  // B
+        do {
+            return try ImagePreprocessor.normalizedNCHW(
+                image: image, size: imageSize,
+                mean: SIMD3<Float>(0, 0, 0), std: SIMD3<Float>(1, 1, 1)
+            )
+        } catch {
+            throw AestheticsModelError.preprocessingFailed
         }
-        return array
     }
 }
 

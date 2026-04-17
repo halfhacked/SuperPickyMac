@@ -50,7 +50,6 @@ public final class FlightModel: @unchecked Sendable {
     // MARK: - Preprocessing (internal for testing)
 
     /// Resize → extract RGB → ImageNet normalize → NCHW MLMultiArray.
-    /// Allocates a fresh buffer on every call (no shared mutable state).
     ///
     /// Uses bilinear interpolation (`quality: .low`) to match PyTorch's
     /// `transforms.Resize((384, 384))` default, so CoreML sees the same pixel
@@ -58,50 +57,13 @@ public final class FlightModel: @unchecked Sendable {
     /// visibly sharper crops and biases the binary flight classifier toward
     /// false positives.
     static func preprocess(image: CGImage) throws -> MLMultiArray {
-        let size = imageSize
-        guard let resized = image.resized(to: CGSize(width: size, height: size),
-                                          quality: .low) else {
+        do {
+            return try ImagePreprocessor.normalizedNCHW(
+                image: image, size: imageSize, interpolation: .low
+            )
+        } catch {
             throw FlightModelError.preprocessFailed
         }
-
-        // Render into RGBA byte buffer
-        let bytesPerPixel = 4
-        var rgba = [UInt8](repeating: 0, count: size * size * bytesPerPixel)
-        guard let ctx = CGContext(
-            data: &rgba,
-            width: size, height: size,
-            bitsPerComponent: 8,
-            bytesPerRow: size * bytesPerPixel,
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else {
-            throw FlightModelError.preprocessFailed
-        }
-        ctx.draw(resized, in: CGRect(x: 0, y: 0, width: size, height: size))
-
-        // NCHW layout: [1, 3, H, W]
-        let inputArray = try MLMultiArray(
-            shape: [1, 3, size as NSNumber, size as NSNumber],
-            dataType: .float32
-        )
-        let ptr = inputArray.dataPointer.assumingMemoryBound(to: Float.self)
-
-        let rOffset = 0 * size * size
-        let gOffset = 1 * size * size
-        let bOffset = 2 * size * size
-        let mean = InferenceConstants.imageNetMean
-        let std = InferenceConstants.imageNetStd
-
-        for i in 0..<(size * size) {
-            let r = Float(rgba[i * bytesPerPixel + 0]) / 255.0
-            let g = Float(rgba[i * bytesPerPixel + 1]) / 255.0
-            let b = Float(rgba[i * bytesPerPixel + 2]) / 255.0
-            ptr[rOffset + i] = (r - mean.x) / std.x
-            ptr[gOffset + i] = (g - mean.y) / std.y
-            ptr[bOffset + i] = (b - mean.z) / std.z
-        }
-
-        return inputArray
     }
 }
 
