@@ -8,13 +8,26 @@ struct DirectoryScanner: Sendable {
     ]
 
     func scan(folder: URL) throws -> [URL] {
-        let contents = try FileManager.default.contentsOfDirectory(
+        guard let enumerator = FileManager.default.enumerator(
             at: folder,
             includingPropertiesForKeys: [.isRegularFileKey],
-            options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]
-        )
-        return contents.filter { url in
-            Self.supportedExtensions.contains(url.pathExtension.lowercased())
-        }.sorted { $0.lastPathComponent < $1.lastPathComponent }
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else {
+            return []
+        }
+        var results: [URL] = []
+        for case let url as URL in enumerator {
+            if Self.supportedExtensions.contains(url.pathExtension.lowercased()) {
+                results.append(url)
+            }
+        }
+        // Sort by (parent path, filename) so bursts within a single
+        // subfolder stay contiguous under the timestamp resort.
+        return results.sorted {
+            let lp = $0.deletingLastPathComponent().path
+            let rp = $1.deletingLastPathComponent().path
+            if lp != rp { return lp < rp }
+            return $0.lastPathComponent < $1.lastPathComponent
+        }
     }
 }
