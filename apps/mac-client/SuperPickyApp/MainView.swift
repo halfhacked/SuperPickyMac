@@ -38,7 +38,8 @@ struct MainView: View {
                     saveFolders()
                 },
                 onCancelProcessing: { cancelProcessing() },
-                onReprocessFolder: { folder in reprocessFolder(folder) }
+                onReprocessFolder: { folder in reprocessFolder(folder) },
+                onRefreshFolder: { folder in refreshFolder(folder) }
             )
             .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 300)
         } detail: {
@@ -179,6 +180,14 @@ struct MainView: View {
             try? db.deleteNonManualPhotos()
         }
 
+        startProcessing(folder: folder)
+    }
+
+    /// Scan the folder for new/un-processed photos and kick processing
+    /// without clearing the DB. Already-processed photos stay as-is
+    /// (skipped by the pipeline); only the gap files get ML'd.
+    private func refreshFolder(_ folder: URL) {
+        guard !appState.isProcessing else { return }
         startProcessing(folder: folder)
     }
 
