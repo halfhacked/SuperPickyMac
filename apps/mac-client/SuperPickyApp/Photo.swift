@@ -40,6 +40,14 @@ struct Photo: Identifiable, Codable, Sendable, FetchableRecord, PersistableRecor
     var aestheticsDistributionJSON: String?
     var birdBboxJSON: String?
 
+    /// JSON-encoded `[SpeciesMatch]` — the set of species currently tagged on
+    /// this photo. First entry is the "primary" species (mirrored into the
+    /// scalar `species*` columns for back-compat with burst-dominance,
+    /// sidebar hierarchy, and legacy queries). Empty/nil when the photo is
+    /// unidentified. Written only via the `assignedSpecies` accessor so the
+    /// primary-column mirror stays in sync.
+    var assignedSpeciesJSON: String?
+
     // Reverse-geocoded location from the photo's GPS EXIF (resolved via
     // CLGeocoder + cell-keyed cache in ReverseGeocoder). Written to the
     // XMP sidecar as photoshop:City / State / Country / Iptc4xmpCore:
@@ -84,9 +92,67 @@ struct Photo: Identifiable, Codable, Sendable, FetchableRecord, PersistableRecor
         speciesCnName = donor.speciesCnName
         speciesPinyin = donor.speciesPinyin
         speciesConfidence = donor.speciesConfidence
+        assignedSpeciesJSON = donor.assignedSpeciesJSON
     }
 
     var hasSpecies: Bool {
         speciesCommonName != nil || speciesScientificName != nil
+    }
+
+    /// Currently-assigned species list, decoded from `assignedSpeciesJSON`.
+    /// Writing this property updates the JSON blob *and* mirrors the first
+    /// entry into the scalar `species*` columns so sidebar hierarchy,
+    /// burst-dominance, and legacy queries keep working without change.
+    var assignedSpecies: [SpeciesMatch] {
+        get {
+            if let json = assignedSpeciesJSON,
+               let data = json.data(using: .utf8),
+               let list = try? JSONDecoder().decode([SpeciesMatch].self, from: data) {
+                return list
+            }
+            // Fall back to the scalar primary columns so rows written
+            // before migration v8, or synthesized by tests that only set
+            // scalar fields, still report a sensible list. Scientific name
+            // may be missing (common-only, cn-only cases): derive a stable
+            // scientific-name slot from the common or Chinese name so
+            // `SpeciesMatch.speciesID` stays non-empty.
+            if speciesCommonName != nil || speciesScientificName != nil
+                || speciesCnName != nil || speciesPinyin != nil {
+                let sci = speciesScientificName
+                    ?? speciesCommonName
+                    ?? speciesCnName
+                    ?? speciesPinyin
+                    ?? ""
+                return [SpeciesMatch(
+                    scientificName: sci,
+                    commonName: speciesCommonName,
+                    confidence: speciesConfidence ?? 0,
+                    cnName: speciesCnName,
+                    pinyin: speciesPinyin,
+                    thresholdUsed: nil,
+                    ebirdCode: nil
+                )]
+            }
+            return []
+        }
+        set {
+            if newValue.isEmpty {
+                assignedSpeciesJSON = "[]"
+                speciesScientificName = nil
+                speciesCommonName = nil
+                speciesCnName = nil
+                speciesPinyin = nil
+                speciesConfidence = nil
+            } else {
+                let data = try? JSONEncoder().encode(newValue)
+                assignedSpeciesJSON = data.flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+                let primary = newValue[0]
+                speciesScientificName = primary.scientificName
+                speciesCommonName = primary.commonName
+                speciesCnName = primary.cnName
+                speciesPinyin = primary.pinyin
+                speciesConfidence = primary.confidence
+            }
+        }
     }
 }

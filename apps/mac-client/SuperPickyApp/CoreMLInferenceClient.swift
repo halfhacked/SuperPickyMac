@@ -197,14 +197,18 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
             let logits = try osea.logits(image: crop, isYOLOCropped: true, useTTA: true)
             let validLogits = Array(logits.prefix(OSEAClassifier.numClasses))
 
-            // 5. Walk the filter cascade. For each level compute softmax
-            //    (masked for gps/country, unmasked for global) and accept
-            //    the first level whose top-1 clears that level's
-            //    threshold. Matches `preen/detector.py` exactly.
+            // 5. Walk the full filter cascade, softmaxing at every level
+            //    (gps, country, global) regardless of whether an earlier
+            //    level already accepted. This lets us surface near-miss
+            //    candidates from each tier in the edit panel — a species
+            //    that just missed the regional threshold but would have
+            //    passed globally still shows up as an option. Top-1
+            //    acceptance logic is unchanged: we still stop *tracking
+            //    acceptance* at the first level whose max clears its gate.
             var acceptedProbs: [Float]?
             var acceptedLevel: SpeciesFilterLevel.Kind = .global
-            var lastProbs: [Float] = []
-            var lastLevel: SpeciesFilterLevel.Kind = .global
+            var perLevelProbs: [(kind: SpeciesFilterLevel.Kind, probs: [Float])] = []
+            perLevelProbs.reserveCapacity(filterChain.count)
             for level in filterChain {
                 let probs: [Float]
                 if let allowed = level.classIDs, !allowed.isEmpty {
@@ -215,49 +219,70 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
                 } else {
                     probs = Self.softmax(logits: validLogits, temperature: Self.oseaTemperature)
                 }
-                lastProbs = probs
-                lastLevel = level.kind
-                let threshold = Self.top1ConfidenceThreshold(level: level.kind)
-                if (probs.max() ?? 0) >= threshold {
-                    acceptedProbs = probs
-                    acceptedLevel = level.kind
-                    break
+                perLevelProbs.append((level.kind, probs))
+                if acceptedProbs == nil {
+                    let threshold = Self.top1ConfidenceThreshold(level: level.kind)
+                    if (probs.max() ?? 0) >= threshold {
+                        acceptedProbs = probs
+                        acceptedLevel = level.kind
+                    }
                 }
             }
 
-            // 6. Build top-5 from the accepted level (or the last level
-            //    tried, for debugging parity). If no level cleared, the
-            //    top-1 is NOT appended — photo stays unidentified, but
-            //    top-5 still surfaces the best guesses for the parity
-            //    harness + diagnostics.
-            let probs = acceptedProbs ?? lastProbs
-            let topLevel = acceptedProbs != nil ? acceptedLevel : lastLevel
-            let topFive = probs.enumerated()
-                .sorted { $0.element > $1.element }
-                .prefix(max(5, topK))
-
-            var thisCropTop5: [SpeciesMatch] = []
-            var top1AppendedForThisCrop = false
-            for (classID, prob) in topFive {
-                guard prob >= Self.oseaFloorProbability else { break }
-                guard let entry = db.lookup(classID: classID) else { continue }
-                let match = SpeciesMatch(
+            // 6a. Primary species (top-1) still comes from the accepted
+            //     level only. If no level cleared, the photo stays
+            //     unidentified — nothing is appended to `speciesMatches`.
+            if let accepted = acceptedProbs,
+               let top1 = accepted.enumerated().max(by: { $0.element < $1.element }),
+               top1.element >= Self.oseaFloorProbability,
+               let entry = db.lookup(classID: top1.offset) {
+                speciesMatches.append(SpeciesMatch(
                     scientificName: entry.scientificName,
                     commonName: entry.englishName,
-                    confidence: prob,
+                    confidence: top1.element,
                     cnName: entry.chineseName,
                     pinyin: entry.pinyin,
-                    thresholdUsed: topLevel.rawValue
-                )
-                if !top1AppendedForThisCrop && acceptedProbs != nil {
-                    speciesMatches.append(match)
-                    top1AppendedForThisCrop = true
-                }
-                thisCropTop5.append(match)
-                if thisCropTop5.count >= 5 { break }
+                    thresholdUsed: acceptedLevel.rawValue,
+                    ebirdCode: entry.ebirdCode
+                ))
             }
-            if bestTop5 == nil && !thisCropTop5.isEmpty {
-                bestTop5 = thisCropTop5
+
+            // 6b. Candidate union across every level. For each (level, probs)
+            //     pair pull the top-5 above floor, then merge into a single
+            //     by-classID map keeping the highest-confidence entry (with
+            //     that level recorded as `thresholdUsed`). Cap final output
+            //     at 10 so the edit panel UI stays digestible.
+            var byClassID: [Int: SpeciesMatch] = [:]
+            for (kind, probs) in perLevelProbs {
+                let top = probs.enumerated()
+                    .sorted { $0.element > $1.element }
+                    .prefix(5)
+                for (classID, prob) in top {
+                    guard prob >= Self.oseaFloorProbability else { break }
+                    guard let entry = db.lookup(classID: classID) else { continue }
+                    let newMatch = SpeciesMatch(
+                        scientificName: entry.scientificName,
+                        commonName: entry.englishName,
+                        confidence: prob,
+                        cnName: entry.chineseName,
+                        pinyin: entry.pinyin,
+                        thresholdUsed: kind.rawValue,
+                        ebirdCode: entry.ebirdCode
+                    )
+                    if let existing = byClassID[classID] {
+                        if prob > existing.confidence {
+                            byClassID[classID] = newMatch
+                        }
+                    } else {
+                        byClassID[classID] = newMatch
+                    }
+                }
+            }
+            let thisCropCandidates = byClassID.values
+                .sorted { $0.confidence > $1.confidence }
+                .prefix(10)
+            if bestTop5 == nil && !thisCropCandidates.isEmpty {
+                bestTop5 = Array(thisCropCandidates)
             }
         }
 
@@ -356,16 +381,23 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
         let osea       = cached("OSEAClassifier").flatMap    { try? OSEAClassifier(url: $0) }
         let aesthetics = cached("AestheticsModel").flatMap   { try? AestheticsModel(url: $0) }
 
-        // Species DB is bundled inside SuperPickyInference (small, always needed).
-        let species = SpeciesDatabase.bundledURL().flatMap { try? SpeciesDatabase(url: $0) }
-
         // Species filter: Avonet SQLite is downloaded on first launch via
         // ModelManager into the same modelsDir; the eBird JSONs live in
         // the framework bundle. If avonet.db isn't there yet (fresh
         // install, offline), the filter still loads with a nil Avonet
         // path and falls straight through to the eBird cascade.
+        // Built first so the eBird ↔ class-id mapping can feed the
+        // species database below.
         let avonetURL = modelsDir.appendingPathComponent("avonet.db")
         let filter = try? SpeciesFilter(avonetPath: avonetURL)
+
+        // Species DB is bundled inside SuperPickyInference (small, always
+        // needed). Annotate each row with its eBird code from the filter
+        // so UI code can use it as a stable identifier.
+        let ebirdByClassID = filter?.ebirdCodeByClassID ?? [:]
+        let species = SpeciesDatabase.bundledURL().flatMap {
+            try? SpeciesDatabase(url: $0, ebirdByClassID: ebirdByClassID)
+        }
 
         return CoreMLInferenceClient(
             flightModel:     try FlightModel(url: flightURL),

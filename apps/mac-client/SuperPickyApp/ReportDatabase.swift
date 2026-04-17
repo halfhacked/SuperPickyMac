@@ -99,6 +99,43 @@ final class ReportDatabase: Sendable {
                 t.add(column: "locationSublocation", .text)
             }
         }
+        migrator.registerMigration("v8_assigned_species") { db in
+            // Multi-species tagging. Each photo now carries a JSON-encoded
+            // list of SpeciesMatch objects; the scalar species* columns
+            // continue to mirror the first entry for back-compat.
+            try db.alter(table: "photos") { t in
+                t.add(column: "assignedSpeciesJSON", .text)
+            }
+            // Backfill existing rows: emit a one-element list derived from
+            // the legacy scalar columns so pre-v8 photos show a consistent
+            // assigned list immediately (no reprocess required).
+            let rows = try Row.fetchAll(db, sql: """
+                SELECT id, speciesScientificName, speciesCommonName,
+                       speciesCnName, speciesPinyin, speciesConfidence
+                FROM photos
+                WHERE speciesScientificName IS NOT NULL
+            """)
+            for row in rows {
+                let id: String = row["id"]
+                let sci: String = row["speciesScientificName"]
+                let match = SpeciesMatch(
+                    scientificName: sci,
+                    commonName: row["speciesCommonName"],
+                    confidence: row["speciesConfidence"] ?? 0,
+                    cnName: row["speciesCnName"],
+                    pinyin: row["speciesPinyin"],
+                    thresholdUsed: nil,
+                    ebirdCode: nil
+                )
+                if let data = try? JSONEncoder().encode([match]),
+                   let json = String(data: data, encoding: .utf8) {
+                    try db.execute(
+                        sql: "UPDATE photos SET assignedSpeciesJSON = ? WHERE id = ?",
+                        arguments: [json, id]
+                    )
+                }
+            }
+        }
         try migrator.migrate(dbQueue)
     }
 

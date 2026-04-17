@@ -181,8 +181,9 @@ import Foundation
         let appState = AppState()
         appState.loadPhotos(for: folder)
 
-        // Filter singles for Eagle
-        appState.sidebarSelection = .singles("Eagle")
+        // Filter singles for Eagle (bucket key is the scientific name because
+        // no eBird code is set on test SpeciesMatch entries).
+        appState.sidebarSelection = .singles("Aquila")
         appState.applyFilter()
 
         #expect(appState.photos.count == 1)
@@ -206,8 +207,8 @@ import Foundation
         let appState = AppState()
         appState.loadPhotos(for: folder)
 
-        let unidentifiedName = appState.speciesEntries.first { $0.isUnidentified }?.name ?? "Unidentified"
-        appState.sidebarSelection = .singles(unidentifiedName)
+        // Unidentified bucket is keyed by `nil`, not by a display string.
+        appState.sidebarSelection = .singles(nil)
         appState.applyFilter()
 
         #expect(appState.photos.count == 2)
@@ -246,9 +247,9 @@ import Foundation
         defer { try? FileManager.default.removeItem(at: folder) }
 
         let entries = [
-            SpeciesEntry(name: "Hawk", cnName: "鹰", count: 1, burstGroups: [], singlePhotos: 1, isUnidentified: false),
-            SpeciesEntry(name: "Eagle", cnName: "雕", count: 1, burstGroups: [], singlePhotos: 1, isUnidentified: false),
-            SpeciesEntry(name: "Egret", cnName: "白鹭", count: 1, burstGroups: [], singlePhotos: 1, isUnidentified: false),
+            SpeciesEntry(speciesID: "hawk", scientificName: "Accipiter", name: "Hawk", cnName: "鹰", count: 1, burstGroups: [], singlePhotos: 1, isUnidentified: false),
+            SpeciesEntry(speciesID: "eagle", scientificName: "Aquila", name: "Eagle", cnName: "雕", count: 1, burstGroups: [], singlePhotos: 1, isUnidentified: false),
+            SpeciesEntry(speciesID: "egret", scientificName: "Egretta", name: "Egret", cnName: "白鹭", count: 1, burstGroups: [], singlePhotos: 1, isUnidentified: false),
         ]
 
         let sorted = SpeciesHierarchyBuilder.sorted(
@@ -317,5 +318,67 @@ import Foundation
         let eagle = appState.speciesEntries.first { $0.name == "Eagle" }
         #expect(eagle?.burstGroups.isEmpty == true)
         #expect(eagle?.singlePhotos == 2)
+    }
+
+    // MARK: - Multi-species assignment
+
+    @Test func photoWithTwoSpeciesAppearsInBothBuckets() throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        var photo = makePhoto(folder: folder)
+        photo.assignedSpecies = [
+            SpeciesMatch(scientificName: "Aquila", commonName: "Eagle",
+                         confidence: 0.9, cnName: nil, pinyin: nil,
+                         thresholdUsed: "gps", ebirdCode: "eagle"),
+            SpeciesMatch(scientificName: "Accipiter", commonName: "Hawk",
+                         confidence: 0.4, cnName: nil, pinyin: nil,
+                         thresholdUsed: "country", ebirdCode: "hawk"),
+        ]
+        try setupDB(folder: folder, photos: [photo])
+
+        let appState = AppState()
+        appState.loadPhotos(for: folder)
+
+        let eagle = appState.speciesEntries.first { $0.speciesID == "eagle" }
+        let hawk = appState.speciesEntries.first { $0.speciesID == "hawk" }
+        #expect(eagle?.count == 1)
+        #expect(hawk?.count == 1)
+        #expect(eagle?.singlePhotos == 1)
+        #expect(hawk?.singlePhotos == 1)
+
+        // Filtering by either bucket returns the same photo.
+        appState.sidebarSelection = .species("eagle")
+        appState.applyFilter()
+        #expect(appState.photos.count == 1)
+
+        appState.sidebarSelection = .species("hawk")
+        appState.applyFilter()
+        #expect(appState.photos.count == 1)
+    }
+
+    @Test func twoSpeciesWithSameDisplayNameStayDistinct() throws {
+        // Safety net for the "never key by display name" rule: two species
+        // sharing the same common name but different eBird codes must show
+        // up as two buckets, not one merged entry.
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        var a = makePhoto(folder: folder, filename: "IMG_A.CR3")
+        a.assignedSpecies = [SpeciesMatch(scientificName: "Species A", commonName: "Sparrow",
+                                           confidence: 0.8, cnName: nil, pinyin: nil,
+                                           thresholdUsed: "gps", ebirdCode: "sparow_a")]
+        var b = makePhoto(folder: folder, filename: "IMG_B.CR3")
+        b.assignedSpecies = [SpeciesMatch(scientificName: "Species B", commonName: "Sparrow",
+                                           confidence: 0.8, cnName: nil, pinyin: nil,
+                                           thresholdUsed: "gps", ebirdCode: "sparow_b")]
+        try setupDB(folder: folder, photos: [a, b])
+
+        let appState = AppState()
+        appState.loadPhotos(for: folder)
+
+        let sparrowBuckets = appState.speciesEntries.filter { $0.name == "Sparrow" }
+        #expect(sparrowBuckets.count == 2)
+        #expect(Set(sparrowBuckets.compactMap(\.speciesID)) == Set(["sparow_a", "sparow_b"]))
     }
 }

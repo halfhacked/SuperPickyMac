@@ -1,10 +1,15 @@
 import SwiftUI
+import SuperPickyInference
 import os
 
 struct MainView: View {
     @Environment(CullingConfig.self) private var config
     let modelState: ModelDownloadState
     @State private var appState = AppState()
+    /// Bundled species reference DB (~11 k entries, ~2 ms load). Used for
+    /// autocomplete in the species edit panel, independent of whether the
+    /// CoreML inference pipeline is running.
+    @State private var speciesDB: SpeciesDatabase? = nil
     @State private var processingTask: Task<Void, Never>?
     @State private var isExporting = false
     @State private var exportProgress = 0
@@ -76,6 +81,22 @@ struct MainView: View {
                     },
                     onCorrectSpecies: { id, name in
                         appState.correctSpecies(id: id, commonName: name)
+                    },
+                    onAssignedSpeciesChanged: { id, species in
+                        appState.setAssignedSpecies(id: id, species: species)
+                    },
+                    searchSpecies: { query in
+                        speciesDB?.search(query: query).map { entry in
+                            SpeciesMatch(
+                                scientificName: entry.scientificName,
+                                commonName: entry.englishName,
+                                confidence: 0,
+                                cnName: entry.chineseName.isEmpty ? nil : entry.chineseName,
+                                pinyin: entry.pinyin,
+                                thresholdUsed: "manual",
+                                ebirdCode: entry.ebirdCode
+                            )
+                        } ?? []
                     }
                 )
             }
@@ -102,6 +123,7 @@ struct MainView: View {
         .onAppear {
             appState.speciesSortOrder = config.speciesSortOrder
             syncSpeciesDisplay()
+            loadSpeciesDatabase()
             if let testFolder = ProcessInfo.processInfo.environment["TEST_FOLDER"] {
                 let folder = URL(fileURLWithPath: testFolder)
                 Task {
@@ -142,6 +164,15 @@ struct MainView: View {
         } message: {
             Text(exportResultMessage)
         }
+    }
+
+    /// Load the bundled species DB once on appear. Keeps the species edit
+    /// panel's autocomplete working even if the CoreML pipeline isn't
+    /// available (e.g. models haven't been downloaded yet).
+    private func loadSpeciesDatabase() {
+        guard speciesDB == nil else { return }
+        guard let url = SpeciesDatabase.bundledURL() else { return }
+        speciesDB = try? SpeciesDatabase(url: url)
     }
 
     /// Mirror the current config's display-name + locale into AppState so

@@ -133,7 +133,7 @@ struct SourceListView: View {
                                 Image(systemName: species.isUnidentified ? "questionmark.circle" : "bird")
                                     .foregroundStyle(.secondary)
                             }
-                            .tag(SidebarSelection.species(species.name))
+                            .tag(SidebarSelection.species(species.speciesID))
                         } else {
                             // Has bursts — native DisclosureGroup
                             DisclosureGroup {
@@ -163,7 +163,7 @@ struct SourceListView: View {
                                         Image(systemName: "photo")
                                             .foregroundStyle(.secondary)
                                     }
-                                    .tag(SidebarSelection.singles(species.name))
+                                    .tag(SidebarSelection.singles(species.speciesID))
                                 }
                             } label: {
                                 Label {
@@ -178,7 +178,7 @@ struct SourceListView: View {
                                         .foregroundStyle(.secondary)
                                 }
                             }
-                            .tag(SidebarSelection.species(species.name))
+                            .tag(SidebarSelection.species(species.speciesID))
                         }
                     }
                 } header: {

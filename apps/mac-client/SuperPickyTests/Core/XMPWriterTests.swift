@@ -181,4 +181,47 @@ import Foundation
         #expect(xml.contains("<rdf:li>Bird|Robin</rdf:li>"))
         // No scientific name line beyond the common name
     }
+
+    // MARK: - Multi-species
+
+    @Test func xmpEmitsKeywordsForEveryAssignedSpecies() {
+        var photo = makePhoto(starRating: 4, isFlying: false)
+        photo.assignedSpecies = [
+            SpeciesMatch(scientificName: "Aquila chrysaetos", commonName: "Golden Eagle",
+                         confidence: 0.9, cnName: "金雕", pinyin: "jindiao",
+                         thresholdUsed: "gps", ebirdCode: "goleag"),
+            SpeciesMatch(scientificName: "Buteo jamaicensis", commonName: "Red-tailed Hawk",
+                         confidence: 0.4, cnName: nil, pinyin: nil,
+                         thresholdUsed: "country", ebirdCode: "rethaw"),
+        ]
+        let xml = XMPWriter.generate(photo: photo)
+        #expect(xml.contains("<rdf:li>Golden Eagle</rdf:li>"))
+        #expect(xml.contains("<rdf:li>Aquila chrysaetos</rdf:li>"))
+        #expect(xml.contains("<rdf:li>金雕</rdf:li>"))
+        #expect(xml.contains("<rdf:li>jindiao</rdf:li>"))
+        #expect(xml.contains("<rdf:li>Red-tailed Hawk</rdf:li>"))
+        #expect(xml.contains("<rdf:li>Buteo jamaicensis</rdf:li>"))
+        #expect(xml.contains("<rdf:li>Bird|Golden Eagle</rdf:li>"))
+        #expect(xml.contains("<rdf:li>Bird|Red-tailed Hawk</rdf:li>"))
+    }
+
+    @Test func xmpDedupesKeywordsThatCollideAcrossSpecies() {
+        // Two matches sharing the same common name — rare but possible for
+        // renamed OSEA classes. Only one rdf:li per unique string.
+        var photo = makePhoto(starRating: 3)
+        photo.assignedSpecies = [
+            SpeciesMatch(scientificName: "Species A", commonName: "Sparrow",
+                         confidence: 0.8, cnName: nil, pinyin: nil,
+                         thresholdUsed: "global", ebirdCode: "a"),
+            SpeciesMatch(scientificName: "Species B", commonName: "Sparrow",
+                         confidence: 0.3, cnName: nil, pinyin: nil,
+                         thresholdUsed: "global", ebirdCode: "b"),
+        ]
+        let xml = XMPWriter.generate(photo: photo)
+        let sparrowCount = xml.components(separatedBy: "<rdf:li>Sparrow</rdf:li>").count - 1
+        #expect(sparrowCount == 1)
+        // Hierarchy also dedupes
+        let hierCount = xml.components(separatedBy: "<rdf:li>Bird|Sparrow</rdf:li>").count - 1
+        #expect(hierCount == 1)
+    }
 }

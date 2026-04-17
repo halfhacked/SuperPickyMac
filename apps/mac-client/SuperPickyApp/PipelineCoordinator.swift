@@ -554,11 +554,12 @@ final class PipelineCoordinator: @unchecked Sendable {
         ])
 
         if let top = identifyResult.species.first {
-            photo.speciesScientificName = top.scientificName
-            photo.speciesCommonName = top.commonName
-            photo.speciesCnName = top.cnName
-            photo.speciesPinyin = top.pinyin
-            photo.speciesConfidence = top.confidence
+            // Writing `assignedSpecies` mirrors the primary SpeciesMatch
+            // into the scalar species* columns, so we avoid setting them
+            // twice.
+            photo.assignedSpecies = [top]
+        } else {
+            photo.assignedSpecies = []
         }
         if let top5 = identifyResult.top5 {
             photo.speciesTop5JSON = Self.encodeJSON(top5)
