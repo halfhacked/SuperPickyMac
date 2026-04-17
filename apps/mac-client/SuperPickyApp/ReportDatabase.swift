@@ -88,6 +88,17 @@ final class ReportDatabase: Sendable {
         migrator.registerMigration("v6_drop_eye_sharpness") { db in
             try db.execute(sql: "ALTER TABLE photos DROP COLUMN eyeSharpnessScore")
         }
+        migrator.registerMigration("v7_reverse_geolocation") { db in
+            // Reverse-geocoded placemark fields, populated by
+            // PipelineCoordinator from CLGeocoder via ReverseGeocoder.
+            try db.alter(table: "photos") { t in
+                t.add(column: "locationCity", .text)
+                t.add(column: "locationState", .text)
+                t.add(column: "locationCountry", .text)
+                t.add(column: "locationCountryCode", .text)
+                t.add(column: "locationSublocation", .text)
+            }
+        }
         try migrator.migrate(dbQueue)
     }
 
