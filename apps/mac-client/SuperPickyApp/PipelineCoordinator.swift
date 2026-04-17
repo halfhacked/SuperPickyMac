@@ -431,26 +431,13 @@ final class PipelineCoordinator: @unchecked Sendable {
         // decoded image instead of reopening the file for a 64px thumbnail.
         pHashOut = BurstDetector.pHash(from: image)
 
-        // Kick off aesthetics before YOLO/OSEA — it only needs the 1280
-        // thumbnail (not the YOLO crop) and runs on `.cpuAndGPU`, so it
-        // executes in parallel with identify's ANE work instead of stacking
-        // on top of it. Cancellation and drain handled at each early return.
-        async let aestheticsResponse = inferenceClient.aesthetics(image: image)
-
         // YOLO detect + OSEA species identify, reusing `image` as the
         // source so identify skips its own thumbnail decode.
-        let identifyResult: IdentifyResponse
-        do {
-            identifyResult = try await inferenceClient.identify(
-                filePath: fileURL.path, topK: 5, preDecodedImage: image
-            )
-        } catch {
-            _ = try? await aestheticsResponse
-            throw error
-        }
+        let identifyResult = try await inferenceClient.identify(
+            filePath: fileURL.path, topK: 5, preDecodedImage: image
+        )
 
         guard let bird = identifyResult.birds?.first else {
-            _ = try? await aestheticsResponse
             photo.starRating = 0
             return
         }
@@ -477,11 +464,11 @@ final class PipelineCoordinator: @unchecked Sendable {
         // a raw rectangular YOLO bbox stretched to their input size causes
         // severe false positives in the flight classifier.
         guard let birdCrop = image.smartSquareBirdCrop(bbox: bird.bbox) else {
-            _ = try? await aestheticsResponse
             photo.starRating = 0
             return
         }
 
+        async let aestheticsResponse = inferenceClient.aesthetics(image: image)
         async let keypointResult = inferenceClient.keypoints(image: birdCrop)
         async let flightResult = flightDetectionEnabled
             ? inferenceClient.flight(image: birdCrop)
