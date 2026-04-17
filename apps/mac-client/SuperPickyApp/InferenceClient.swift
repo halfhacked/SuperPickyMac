@@ -11,11 +11,22 @@ protocol InferenceClient: Sendable {
     /// internally. Caller must pass a CGImage whose coordinate space is
     /// consistent with the original file (same aspect ratio) — any
     /// thumbnail ≥ 640×N is fine since YOLO letterboxes to 640 anyway.
-    func identify(filePath: String, topK: Int, preDecodedImage: CGImage?) async throws -> IdentifyResponse
+    ///
+    /// If `preGPS` is non-nil, the SpeciesFilter reuses it instead of
+    /// re-opening the file for a second CGImageSource to read the GPS
+    /// IFD. Saves ~5–10 ms of redundant file I/O per photo.
+    func identify(
+        filePath: String, topK: Int,
+        preDecodedImage: CGImage?, preGPS: (lat: Double, lon: Double)?
+    ) async throws -> IdentifyResponse
 }
 
 extension InferenceClient {
     func identify(filePath: String, topK: Int) async throws -> IdentifyResponse {
-        try await identify(filePath: filePath, topK: topK, preDecodedImage: nil)
+        try await identify(filePath: filePath, topK: topK, preDecodedImage: nil, preGPS: nil)
+    }
+
+    func identify(filePath: String, topK: Int, preDecodedImage: CGImage?) async throws -> IdentifyResponse {
+        try await identify(filePath: filePath, topK: topK, preDecodedImage: preDecodedImage, preGPS: nil)
     }
 }
