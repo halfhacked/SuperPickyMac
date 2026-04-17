@@ -164,6 +164,7 @@
 "Export photos (⌘E for picks)" = "导出照片（⌘E 导出精选）";
 "Calibrate thresholds against this photo" = "以此照片校准阈值";
 "Reprocess Folder" = "重新处理文件夹";
+"Refresh Folder" = "刷新文件夹";
 "Cancel processing" = "取消处理";
 "Exporting..." = "正在导出…";
 "No photos in the current view" = "当前视图中没有照片";
