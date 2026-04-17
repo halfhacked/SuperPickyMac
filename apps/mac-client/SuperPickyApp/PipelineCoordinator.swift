@@ -442,25 +442,22 @@ final class PipelineCoordinator: @unchecked Sendable {
         imageSizeOut: inout (width: Int, height: Int)?
     ) async throws {
         let photoStart = DispatchTime.now()
-        // Single-read EXIF: one CGImageSource open powers the original
-        // image dimensions (logged for perf correlation), the ISO sharpness
-        // factor, and the focus-point weighting below.
-        let exifStart = DispatchTime.now()
-        let imageProps = ImageProperties.load(filePath: fileURL.path)
+        // One CGImageSource open per photo — extract both the 1280 thumbnail
+        // and the EXIF/TIFF property dictionary together. Every consumer
+        // downstream (ISO sharpness factor, focus-point weighting, image
+        // dimensions logged below) wants a slice of the same property dict;
+        // re-opening the source for properties after the thumbnail decode
+        // used to cost ~4 ms / photo.
+        let decodeStart = DispatchTime.now()
+        let decoded = try rawConverter.decode(fileURL: fileURL)
+        let image = decoded.image
+        let imageProps = decoded.properties
+        let decodeMs = Self.elapsedMs(since: decodeStart)
         if let props = imageProps,
            let w = props[kCGImagePropertyPixelWidth as String] as? Int,
            let h = props[kCGImagePropertyPixelHeight as String] as? Int {
             imageSizeOut = (w, h)
         }
-        let exifMs = Self.elapsedMs(since: exifStart)
-
-        // Decode the 1280 thumbnail up front — identify, OSEA crop,
-        // aesthetics / keypoints / flight, and the burst pHash all
-        // consume the same pixels; we used to decode twice (once
-        // inside identify, once here) which doubled the decode cost.
-        let decodeStart = DispatchTime.now()
-        let image = try rawConverter.convert(fileURL: fileURL)
-        let decodeMs = Self.elapsedMs(since: decodeStart)
         // Perceptual hash for the burst-similarity check — reuse the already
         // decoded image instead of reopening the file for a 64px thumbnail.
         let pHashStart = DispatchTime.now()
@@ -615,7 +612,7 @@ final class PipelineCoordinator: @unchecked Sendable {
         )
         photo.starRating = ratingResult.rating
         let photoMs = Self.elapsedMs(since: photoStart)
-        logger.debug("photo.ml exif=\(exifMs, privacy: .public)ms decode=\(decodeMs, privacy: .public)ms pHash=\(pHashMs, privacy: .public)ms postMl=\(postMlMs, privacy: .public)ms total=\(photoMs, privacy: .public)ms")
+        logger.debug("photo.ml decode=\(decodeMs, privacy: .public)ms pHash=\(pHashMs, privacy: .public)ms postMl=\(postMlMs, privacy: .public)ms total=\(photoMs, privacy: .public)ms")
     }
 
     private static func elapsedMs(since start: DispatchTime) -> String {
