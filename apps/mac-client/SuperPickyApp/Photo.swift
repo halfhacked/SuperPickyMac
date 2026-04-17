@@ -144,8 +144,12 @@ struct Photo: Identifiable, Codable, Sendable, FetchableRecord, PersistableRecor
                 speciesPinyin = nil
                 speciesConfidence = nil
             } else {
-                let data = try? JSONEncoder().encode(newValue)
-                assignedSpeciesJSON = data.flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+                if let data = try? JSONEncoder().encode(newValue),
+                   let json = String(data: data, encoding: .utf8) {
+                    assignedSpeciesJSON = json
+                } else {
+                    assignedSpeciesJSON = "[]"
+                }
                 let primary = newValue[0]
                 speciesScientificName = primary.scientificName
                 speciesCommonName = primary.commonName

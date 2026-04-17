@@ -182,7 +182,8 @@ import Foundation
 
         // DB round-trip: refetch via a fresh database handle.
         let db2 = try ReportDatabase(folderPath: folder)
-        let refetched = try #require(try db2.fetchPhoto(id: photo.id))
+        let fetched = try db2.fetchPhoto(id: photo.id)
+        let refetched = try #require(fetched)
         #expect(refetched.assignedSpecies.count == 2)
         #expect(refetched.assignedSpecies.map(\.speciesID) == ["eagle", "hawk"])
     }
@@ -250,7 +251,8 @@ import Foundation
         appState.correctSpecies(id: photo.id, commonName: "Golden Eagle")
 
         let db2 = try ReportDatabase(folderPath: folder)
-        let refetched = try #require(try db2.fetchPhoto(id: photo.id))
+        let fetched = try db2.fetchPhoto(id: photo.id)
+        let refetched = try #require(fetched)
         #expect(refetched.assignedSpecies.first?.commonName == "Golden Eagle")
         // Stable identity preserved — the sidebar bucket shouldn't jump.
         #expect(refetched.assignedSpecies.first?.speciesID == "goleag")
@@ -270,7 +272,8 @@ import Foundation
         appState.correctSpecies(id: photo.id, commonName: "Mystery Bird")
 
         let db2 = try ReportDatabase(folderPath: folder)
-        let refetched = try #require(try db2.fetchPhoto(id: photo.id))
+        let fetched = try db2.fetchPhoto(id: photo.id)
+        let refetched = try #require(fetched)
         #expect(refetched.assignedSpecies.count == 1)
         #expect(refetched.assignedSpecies.first?.commonName == "Mystery Bird")
         #expect(refetched.assignedSpecies.first?.ebirdCode == nil)

@@ -159,12 +159,13 @@ import GRDB
         // Clear assignedSpeciesJSON to mimic a pre-migration row that the
         // backfill wouldn't have seen (or any row where it's still nil),
         // then re-fetch to confirm the accessor fallback.
-        _ = try db.fetchPhoto(id: legacy.id)
-        var row = try #require(try db.fetchPhoto(id: legacy.id))
+        let fetched = try db.fetchPhoto(id: legacy.id)
+        var row = try #require(fetched)
         row.assignedSpeciesJSON = nil
         try db.save(&row)
 
-        let refetched = try #require(try db.fetchPhoto(id: legacy.id))
+        let reread = try db.fetchPhoto(id: legacy.id)
+        let refetched = try #require(reread)
         #expect(refetched.assignedSpecies.count == 1)
         #expect(refetched.assignedSpecies.first?.scientificName == "Falco peregrinus")
         #expect(refetched.assignedSpecies.first?.commonName == "Peregrine Falcon")

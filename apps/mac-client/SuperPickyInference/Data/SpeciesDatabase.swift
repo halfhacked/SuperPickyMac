@@ -108,7 +108,7 @@ public final class SpeciesDatabase: Sendable {
             if a.score != b.score { return a.score > b.score }
             return a.entry.englishName.localizedCaseInsensitiveCompare(b.entry.englishName) == .orderedAscending
         }
-        return scored.prefix(limit).map(\.entry)
+        return scored.prefix(limit).map { $0.entry }
     }
 
     /// Locate the bundled `bird_reference.sqlite` inside the SuperPickyInference
