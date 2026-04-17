@@ -10,6 +10,8 @@ struct SourceListView: View {
     let speciesEntries: [SpeciesEntry]
     let processingFolder: URL?
     let processingProgress: Double
+    let processingProcessed: Int
+    let processingTotal: Int
 
     let onAddFolder: () -> Void
     let onRemoveFolder: (URL) -> Void
@@ -26,6 +28,8 @@ struct SourceListView: View {
                         folder: folder,
                         isProcessing: processingFolder == folder,
                         progress: processingFolder == folder ? processingProgress : 0,
+                        processed: processingFolder == folder ? processingProcessed : 0,
+                        total: processingFolder == folder ? processingTotal : 0,
                         onCancel: (processingFolder == folder) ? onCancelProcessing : nil
                     )
                     .tag(SidebarSelection.folder(folder))
@@ -182,16 +186,18 @@ struct SourceListView: View {
                         Text(config.localized("Species"))
                         Spacer()
                         Menu {
-                            Picker("", selection: $config.speciesSortOrder) {
+                            Picker(config.localized("Sort species"), selection: $config.speciesSortOrder) {
                                 Text(config.localized("Sort by name")).tag(SpeciesSortOrder.name)
                                 Text(config.localized("Sort by count")).tag(SpeciesSortOrder.count)
                             }
+                            .pickerStyle(.inline)
                         } label: {
-                            Image(systemName: "arrow.up.arrow.down")
+                            Image(systemName: "arrow.up.arrow.down.circle.fill")
                                 .font(.body)
                                 .foregroundStyle(.secondary)
                         }
-                        .menuStyle(.borderlessButton)
+                        .menuStyle(.button)
+                        .buttonStyle(.plain)
                         .menuIndicator(.hidden)
                         .fixedSize()
                         .help(config.localized("Sort species"))
@@ -254,6 +260,8 @@ struct FolderRow: View {
     let folder: URL
     let isProcessing: Bool
     let progress: Double
+    let processed: Int
+    let total: Int
     var onCancel: (() -> Void)?
 
     var body: some View {
@@ -264,6 +272,12 @@ struct FolderRow: View {
                     ProgressView(value: progress)
                         .progressViewStyle(.linear)
                         .scaleEffect(y: 0.5)
+                    if total > 0 {
+                        Text("\(processed)/\(total)")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
                     Button {
                         onCancel?()
                     } label: {

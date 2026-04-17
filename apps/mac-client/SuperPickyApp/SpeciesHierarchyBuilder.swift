@@ -2,7 +2,12 @@ import Foundation
 
 /// Pure computation: groups photos into species hierarchy entries.
 struct SpeciesHierarchyBuilder {
-    static func build(from photos: [Photo], sortOrder: SpeciesSortOrder = .name) -> [SpeciesEntry] {
+    static func build(
+        from photos: [Photo],
+        sortOrder: SpeciesSortOrder = .name,
+        displayName: (SpeciesEntry) -> String = { $0.name },
+        locale: Locale = .current
+    ) -> [SpeciesEntry] {
         // Assign each burst to its dominant species by highest confidence ID.
         // A burst spanning multiple species classifications appears only once.
         var burstToSpecies: [UUID: String] = [:]
@@ -72,17 +77,23 @@ struct SpeciesHierarchyBuilder {
                 isUnidentified: entry.isUnidentified
             )
         }
-        return sorted(entries: entries, by: sortOrder)
+        return sorted(entries: entries, by: sortOrder, displayName: displayName, locale: locale)
     }
 
-    /// Unidentified always first, then by the chosen sort order.
-    /// Alphabetical uses `localizedStandardCompare` for natural ordering.
-    static func sorted(entries: [SpeciesEntry], by order: SpeciesSortOrder) -> [SpeciesEntry] {
+    /// Unidentified always first, then by the chosen sort order. Name sort
+    /// uses `displayName` and the matching `locale`, so e.g. Chinese rows
+    /// sort by pinyin under `zh-Hans`, Japanese by gojūon under `ja`, etc.
+    static func sorted(
+        entries: [SpeciesEntry],
+        by order: SpeciesSortOrder,
+        displayName: (SpeciesEntry) -> String = { $0.name },
+        locale: Locale = .current
+    ) -> [SpeciesEntry] {
         entries.sorted { a, b in
             if a.isUnidentified != b.isUnidentified { return a.isUnidentified }
             switch order {
             case .name:
-                return a.name.localizedStandardCompare(b.name) == .orderedAscending
+                return displayName(a).compare(displayName(b), options: [], range: nil, locale: locale) == .orderedAscending
             case .count:
                 return a.count > b.count
             }
