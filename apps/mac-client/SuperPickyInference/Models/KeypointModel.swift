@@ -25,7 +25,7 @@ public final class KeypointModel: @unchecked Sendable {
     // MARK: - Init
 
     public init(url: URL, configuration: MLModelConfiguration = .init()) throws {
-        configuration.computeUnits = .cpuAndNeuralEngine
+        configuration.computeUnits = .cpuAndGPU
         self.model = try MLModel(contentsOf: url, configuration: configuration)
     }
 

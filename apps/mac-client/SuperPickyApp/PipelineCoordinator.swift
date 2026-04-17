@@ -151,6 +151,22 @@ final class PipelineCoordinator: @unchecked Sendable {
         var lastPHash: UInt64?
         var sawSkipped = false
 
+        // Serial write-behind chain for `db.save` + `XMPWriter.write`. Photo.id
+        // is a client-side UUID (not assigned by GRDB), so saves don't need to
+        // complete before the next finalize iteration reads photo state. Moving
+        // them off the serial finalize path removes ~2 ms × N photos from the
+        // main-loop critical path. Drain before the picked-flag phase (which
+        // reads from the DB).
+        var writeBehindChain: Task<Void, Never> = Task {}
+        @Sendable
+        func writeBehind(_ work: @escaping @Sendable () -> Void) {
+            let prev = writeBehindChain
+            writeBehindChain = Task.detached(priority: .utility) {
+                _ = await prev.value
+                work()
+            }
+        }
+
         // Finalizer for one photo. Runs serially in timestamp order (one at
         // a time) so the incremental burst state, DB writes, and UI callback
         // stay coherent regardless of which order the concurrent ML tasks
@@ -173,11 +189,13 @@ final class PipelineCoordinator: @unchecked Sendable {
                 photo.starRating = 0
             }
 
-            do {
-                try db.save(&photo)
-                try? XMPWriter.write(photo: photo)
-            } catch {
-                logger.error("Failed to save photo: \(error)")
+            let snapshot = photo
+            writeBehind { [logger] in
+                var p = snapshot
+                do { try db.save(&p) } catch {
+                    logger.error("Failed to save photo: \(error)")
+                }
+                try? XMPWriter.write(photo: snapshot)
             }
             processedCount += 1
             let elapsedMs = Double(DispatchTime.now().uptimeNanoseconds - startedAt.uptimeNanoseconds) / 1_000_000
@@ -221,12 +239,14 @@ final class PipelineCoordinator: @unchecked Sendable {
                         if burstPhotos[i].burstGroupID != groupID || burstPhotos[i].isBurstBest != newBest {
                             burstPhotos[i].burstGroupID = groupID
                             burstPhotos[i].isBurstBest = newBest
-                            do {
-                                try db.save(&burstPhotos[i])
-                                updated.append(burstPhotos[i])
-                            } catch {
-                                logger.error("Failed to save burst update: \(error)")
+                            let toSave = burstPhotos[i]
+                            writeBehind { [logger] in
+                                var p = toSave
+                                do { try db.save(&p) } catch {
+                                    logger.error("Failed to save burst update: \(error)")
+                                }
                             }
+                            updated.append(burstPhotos[i])
                         }
                     }
 
@@ -297,6 +317,9 @@ final class PipelineCoordinator: @unchecked Sendable {
             inflight.removeFirst()
             await finalize(url: first.0, workTask: first.1)
         }
+
+        // Drain the write-behind chain before any phase that reads from the DB.
+        await writeBehindChain.value
 
         // If we skipped existing photos, the running burst window was reset
         // at each skip. Run a full reconciliation so bursts spanning the
