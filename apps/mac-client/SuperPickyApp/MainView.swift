@@ -79,6 +79,10 @@ struct MainView: View {
             }
         }
         .navigationTitle("")
+        .onChange(of: config.speciesSortOrder) { _, newValue in
+            appState.speciesSortOrder = newValue
+            appState.resortSpeciesEntries()
+        }
         .onChange(of: appState.sidebarSelection) { _, newValue in
             switch newValue {
             case .folder(let url):
@@ -90,6 +94,7 @@ struct MainView: View {
             }
         }
         .onAppear {
+            appState.speciesSortOrder = config.speciesSortOrder
             if let testFolder = ProcessInfo.processInfo.environment["TEST_FOLDER"] {
                 let folder = URL(fileURLWithPath: testFolder)
                 Task {

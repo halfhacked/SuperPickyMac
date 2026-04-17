@@ -39,6 +39,7 @@ final class AppState {
     var flyingCount: Int = 0
     var picksCount: Int = 0
     var speciesEntries: [SpeciesEntry] = []
+    var speciesSortOrder: SpeciesSortOrder = .name
 
     struct UndoAction {
         let photoID: UUID
@@ -143,7 +144,12 @@ final class AppState {
 
     /// Build species → burst group hierarchy from loaded photos.
     private func buildSpeciesHierarchy() {
-        speciesEntries = SpeciesHierarchyBuilder.build(from: allPhotos)
+        speciesEntries = SpeciesHierarchyBuilder.build(from: allPhotos, sortOrder: speciesSortOrder)
+    }
+
+    /// Re-sort the current hierarchy in place. Cheap — no rebuild.
+    func resortSpeciesEntries() {
+        speciesEntries = SpeciesHierarchyBuilder.sorted(entries: speciesEntries, by: speciesSortOrder)
     }
 
     /// Incrementally append or replace a single processed photo. Hot
@@ -205,10 +211,7 @@ final class AppState {
 
         if let old { remove(old) }
         add(photo)
-        speciesEntries.sort {
-            if $0.isUnidentified != $1.isUnidentified { return $0.isUnidentified }
-            return $0.count > $1.count
-        }
+        speciesEntries = SpeciesHierarchyBuilder.sorted(entries: speciesEntries, by: speciesSortOrder)
     }
 
     private func add(_ photo: Photo) {

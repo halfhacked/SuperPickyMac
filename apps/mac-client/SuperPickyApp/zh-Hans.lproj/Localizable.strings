@@ -161,6 +161,9 @@
 "Move to Trash?" = "移到废纸篓？";
 "Export All Visible" = "导出所有可见";
 "Sort photos" = "排序照片";
+"Sort species" = "排序鸟种";
+"Sort by name" = "按名称";
+"Sort by count" = "按数量";
 "Export photos (⌘E for picks)" = "导出照片（⌘E 导出精选）";
 "Calibrate thresholds against this photo" = "以此照片校准阈值";
 "Reprocess Folder" = "重新处理文件夹";
