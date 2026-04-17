@@ -166,7 +166,6 @@ final class PipelineCoordinator: @unchecked Sendable {
         var burstID: UUID?
         var lastTimestamp: Double?
         var lastPHash: UInt64?
-        var sawSkipped = false
 
         // Serial write-behind chain for `db.save` + `XMPWriter.write`. Photo.id
         // is a client-side UUID (not assigned by GRDB), so saves don't need to
@@ -316,14 +315,18 @@ final class PipelineCoordinator: @unchecked Sendable {
             currentFilename = fileURL.lastPathComponent
 
             if existingPaths.contains(fileURL.path) {
-                // Drain in-flight before the skip so the skip's burst reset
-                // applies to the true sequential position.
+                // Resumption: already-processed photos are in DB from an
+                // earlier run. Skip ML, but drain in-flight first and
+                // reset the incremental burst window so a new photo
+                // after the skip doesn't accidentally extend a burst
+                // that pre-dates the skip. Cross-skip bursts aren't
+                // detected — a known gap the streaming pipeline will
+                // close.
                 while let first = inflight.first {
                     inflight.removeFirst()
                     await finalize(url: first.0, workTask: first.1)
                 }
                 processedCount += 1
-                sawSkipped = true
                 burstPhotos.removeAll(keepingCapacity: true)
                 burstID = nil
                 lastTimestamp = nil
@@ -364,13 +367,6 @@ final class PipelineCoordinator: @unchecked Sendable {
         await writeBehindChain.value
         let wbEnd = DispatchTime.now()
 
-        // If we skipped existing photos, the running burst window was reset
-        // at each skip. Run a full reconciliation so bursts spanning the
-        // skip boundary are correct. Fresh-processing runs don't need this.
-        if burstDetectionEnabled && sawSkipped {
-            await runBurstDetection(db: db, detector: burstDetector)
-        }
-
         // Picked flag calculation (intersection of top aesthetics & sharpness among 5-star)
         await runPickedFlagCalculation(db: db, topPercentage: pickedTopPercentage)
         let allEnd = DispatchTime.now()
@@ -396,30 +392,6 @@ final class PipelineCoordinator: @unchecked Sendable {
         photos
             .filter { $0.hasSpecies }
             .max { ($0.speciesConfidence ?? 0) < ($1.speciesConfidence ?? 0) }
-    }
-
-    private func runBurstDetection(db: ReportDatabase, detector: BurstDetector) async {
-        do {
-            let allPhotos = try db.fetchAllPhotos()
-            let burstGroups = await Task.detached(priority: .utility) {
-                detector.detect(photos: allPhotos)
-            }.value
-            for group in burstGroups {
-                let donor = Self.speciesDonor(in: group.photos)
-                for photo in group.photos {
-                    var updated = photo
-                    updated.burstGroupID = group.id
-                    updated.isBurstBest = (photo.id == group.bestPhotoID)
-                    if let donor, !updated.hasSpecies, updated.id != donor.id {
-                        updated.inheritSpecies(from: donor)
-                        try? XMPWriter.write(photo: updated)
-                    }
-                    try db.save(&updated)
-                }
-            }
-        } catch {
-            logger.error("Burst detection failed: \(error)")
-        }
     }
 
     private func runPickedFlagCalculation(db: ReportDatabase, topPercentage: Int) async {
