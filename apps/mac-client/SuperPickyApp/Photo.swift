@@ -72,4 +72,21 @@ struct Photo: Identifiable, Codable, Sendable, FetchableRecord, PersistableRecor
         locationCountryCode = loc.countryCode
         locationSublocation = loc.sublocation
     }
+
+    /// Copy species fields from another burst member. Bursts are rapid-
+    /// fire frames of the same subject, so once one frame is confidently
+    /// identified we propagate that label to every other member whose own
+    /// OSEA run fell below the threshold (or swung to an implausible
+    /// lookalike due to a slightly-different crop).
+    mutating func inheritSpecies(from donor: Photo) {
+        speciesCommonName = donor.speciesCommonName
+        speciesScientificName = donor.speciesScientificName
+        speciesCnName = donor.speciesCnName
+        speciesPinyin = donor.speciesPinyin
+        speciesConfidence = donor.speciesConfidence
+    }
+
+    var hasSpecies: Bool {
+        speciesCommonName != nil || speciesScientificName != nil
+    }
 }
