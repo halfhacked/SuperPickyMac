@@ -37,6 +37,14 @@ final class AppState {
     var folders: [URL] = []
     var speciesEntries: [SpeciesEntry] = []
     var speciesSortOrder: SpeciesSortOrder = .name
+    /// Closure to derive the display name used for alphabetical sort.
+    /// MainView wires this to `config.localizedName(...)` so the order
+    /// matches whatever the user sees. Default preserves the English
+    /// name for unit tests that don't plumb config.
+    var speciesDisplayName: (SpeciesEntry) -> String = { $0.name }
+    /// Locale used for alphabetical comparison — drives ICU collation
+    /// (e.g. pinyin for `zh-Hans`, gojūon for `ja`).
+    var speciesSortLocale: Locale = .current
 
     var ratingCounts: [Int: Int] {
         var counts: [Int: Int] = [:]
@@ -87,6 +95,8 @@ final class AppState {
     // Per-folder processing state
     var processingFolder: URL?
     var processingProgress: Double = 0
+    var processingProcessed: Int = 0
+    var processingTotal: Int = 0
     var currentFolder: URL?
     var isProcessing: Bool { processingFolder != nil }
 
@@ -145,12 +155,22 @@ final class AppState {
 
     /// Build species → burst group hierarchy from loaded photos.
     private func buildSpeciesHierarchy() {
-        speciesEntries = SpeciesHierarchyBuilder.build(from: allPhotos, sortOrder: speciesSortOrder)
+        speciesEntries = SpeciesHierarchyBuilder.build(
+            from: allPhotos,
+            sortOrder: speciesSortOrder,
+            displayName: speciesDisplayName,
+            locale: speciesSortLocale
+        )
     }
 
     /// Re-sort the current hierarchy in place. Cheap — no rebuild.
     func resortSpeciesEntries() {
-        speciesEntries = SpeciesHierarchyBuilder.sorted(entries: speciesEntries, by: speciesSortOrder)
+        speciesEntries = SpeciesHierarchyBuilder.sorted(
+            entries: speciesEntries,
+            by: speciesSortOrder,
+            displayName: speciesDisplayName,
+            locale: speciesSortLocale
+        )
     }
 
     /// Incrementally append or replace a single processed photo. Hot
@@ -193,17 +213,52 @@ final class AppState {
     /// is constant work, not a full `SpeciesHierarchyBuilder.build` pass.
     private func updateSpeciesHierarchy(removing old: Photo?, adding photo: Photo) {
         // Burst reassignment across species is too subtle to get right
-        // incrementally (dominant species can flip). When either side
-        // touches a burst, fall back to a full rebuild — still O(n) in
-        // allPhotos but rare enough not to dominate.
+        // incrementally (dominant species can flip). Fall back to a full
+        // rebuild — but run it off-main with a debounce, otherwise every
+        // burst photo during a large-folder ingest stalls the main
+        // thread with O(n) work and throughput collapses to O(n²).
         if (old?.burstGroupID != nil) || (photo.burstGroupID != nil) {
-            buildSpeciesHierarchy()
+            scheduleAsyncHierarchyRebuild()
             return
         }
 
         if let old { remove(old) }
         add(photo)
-        speciesEntries = SpeciesHierarchyBuilder.sorted(entries: speciesEntries, by: speciesSortOrder)
+        speciesEntries = SpeciesHierarchyBuilder.sorted(
+            entries: speciesEntries,
+            by: speciesSortOrder,
+            displayName: speciesDisplayName,
+            locale: speciesSortLocale
+        )
+    }
+
+    @ObservationIgnored private var pendingHierarchyRebuild: Task<Void, Never>?
+
+    /// Coalesce many burst-photo arrivals into a single background rebuild.
+    /// Snapshot is COW so the copy is O(1). The sleep is the debounce
+    /// window — constant bursts during processing delay the rebuild
+    /// until the flurry pauses, which is fine because `loadPhotos`
+    /// already does a correct full rebuild at end-of-run.
+    private func scheduleAsyncHierarchyRebuild() {
+        pendingHierarchyRebuild?.cancel()
+        let snapshot = allPhotos
+        let order = speciesSortOrder
+        let displayName = speciesDisplayName
+        let locale = speciesSortLocale
+        pendingHierarchyRebuild = Task.detached(priority: .userInitiated) { [weak self] in
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            if Task.isCancelled { return }
+            let entries = SpeciesHierarchyBuilder.build(
+                from: snapshot,
+                sortOrder: order,
+                displayName: displayName,
+                locale: locale
+            )
+            if Task.isCancelled { return }
+            await MainActor.run {
+                self?.speciesEntries = entries
+            }
+        }
     }
 
     private func add(_ photo: Photo) {

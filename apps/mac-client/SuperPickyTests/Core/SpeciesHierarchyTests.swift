@@ -237,6 +237,30 @@ import Foundation
         #expect(identified == ["Albatross", "Mockingbird", "Zebra Finch"])
     }
 
+    @Test func nameSortUsesDisplayNameAndLocale() throws {
+        // Chinese names: 白鹭 (bái), 雕 (diāo), 鹰 (yīng).
+        // Pinyin order: bái < diāo < yīng → Egret, Eagle, Hawk.
+        // Feed English names in reverse alphabetical order to prove the
+        // displayName + zh-Hans locale (not the English name) drives sort.
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let entries = [
+            SpeciesEntry(name: "Hawk", cnName: "鹰", count: 1, burstGroups: [], singlePhotos: 1, isUnidentified: false),
+            SpeciesEntry(name: "Eagle", cnName: "雕", count: 1, burstGroups: [], singlePhotos: 1, isUnidentified: false),
+            SpeciesEntry(name: "Egret", cnName: "白鹭", count: 1, burstGroups: [], singlePhotos: 1, isUnidentified: false),
+        ]
+
+        let sorted = SpeciesHierarchyBuilder.sorted(
+            entries: entries,
+            by: .name,
+            displayName: { $0.cnName ?? $0.name },
+            locale: Locale(identifier: "zh-Hans")
+        )
+
+        #expect(sorted.map(\.name) == ["Egret", "Eagle", "Hawk"])
+    }
+
     @Test func countSortPutsLargestFirst() throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }

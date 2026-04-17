@@ -89,22 +89,41 @@ final class PipelineCoordinator: @unchecked Sendable {
             let timestamp: Double?
             let gps: (lat: Double, lon: Double)?
         }
+        // Cap concurrency: Apple's RawCamera.bundle LRU cache is not
+        // thread-safe under unbounded RAW `CGImageSourceCopyPropertiesAtIndex`
+        // fan-out (SIGSEGV in `_value_entry_release`). Beyond ~6 threads the
+        // XMP parser mutex serializes anyway, so the cap costs nothing.
+        let prePassWidth = Self.maxConcurrentMLWork
         let filesWithTime: [PrePassInfo] = await withTaskGroup(
             of: (Int, PrePassInfo).self,
             returning: [PrePassInfo].self
         ) { group in
-            for (idx, url) in scannedFiles.enumerated() {
-                group.addTask {
-                    let result = BurstDetector.readPreciseTimestampAndGPS(filePath: url.path)
-                    return (idx, PrePassInfo(url: url, timestamp: result.timestamp, gps: result.gps))
-                }
-            }
             var results = [PrePassInfo](
                 repeating: PrePassInfo(url: URL(fileURLWithPath: ""), timestamp: nil, gps: nil),
                 count: scannedFiles.count
             )
+            var nextIdx = 0
+            let initial = min(prePassWidth, scannedFiles.count)
+            while nextIdx < initial {
+                let idx = nextIdx
+                let url = scannedFiles[idx]
+                group.addTask {
+                    let result = BurstDetector.readPreciseTimestampAndGPS(filePath: url.path)
+                    return (idx, PrePassInfo(url: url, timestamp: result.timestamp, gps: result.gps))
+                }
+                nextIdx += 1
+            }
             for await (idx, info) in group {
                 results[idx] = info
+                if nextIdx < scannedFiles.count {
+                    let nIdx = nextIdx
+                    let url = scannedFiles[nIdx]
+                    group.addTask {
+                        let result = BurstDetector.readPreciseTimestampAndGPS(filePath: url.path)
+                        return (nIdx, PrePassInfo(url: url, timestamp: result.timestamp, gps: result.gps))
+                    }
+                    nextIdx += 1
+                }
             }
             return results
         }
