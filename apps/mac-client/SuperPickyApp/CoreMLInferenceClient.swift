@@ -90,13 +90,9 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
 
     // MARK: - Native species identification
 
-    /// Populates SpeciesFilter's Avonet cache for every unique GPS cell
-    /// concurrently *before* the main ML loop runs. Without this, the
-    /// first six photos all cache-miss at once, serialize on the SQLite
-    /// FULLMUTEX lock, and each `identify.gps` call stretches to 400–
-    /// 1300 ms (measured). With pre-warm, the cache is hot before any
-    /// photo's `identify` runs, so per-photo GPS lookup is a single dict
-    /// read (~1 µs).
+    /// Populate SpeciesFilter's Avonet cache concurrently. Six parallel
+    /// `identify` calls all cache-missing on the same cell would serialize
+    /// on the SQLite FULLMUTEX and stall each call for the full query time.
     func prewarmGPSCells(_ cells: [(lat: Double, lon: Double)]) async {
         guard let filter = speciesFilter, !cells.isEmpty else { return }
         await withTaskGroup(of: Void.self) { group in
@@ -147,13 +143,9 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
         }
         let decodeMs = Self.elapsedMs(since: decodeStart)
 
-        // 1a. Extract GPS from EXIF and resolve an allowed species set.
-        //     nil → no filter (either no GPS in file, or the filter
-        //     isn't installed, or the region has no data — all fall
-        //     through to the existing global-top-1 behavior). Prefer the
-        //     caller-supplied `preGPS` (resolved once in the pipeline's
-        //     pre-pass) over reopening the file — saves ~5–10 ms of
-        //     redundant CGImageSource I/O per photo.
+        // 1a. Resolve an allowed species set from GPS. nil means no filter
+        //     (no GPS, no DB, or no regional data) and we fall through to
+        //     the global-top-1 behavior.
         let gpsStart = DispatchTime.now()
         let allowedIDs: Set<Int>? = {
             guard let filter = speciesFilter else { return nil }

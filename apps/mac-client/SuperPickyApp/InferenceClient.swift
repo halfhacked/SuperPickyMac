@@ -6,26 +6,16 @@ protocol InferenceClient: Sendable {
     func aesthetics(image: CGImage) async throws -> AestheticsResponse
     func keypoints(image: CGImage) async throws -> KeypointResult
     func flight(image: CGImage) async throws -> FlightResult
-    /// If `preDecodedImage` is non-nil, YOLO + OSEA consume it directly
-    /// and skip the thumbnail decode that `identify` otherwise performs
-    /// internally. Caller must pass a CGImage whose coordinate space is
-    /// consistent with the original file (same aspect ratio) — any
-    /// thumbnail ≥ 640×N is fine since YOLO letterboxes to 640 anyway.
-    ///
-    /// If `preGPS` is non-nil, the SpeciesFilter reuses it instead of
-    /// re-opening the file for a second CGImageSource to read the GPS
-    /// IFD. Saves ~5–10 ms of redundant file I/O per photo.
+    /// `preDecodedImage` and `preGPS` let the caller pass work already done
+    /// in the pipeline's pre-pass so `identify` doesn't re-open the file.
+    /// Any thumbnail ≥ 640×N works for YOLO (it letterboxes to 640).
     func identify(
         filePath: String, topK: Int,
         preDecodedImage: CGImage?, preGPS: (lat: Double, lon: Double)?
     ) async throws -> IdentifyResponse
 
-    /// Prewarm any per-GPS caches (SpeciesFilter's Avonet lookup) for the
-    /// given cells before the main ML loop starts. Without this, the first
-    /// six concurrent `identify` calls all cache-miss simultaneously and
-    /// serialize on the Avonet SQLite mutex — adding ~1 s per cold cell
-    /// to ML wall time. Calling this once after the EXIF pre-pass turns
-    /// every per-photo `identify.gps` into a cache hit.
+    /// Warm per-GPS caches for the given cells before the main ML loop,
+    /// so concurrent `identify` calls don't serialize on a shared mutex.
     func prewarmGPSCells(_ cells: [(lat: Double, lon: Double)]) async
 }
 
