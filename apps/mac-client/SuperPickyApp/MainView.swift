@@ -101,6 +101,7 @@ struct MainView: View {
                 if let last = appState.folders.last {
                     appState.sidebarSelection = .folder(last)
                     appState.loadPhotos(for: last)
+                    maybeResumeProcessing(folder: last)
                 }
             }
         }
@@ -245,6 +246,24 @@ struct MainView: View {
     }
 
     private let logger = Logger(subsystem: "com.superpicky.mac", category: "MainView")
+
+    /// If the folder has more files on disk than the DB has rows, a
+    /// previous run was interrupted (crash, force-quit, or the user
+    /// dropped in new photos). Auto-kick processing so the remaining
+    /// photos are picked up without a manual click. Scanning the disk
+    /// is I/O-bound on an external drive, so do it off the main actor.
+    private func maybeResumeProcessing(folder: URL) {
+        guard !appState.isProcessing, !isTestMode else { return }
+        Task.detached(priority: .utility) {
+            let scanned = (try? DirectoryScanner().scan(folder: folder))?.count ?? 0
+            let inDB = (try? ReportDatabase(folderPath: folder).fetchAllFilePaths().count) ?? 0
+            guard scanned > inDB else { return }
+            await MainActor.run {
+                logger.info("Auto-resuming \(folder.lastPathComponent, privacy: .public): \(scanned - inDB) of \(scanned) un-processed")
+                startProcessing(folder: folder)
+            }
+        }
+    }
 
     private func startProcessing(folder: URL) {
         guard !appState.isProcessing else { return }
