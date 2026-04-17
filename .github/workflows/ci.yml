@@ -18,7 +18,20 @@ jobs:
 
       - name: Swift Build
         working-directory: apps/mac-client
-        run: swift build
+        run: |
+          set -o pipefail
+          swift build 2>&1 | tee /tmp/swift-build.log
+        shell: bash
+
+      - name: Dump Swift Build errors on failure
+        if: failure()
+        working-directory: apps/mac-client
+        shell: bash
+        run: |
+          echo "### Swift Build failure" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          grep -nE 'error:|warning:' /tmp/swift-build.log | head -80 >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Swift Test (L1 Unit)
         working-directory: apps/mac-client
