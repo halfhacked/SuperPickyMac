@@ -511,9 +511,13 @@ final class PipelineCoordinator: @unchecked Sendable {
         let pHashMs = Self.elapsedMs(since: pHashStart)
 
         // YOLO detect + OSEA species identify, reusing `image` as the
-        // source so identify skips its own thumbnail decode.
+        // source so identify skips its own thumbnail decode, and
+        // threading GPS through from the already-loaded `imageProps` so
+        // SpeciesFilter doesn't reopen the file to read the GPS IFD.
+        let preGPS = imageProps.flatMap { GPSExtractor.gps(fromProperties: $0) }
         let identifyResult = try await inferenceClient.identify(
-            filePath: fileURL.path, topK: 5, preDecodedImage: image
+            filePath: fileURL.path, topK: 5,
+            preDecodedImage: image, preGPS: preGPS
         )
 
         guard let bird = identifyResult.birds?.first else {

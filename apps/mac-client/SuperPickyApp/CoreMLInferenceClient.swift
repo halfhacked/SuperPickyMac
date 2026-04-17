@@ -90,7 +90,10 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
 
     // MARK: - Native species identification
 
-    func identify(filePath: String, topK: Int, preDecodedImage: CGImage?) async throws -> IdentifyResponse {
+    func identify(
+        filePath: String, topK: Int,
+        preDecodedImage: CGImage?, preGPS: (lat: Double, lon: Double)?
+    ) async throws -> IdentifyResponse {
         guard let yolo = yoloModel, let osea = oseaModel, let db = speciesDB else {
             return IdentifyResponse(species: [], birds: nil, totalDetected: 0)
         }
@@ -126,11 +129,17 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
         // 1a. Extract GPS from EXIF and resolve an allowed species set.
         //     nil → no filter (either no GPS in file, or the filter
         //     isn't installed, or the region has no data — all fall
-        //     through to the existing global-top-1 behavior).
+        //     through to the existing global-top-1 behavior). Prefer the
+        //     caller-supplied `preGPS` (resolved once in the pipeline's
+        //     pre-pass) over reopening the file — saves ~5–10 ms of
+        //     redundant CGImageSource I/O per photo.
         let gpsStart = DispatchTime.now()
         let allowedIDs: Set<Int>? = {
-            guard let filter = speciesFilter,
-                  let gps = GPSExtractor.gps(for: fileURL) else { return nil }
+            guard let filter = speciesFilter else { return nil }
+            let gps: (lat: Double, lon: Double)?
+            if let preGPS { gps = preGPS }
+            else { gps = GPSExtractor.gps(for: fileURL) }
+            guard let gps else { return nil }
             return filter.allowedClassIDs(lat: gps.lat, lon: gps.lon)
         }()
         let gpsMs = Self.elapsedMs(since: gpsStart)

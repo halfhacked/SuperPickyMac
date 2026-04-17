@@ -151,7 +151,7 @@ private struct StubInferenceClient: InferenceClient {
     func aesthetics(image: CGImage) async throws -> AestheticsResponse { aestheticsResult }
     func keypoints(image: CGImage) async throws -> KeypointResult { keypointResult }
     func flight(image: CGImage) async throws -> FlightResult { FlightResult(isFlying: false, confidence: 0.1) }
-    func identify(filePath: String, topK: Int, preDecodedImage: CGImage?) async throws -> IdentifyResponse {
+    func identify(filePath: String, topK: Int, preDecodedImage: CGImage?, preGPS: (lat: Double, lon: Double)?) async throws -> IdentifyResponse {
         IdentifyResponse(species: [], birds: identifyBirds, totalDetected: identifyBirds.count)
     }
 }
@@ -171,7 +171,7 @@ private struct SlowInferenceClient: InferenceClient {
                        beak: Keypoint(x: 0.5, y: 0.5, visibility: 0.9))
     }
     func flight(image: CGImage) async throws -> FlightResult { FlightResult(isFlying: false, confidence: 0.1) }
-    func identify(filePath: String, topK: Int, preDecodedImage: CGImage?) async throws -> IdentifyResponse {
+    func identify(filePath: String, topK: Int, preDecodedImage: CGImage?, preGPS: (lat: Double, lon: Double)?) async throws -> IdentifyResponse {
         try await Task.sleep(for: .milliseconds(500))
         return IdentifyResponse(species: [], birds: [], totalDetected: 0)
     }
