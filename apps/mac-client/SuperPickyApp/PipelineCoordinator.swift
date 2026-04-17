@@ -54,6 +54,7 @@ final class PipelineCoordinator: @unchecked Sendable {
     ) async {
         isProcessing = true
         defer { isProcessing = false }
+        let pipelineStart = DispatchTime.now()
 
         // Build a local BurstDetector with the user-configured thresholds.
         // Default init on the class-level `burstDetector` only supplied
@@ -140,6 +141,26 @@ final class PipelineCoordinator: @unchecked Sendable {
                 return (info.url.path, (lat, lon))
             }
         )
+
+        // Pre-warm SpeciesFilter's Avonet cache for every unique 0.1° GPS
+        // cell concurrently. Without this, the first six in-flight ML
+        // tasks all cache-miss at once and serialize on the SQLite
+        // FULLMUTEX lock, stretching `identify.gps` from <1 ms to 400–
+        // 1300 ms per photo (measured on a cold 877-photo bench). Warming
+        // here runs in parallel with the ML startup (model ready, first
+        // decode) and is absorbed entirely by that latency.
+        var seenCells = Set<Int64>()
+        var uniqueCells: [(lat: Double, lon: Double)] = []
+        for info in filesWithTime {
+            guard let lat = info.lat, let lon = info.lon else { continue }
+            let latK = Int64((lat * 10).rounded())
+            let lonK = Int64((lon * 10).rounded())
+            let key = (latK << 32) | (lonK & 0xFFFFFFFF)
+            if seenCells.insert(key).inserted {
+                uniqueCells.append((lat, lon))
+            }
+        }
+        await inferenceClient.prewarmGPSCells(uniqueCells)
 
         totalCount = files.count
         processedCount = 0
@@ -363,9 +384,11 @@ final class PipelineCoordinator: @unchecked Sendable {
             inflight.removeFirst()
             await finalize(url: first.0, workTask: first.1)
         }
+        let mlEnd = DispatchTime.now()
 
         // Drain the write-behind chain before any phase that reads from the DB.
         await writeBehindChain.value
+        let wbEnd = DispatchTime.now()
 
         // If we skipped existing photos, the running burst window was reset
         // at each skip. Run a full reconciliation so bursts spanning the
@@ -376,6 +399,11 @@ final class PipelineCoordinator: @unchecked Sendable {
 
         // Picked flag calculation (intersection of top aesthetics & sharpness among 5-star)
         await runPickedFlagCalculation(db: db, topPercentage: pickedTopPercentage)
+        let allEnd = DispatchTime.now()
+        let mlMs = Double(mlEnd.uptimeNanoseconds - pipelineStart.uptimeNanoseconds) / 1_000_000
+        let wbTailMs = Double(wbEnd.uptimeNanoseconds - mlEnd.uptimeNanoseconds) / 1_000_000
+        let finalMs = Double(allEnd.uptimeNanoseconds - wbEnd.uptimeNanoseconds) / 1_000_000
+        logger.notice("pipeline.finished ml=\(String(format: "%.0f", mlMs), privacy: .public)ms wbTail=\(String(format: "%.0f", wbTailMs), privacy: .public)ms final=\(String(format: "%.0f", finalMs), privacy: .public)ms total=\(String(format: "%.0f", mlMs + wbTailMs + finalMs), privacy: .public)ms")
     }
 
     /// Best photo in a burst: highest combined sharpness + aesthetics score.
