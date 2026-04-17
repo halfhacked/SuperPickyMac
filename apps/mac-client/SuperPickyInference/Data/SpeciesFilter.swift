@@ -39,6 +39,23 @@ public final class SpeciesFilter: @unchecked Sendable {
     private let ebirdCacheLock = NSLock()
     private var ebirdCache: [String: Set<Int>] = [:]
 
+    /// Cache of Avonet + fallback lookups, keyed by GPS cell (0.1° ≈ 11 km).
+    /// A full-folder bird shoot typically stays within a single cell, so
+    /// without this cache every photo re-hits the Avonet SQLite behind
+    /// the SQLITE_OPEN_FULLMUTEX lock and serializes across the 3-way
+    /// concurrent pipeline — measured as ~650 ms per photo on `~/photo`,
+    /// dominating the whole identify() wall time.
+    private let allowedCacheLock = NSLock()
+    private var allowedCache: [UInt64: Set<Int>?] = [:]
+
+    private static func cellKey(lat: Double, lon: Double) -> UInt64 {
+        // 0.1° grid, same precision as Avonet's 1°×1° cells give or take.
+        let latK = Int32((lat * 10).rounded())
+        let lonK = Int32((lon * 10).rounded())
+        return (UInt64(bitPattern: Int64(latK)) & 0xFFFFFFFF) << 32
+            | (UInt64(bitPattern: Int64(lonK)) & 0xFFFFFFFF)
+    }
+
     /// - Parameters:
     ///   - avonetPath: Path to the Avonet SQLite DB (downloaded via
     ///     ModelManager). If the file doesn't exist, Avonet queries
@@ -71,14 +88,29 @@ public final class SpeciesFilter: @unchecked Sendable {
     /// Returns the set of allowed OSEA class IDs for the given GPS, or
     /// `nil` when no filter applies (caller should NOT mask logits).
     public func allowedClassIDs(lat: Double, lon: Double) -> Set<Int>? {
-        if let ids = queryAvonet(lat: lat, lon: lon), !ids.isEmpty {
-            return ids
+        let key = Self.cellKey(lat: lat, lon: lon)
+        allowedCacheLock.lock()
+        if let cached = allowedCache[key] {
+            allowedCacheLock.unlock()
+            return cached
         }
-        if let country = RegionBounds.smallestContaining(lat: lat, lon: lon),
-           let ids = loadEbirdSpecies(regionCode: country), !ids.isEmpty {
-            return ids
-        }
-        return nil
+        allowedCacheLock.unlock()
+
+        let resolved: Set<Int>? = {
+            if let ids = queryAvonet(lat: lat, lon: lon), !ids.isEmpty {
+                return ids
+            }
+            if let country = RegionBounds.smallestContaining(lat: lat, lon: lon),
+               let ids = loadEbirdSpecies(regionCode: country), !ids.isEmpty {
+                return ids
+            }
+            return nil
+        }()
+
+        allowedCacheLock.lock()
+        allowedCache[key] = resolved
+        allowedCacheLock.unlock()
+        return resolved
     }
 
     // MARK: - Avonet SQLite query
