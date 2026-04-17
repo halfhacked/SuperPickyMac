@@ -157,8 +157,11 @@ private struct StubInferenceClient: InferenceClient {
 }
 
 private struct SlowInferenceClient: InferenceClient {
+    // Long enough that, even with N-way concurrency, 10 photos can't all
+    // finish inside the 200 ms window the cancellation test uses — keeps the
+    // assertion robust when `maxConcurrentMLWork` is tuned.
     func detect(image: CGImage) async throws -> DetectionResult {
-        try await Task.sleep(for: .milliseconds(100))
+        try await Task.sleep(for: .milliseconds(500))
         return DetectionResult(birds: [])
     }
     func aesthetics(image: CGImage) async throws -> AestheticsResponse { AestheticsResponse(score: 5.0, distribution: []) }
@@ -169,7 +172,7 @@ private struct SlowInferenceClient: InferenceClient {
     }
     func flight(image: CGImage) async throws -> FlightResult { FlightResult(isFlying: false, confidence: 0.1) }
     func identify(filePath: String, topK: Int, preDecodedImage: CGImage?) async throws -> IdentifyResponse {
-        try await Task.sleep(for: .milliseconds(100))
+        try await Task.sleep(for: .milliseconds(500))
         return IdentifyResponse(species: [], birds: [], totalDetected: 0)
     }
 }
