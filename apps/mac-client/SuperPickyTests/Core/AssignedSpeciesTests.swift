@@ -365,4 +365,30 @@ import Foundation
         let solo = try #require(try db.fetchPhoto(id: seeded.soloID))
         #expect(solo.assignedSpecies.map(\.speciesID) == ["eagle"])
     }
+
+    @Test func correctSpeciesFansOutToAllBurstMembers() throws {
+        let seeded = try seedBurstAndSolo(
+            burstPrimary: match(sci: "Aquila chrysaetos",
+                                common: "Bald Eagle", // deliberately wrong
+                                ebird: "goleag")
+        )
+        defer { try? FileManager.default.removeItem(at: seeded.folder) }
+
+        let appState = AppState()
+        appState.loadPhotos(for: seeded.folder)
+
+        appState.correctSpecies(id: seeded.burstIDs[0], commonName: "Golden Eagle")
+
+        let db = try ReportDatabase(folderPath: seeded.folder)
+        for id in seeded.burstIDs {
+            let fetched = try #require(try db.fetchPhoto(id: id))
+            let primary = try #require(fetched.assignedSpecies.first)
+            #expect(primary.commonName == "Golden Eagle")
+            // Stable identity preserved — sidebar bucket must not jump.
+            #expect(primary.speciesID == "goleag")
+            #expect(primary.scientificName == "Aquila chrysaetos")
+        }
+        let solo = try #require(try db.fetchPhoto(id: seeded.soloID))
+        #expect(solo.assignedSpecies.first?.commonName == "Bald Eagle")
+    }
 }
