@@ -596,7 +596,15 @@ final class CullingWorkflowUITests: XCTestCase {
                       "EXIF keywords should refresh after species edit")
         XCTAssertTrue(app.staticTexts["ExifKeyword_Bald Eagle"].exists)
 
-        tapButton(app.buttons["SpeciesEditPanel_Remove_goleag"])
+        let removeGoleag = app.buttons["SpeciesEditPanel_Remove_goleag"]
+        tapButton(removeGoleag)
+        // `tapButton`'s coordinate fallback can silently miss on CI. Confirm
+        // the click actually fired (Add_goleag reappears in Candidates)
+        // before asserting the downstream keyword refresh, so a missed
+        // click shows up here with a clear message instead of as a
+        // misleading "keyword didn't drop" timeout below.
+        XCTAssertTrue(app.buttons["SpeciesEditPanel_Add_goleag"].waitForExistence(timeout: 3),
+                      "Remove click should have moved goleag back to Candidates")
         XCTAssertTrue(poll(timeout: 4) { !app.staticTexts["ExifKeyword_Golden Eagle"].exists },
                       "Keyword should drop after removal")
 
