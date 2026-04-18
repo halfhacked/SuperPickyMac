@@ -283,16 +283,23 @@ final class CullingWorkflowUITests: XCTestCase {
         Self.app.textFields["SpeciesEditPanel_SearchField"].exists
     }
 
+    // On macOS CI (GitHub Actions runner), SwiftUI toolbar buttons surface as a
+    // nested Button→Button pair that share the accessibility identifier, so a
+    // plain subscript query matches twice. `.firstMatch` picks the outer one.
+    private var speciesEditToggleButton: XCUIElement {
+        Self.app.buttons.matching(identifier: "SpeciesEditToggle").firstMatch
+    }
+
     private func ensurePanelClosed() {
         guard panelIsOpen() else { return }
-        Self.app.buttons["SpeciesEditToggle"].click()
+        speciesEditToggleButton.click()
         Thread.sleep(forTimeInterval: 0.4)
     }
 
     private func openPanelOnEagle() {
         ensurePanelClosed()
         selectEaglePhoto()
-        Self.app.buttons["SpeciesEditToggle"].click()
+        speciesEditToggleButton.click()
         XCTAssertTrue(Self.app.textFields["SpeciesEditPanel_SearchField"].waitForExistence(timeout: 3),
                       "Panel should open")
     }
@@ -436,7 +443,7 @@ final class CullingWorkflowUITests: XCTestCase {
         ensurePanelClosed()
         // DSC00029 is a bird-but-unidentified photo in the mock fixture.
         selectThumbnail(filename: "DSC00029.jpg")
-        app.buttons["SpeciesEditToggle"].click()
+        speciesEditToggleButton.click()
         XCTAssertTrue(app.textFields["SpeciesEditPanel_SearchField"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["SpeciesEditPanel_EmptyAssigned"].waitForExistence(timeout: 2))
         XCTAssertFalse(app.buttons["SpeciesEditPanel_Remove_baleag"].exists)
@@ -562,7 +569,7 @@ final class CullingWorkflowUITests: XCTestCase {
         XCTAssertTrue(baldKeyword.waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["ExifKeyword_Golden Eagle"].exists)
 
-        app.buttons["SpeciesEditToggle"].click()
+        speciesEditToggleButton.click()
         XCTAssertTrue(app.buttons["SpeciesEditPanel_Add_goleag"].waitForExistence(timeout: 3))
         app.buttons["SpeciesEditPanel_Add_goleag"].click()
         XCTAssertTrue(app.buttons["SpeciesEditPanel_Remove_goleag"].waitForExistence(timeout: 2))
