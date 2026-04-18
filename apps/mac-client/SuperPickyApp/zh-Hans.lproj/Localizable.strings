@@ -109,7 +109,7 @@
 "Tags" = "标签";
 "Threshold" = "阈值";
 "Thresholds" = "阈值";
-"Toggle EXIF Info (I)" = "切换 EXIF 信息 (I)";
+"Toggle Info (I)" = "切换信息 (I)";
 "Undo" = "撤销";
 "Unidentified" = "未识别";
 "View" = "显示";
@@ -136,7 +136,7 @@
 "Navigate photos" = "浏览照片";
 "Fullscreen viewer" = "全屏查看";
 "Compare mode" = "对比模式";
-"Toggle EXIF info" = "切换 EXIF 信息";
+"Toggle info" = "切换信息";
 "Toggle zoom (100% ↔ fit)" = "切换缩放（100% ↔ 适应）";
 "Adjust brightness" = "调节亮度";
 "Set star rating" = "设置星级评分";
@@ -186,4 +186,3 @@
 "Region" = "区域";
 "Global" = "全球";
 "Manual" = "手动";
-"Edit species (S)" = "编辑鸟种 (S)";
