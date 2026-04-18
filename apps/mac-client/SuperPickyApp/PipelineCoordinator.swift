@@ -195,7 +195,7 @@ final class PipelineCoordinator: @unchecked Sendable {
             (0..<writeBehindLanes).map { _ in Task {} }
         @Sendable
         func writeBehind(key: String, _ work: @escaping @Sendable () async -> Void) {
-            let lane = (abs(key.hashValue)) % writeBehindLanes
+            let lane = Int(UInt(bitPattern: key.hashValue) % UInt(writeBehindLanes))
             let prev = writeBehindChains[lane]
             writeBehindChains[lane] = Task.detached(priority: .utility) {
                 _ = await prev.value
