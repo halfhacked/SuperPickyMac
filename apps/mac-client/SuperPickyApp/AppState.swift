@@ -283,6 +283,22 @@ final class AppState {
         undoStack = []
     }
 
+    /// Return the photo IDs that should receive a species edit originated
+    /// from `id`. For a photo whose `burstGroupID` is non-nil, this is the
+    /// full set of burst members (in `allPhotos` order); otherwise it is
+    /// just `[id]`. Species edits fan out across the whole burst so the
+    /// sidebar, keywords, and sidecars stay consistent across frames that
+    /// depict the same bird(s).
+    private func burstMemberIDs(for id: UUID) -> [UUID] {
+        guard
+            let idx = allPhotoIndex[id],
+            let groupID = allPhotos[idx].burstGroupID
+        else {
+            return [id]
+        }
+        return allPhotos.filter { $0.burstGroupID == groupID }.map(\.id)
+    }
+
     /// Mutate a photo, persist to DB + XMP, and update in-memory arrays.
     /// Saves undo state before mutation. The `updateView` closure handles
     /// how the filtered `photos` array should change (update in-place vs remove).
@@ -398,8 +414,10 @@ final class AppState {
     /// accessor mirrors into the scalar columns), every entry appears in
     /// the sidebar hierarchy, and the XMP sidecar picks up all of them.
     func setAssignedSpecies(id: UUID, species: [SpeciesMatch]) {
-        mutatePhoto(id: id) { photo in
-            photo.assignedSpecies = species
+        for memberID in burstMemberIDs(for: id) {
+            mutatePhoto(id: memberID) { photo in
+                photo.assignedSpecies = species
+            }
         }
         buildSpeciesHierarchy()
     }
