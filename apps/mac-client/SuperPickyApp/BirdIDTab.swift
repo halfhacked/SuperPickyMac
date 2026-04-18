@@ -15,20 +15,13 @@ struct BirdIDTab: View {
             }
 
             Section(config.localized("Confidence")) {
-                HStack {
-                    Text(config.localized("Bird ID Confidence"))
-                    Slider(
-                        value: Binding(
-                            get: { Double(config.birdIdConfidence) },
-                            set: { config.birdIdConfidence = Int($0) }
-                        ),
-                        in: 50...95,
-                        step: 5
-                    )
-                    Text("\(config.birdIdConfidence)%")
-                        .monospacedDigit()
-                        .frame(width: 40)
-                }
+                SliderRow(label: config.localized("Bird ID Confidence"),
+                          value: Binding(
+                              get: { Double(config.birdIdConfidence) },
+                              set: { config.birdIdConfidence = (Int(($0 / 5).rounded()) * 5) }
+                          ),
+                          range: 50...95,
+                          display: "\(config.birdIdConfidence)%")
                 Text(config.localized("Species below this confidence will not be written to EXIF."))
                     .font(.caption)
                     .foregroundStyle(.secondary)

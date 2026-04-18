@@ -16,7 +16,7 @@ struct SettingsView: View {
             AdvancedTab()
                 .tabItem { Label(config.localized("Advanced"), systemImage: "wrench.and.screwdriver") }
         }
-        .frame(width: 500, height: 300)
+        .frame(width: 640, height: 360)
         .environment(\.locale, config.appLanguage.locale)
         .task(id: config.appLanguage) {
             try? await Task.sleep(for: .milliseconds(100))
