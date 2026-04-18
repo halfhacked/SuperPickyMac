@@ -126,6 +126,82 @@ struct SpeciesHierarchyBuilder {
         return sorted(entries: entries, by: sortOrder, displayName: displayName, locale: locale)
     }
 
+    /// Apply a single-photo delta — `remove` an old primary-bucket
+    /// contribution and/or `add` a new one — without rebuilding the whole
+    /// hierarchy. Only touches the two buckets involved. Callers should
+    /// `sorted(...)` afterwards when ordering matters.
+    static func applyIncremental(
+        entries: [SpeciesEntry],
+        removing old: Photo? = nil,
+        adding newPhoto: Photo? = nil
+    ) -> [SpeciesEntry] {
+        var updated = entries
+        if let old { removePrimary(from: &updated, of: old) }
+        if let newPhoto { addPrimary(to: &updated, of: newPhoto) }
+        return updated
+    }
+
+    private static func bucketKey(for photo: Photo) -> String {
+        photo.assignedSpecies.first?.speciesID ?? unidentifiedKey
+    }
+
+    private static func indexOfBucket(in entries: [SpeciesEntry], key: String) -> Int? {
+        entries.firstIndex { ($0.speciesID ?? unidentifiedKey) == key }
+    }
+
+    private static func addPrimary(to entries: inout [SpeciesEntry], of photo: Photo) {
+        let primary = photo.assignedSpecies.first
+        let key = bucketKey(for: photo)
+        if let idx = indexOfBucket(in: entries, key: key) {
+            let existing = entries[idx]
+            entries[idx] = SpeciesEntry(
+                speciesID: existing.speciesID,
+                scientificName: existing.scientificName ?? primary?.scientificName,
+                name: existing.name,
+                cnName: existing.cnName ?? primary?.cnName,
+                count: existing.count + 1,
+                burstGroups: existing.burstGroups,
+                singlePhotos: existing.singlePhotos + 1,
+                isUnidentified: existing.isUnidentified
+            )
+        } else {
+            let hasSpecies = primary != nil
+            let name = primary?.commonName
+                ?? primary?.scientificName
+                ?? String(localized: "Unidentified")
+            entries.append(SpeciesEntry(
+                speciesID: primary?.speciesID,
+                scientificName: primary?.scientificName,
+                name: name,
+                cnName: primary?.cnName,
+                count: 1,
+                burstGroups: [],
+                singlePhotos: 1,
+                isUnidentified: !hasSpecies
+            ))
+        }
+    }
+
+    private static func removePrimary(from entries: inout [SpeciesEntry], of photo: Photo) {
+        let key = bucketKey(for: photo)
+        guard let idx = indexOfBucket(in: entries, key: key) else { return }
+        let existing = entries[idx]
+        if existing.count <= 1 && existing.burstGroups.isEmpty {
+            entries.remove(at: idx)
+            return
+        }
+        entries[idx] = SpeciesEntry(
+            speciesID: existing.speciesID,
+            scientificName: existing.scientificName,
+            name: existing.name,
+            cnName: existing.cnName,
+            count: max(0, existing.count - 1),
+            burstGroups: existing.burstGroups,
+            singlePhotos: max(0, existing.singlePhotos - 1),
+            isUnidentified: existing.isUnidentified
+        )
+    }
+
     /// Unidentified always first, then by the chosen sort order. Name sort
     /// uses `displayName` and the matching `locale`, so e.g. Chinese rows
     /// sort by pinyin under `zh-Hans`, Japanese by gojūon under `ja`, etc.

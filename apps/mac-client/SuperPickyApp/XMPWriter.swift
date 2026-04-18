@@ -31,43 +31,21 @@ struct XMPWriter {
         """
 
         if hasKeywords {
+            let flatKeywords = keywordBag(for: assigned, isFlying: photo.isFlying)
+            let hierarchicalKeywords = hierarchicalBag(for: assigned, isFlying: photo.isFlying)
+
             xml += "      <dc:subject>\n"
             xml += "        <rdf:Bag>\n"
-            // Emit a keyword per assigned species, deduplicating so a
-            // photo tagged with two species whose common names collide
-            // doesn't produce duplicate rdf:li entries.
-            var emitted = Set<String>()
-            for match in assigned {
-                if let common = match.commonName, emitted.insert(common).inserted {
-                    xml += "          <rdf:li>\(xmlEscape(common))</rdf:li>\n"
-                }
-                if emitted.insert(match.scientificName).inserted {
-                    xml += "          <rdf:li>\(xmlEscape(match.scientificName))</rdf:li>\n"
-                }
-                if let cn = match.cnName, emitted.insert(cn).inserted {
-                    xml += "          <rdf:li>\(xmlEscape(cn))</rdf:li>\n"
-                }
-                if let pinyin = match.pinyin, emitted.insert(pinyin).inserted {
-                    xml += "          <rdf:li>\(xmlEscape(pinyin))</rdf:li>\n"
-                }
-            }
-            if photo.isFlying {
-                xml += "          <rdf:li>In Flight</rdf:li>\n"
+            for keyword in flatKeywords {
+                xml += "          <rdf:li>\(xmlEscape(keyword))</rdf:li>\n"
             }
             xml += "        </rdf:Bag>\n"
             xml += "      </dc:subject>\n"
 
             xml += "      <lr:hierarchicalSubject>\n"
             xml += "        <rdf:Bag>\n"
-            var hierEmitted = Set<String>()
-            for match in assigned {
-                guard let common = match.commonName else { continue }
-                if hierEmitted.insert(common).inserted {
-                    xml += "          <rdf:li>Bird|\(xmlEscape(common))</rdf:li>\n"
-                }
-            }
-            if photo.isFlying {
-                xml += "          <rdf:li>Behavior|In Flight</rdf:li>\n"
+            for keyword in hierarchicalKeywords {
+                xml += "          <rdf:li>\(xmlEscape(keyword))</rdf:li>\n"
             }
             xml += "        </rdf:Bag>\n"
             xml += "      </lr:hierarchicalSubject>\n"
@@ -107,6 +85,41 @@ struct XMPWriter {
         let content = generate(photo: photo)
         try content.data(using: .utf8)!.write(to: url)
         return url
+    }
+
+    /// Flat `dc:subject` keyword list for the XMP sidecar. Emits common name,
+    /// scientific name, Chinese name, pinyin per species (each only if
+    /// non-nil) plus "In Flight" when applicable, deduping across species so
+    /// two photos tagged with colliding common names don't double-emit.
+    static func keywordBag(for assigned: [SpeciesMatch], isFlying: Bool) -> [String] {
+        var emitted = Set<String>()
+        var bag: [String] = []
+        func push(_ value: String?) {
+            guard let value, emitted.insert(value).inserted else { return }
+            bag.append(value)
+        }
+        for match in assigned {
+            push(match.commonName)
+            push(match.scientificName)
+            push(match.cnName)
+            push(match.pinyin)
+        }
+        if isFlying { bag.append("In Flight") }
+        return bag
+    }
+
+    /// `lr:hierarchicalSubject` keyword list. Emits `Bird|<commonName>` per
+    /// species (skipping entries without a common name) and `Behavior|In Flight`
+    /// when applicable, deduped by common name.
+    static func hierarchicalBag(for assigned: [SpeciesMatch], isFlying: Bool) -> [String] {
+        var emitted = Set<String>()
+        var bag: [String] = []
+        for match in assigned {
+            guard let common = match.commonName, emitted.insert(common).inserted else { continue }
+            bag.append("Bird|\(common)")
+        }
+        if isFlying { bag.append("Behavior|In Flight") }
+        return bag
     }
 
     // MARK: - Private
