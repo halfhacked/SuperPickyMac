@@ -388,8 +388,14 @@ final class CullingWorkflowUITests: XCTestCase {
         XCTAssertTrue(remove.waitForExistence(timeout: 2))
         XCTAssertFalse(app.buttons["SpeciesEditPanel_Add_goleag"].exists)
 
+        // Verify the remove click actually fired before handing off to the
+        // next test. `tapButton`'s coordinate fallback can silently miss on
+        // CI's smaller window if the click lands outside the row; without
+        // this assertion the failure leaks into test45+ as "Add_goleag not
+        // found" (because goleag is still in Assigned, not Candidates).
         tapButton(remove)
-        Thread.sleep(forTimeInterval: 0.3)
+        XCTAssertTrue(app.buttons["SpeciesEditPanel_Add_goleag"].waitForExistence(timeout: 2),
+                      "Remove click should have moved goleag back to Candidates")
         ensurePanelClosed()
     }
 
