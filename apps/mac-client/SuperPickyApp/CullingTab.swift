@@ -9,32 +9,22 @@ struct CullingTab: View {
             Section(config.localized("Detection")) {
                 Toggle(config.localized("Enable exposure detection"), isOn: $config.exposureDetectionEnabled)
                 if config.exposureDetectionEnabled {
-                    HStack {
-                        Text(config.localized("Threshold"))
-                        Slider(value: $config.exposureThreshold, in: 0.05...0.20, step: 0.01)
-                        Text("\(Int(config.exposureThreshold * 100))%")
-                            .monospacedDigit()
-                            .frame(width: 40)
-                    }
+                    SliderRow(label: config.localized("Threshold"),
+                              value: snappedBinding($config.exposureThreshold, step: 0.01),
+                              range: 0.05...0.20,
+                              display: "\(Int(config.exposureThreshold * 100))%")
                 }
                 Toggle(config.localized("Enable flight detection"), isOn: $config.flightDetectionEnabled)
             }
 
             Section(config.localized("Picks")) {
-                HStack {
-                    Text(config.localized("Top percentage"))
-                    Slider(
-                        value: Binding(
-                            get: { Double(config.pickedTopPercentage) },
-                            set: { config.pickedTopPercentage = Int($0) }
-                        ),
-                        in: 10...50,
-                        step: 5
-                    )
-                    Text("\(config.pickedTopPercentage)%")
-                        .monospacedDigit()
-                        .frame(width: 40)
-                }
+                SliderRow(label: config.localized("Top percentage"),
+                          value: Binding(
+                              get: { Double(config.pickedTopPercentage) },
+                              set: { config.pickedTopPercentage = (Int(($0 / 5).rounded()) * 5) }
+                          ),
+                          range: 10...50,
+                          display: "\(config.pickedTopPercentage)%")
                 Text(config.localized("Percentage of top-rated photos to flag as picks."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
