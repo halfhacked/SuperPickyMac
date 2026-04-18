@@ -396,9 +396,12 @@ struct MainView: View {
             )
             await batcher.flush()
 
-            // On cancel, `cancelProcessing()` already cleared UI state —
-            // don't rebuild the species hierarchy for a partial run.
-            if Task.isCancelled { return }
+            // Always run loadPhotos — it re-fetches from the DB and
+            // runs the full `buildSpeciesHierarchy` rebuild, which is
+            // how burst groups and dominant-species attribution get
+            // materialized (we skip that work in the per-photo hot
+            // path). Required on cancel, refresh, and normal completion
+            // alike so the sidebar reflects the actual DB state.
             await MainActor.run {
                 appState.processingFolder = nil
                 appState.processingProgress = 0
@@ -406,7 +409,7 @@ struct MainView: View {
                 appState.processingTotal = 0
                 appState.loadPhotos(for: folder)
             }
-            if !isTestMode { NSSound.beep() }
+            if !Task.isCancelled, !isTestMode { NSSound.beep() }
         }
     }
 }
