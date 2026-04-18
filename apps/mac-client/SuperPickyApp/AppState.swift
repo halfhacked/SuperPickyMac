@@ -230,66 +230,16 @@ final class AppState {
     /// members show under their own species and burst groups don't
     /// appear in the sidebar.
     private func updateSpeciesHierarchy(removing old: Photo?, adding photo: Photo) {
-        if let old { remove(old) }
-        add(photo)
-        speciesEntries = SpeciesHierarchyBuilder.sorted(
+        let updated = SpeciesHierarchyBuilder.applyIncremental(
             entries: speciesEntries,
+            removing: old,
+            adding: photo
+        )
+        speciesEntries = SpeciesHierarchyBuilder.sorted(
+            entries: updated,
             by: speciesSortOrder,
             displayName: speciesDisplayName,
             locale: speciesSortLocale
-        )
-    }
-
-    private func add(_ photo: Photo) {
-        let primary = photo.assignedSpecies.first
-        let hasSpecies = primary != nil
-        let id = primary?.speciesID
-        let name = primary?.commonName ?? primary?.scientificName ?? String(localized: "Unidentified")
-        let key: String = id ?? "__unidentified__"
-        if let idx = speciesEntries.firstIndex(where: { ($0.speciesID ?? "__unidentified__") == key }) {
-            let existing = speciesEntries[idx]
-            speciesEntries[idx] = SpeciesEntry(
-                speciesID: existing.speciesID,
-                scientificName: existing.scientificName ?? primary?.scientificName,
-                name: existing.name,
-                cnName: existing.cnName ?? primary?.cnName,
-                count: existing.count + 1,
-                burstGroups: existing.burstGroups,
-                singlePhotos: existing.singlePhotos + 1,
-                isUnidentified: existing.isUnidentified
-            )
-        } else {
-            speciesEntries.append(SpeciesEntry(
-                speciesID: id,
-                scientificName: primary?.scientificName,
-                name: name,
-                cnName: primary?.cnName,
-                count: 1,
-                burstGroups: [],
-                singlePhotos: 1,
-                isUnidentified: !hasSpecies
-            ))
-        }
-    }
-
-    private func remove(_ photo: Photo) {
-        let primary = photo.assignedSpecies.first
-        let key: String = primary?.speciesID ?? "__unidentified__"
-        guard let idx = speciesEntries.firstIndex(where: { ($0.speciesID ?? "__unidentified__") == key }) else { return }
-        let existing = speciesEntries[idx]
-        if existing.count <= 1 && existing.burstGroups.isEmpty {
-            speciesEntries.remove(at: idx)
-            return
-        }
-        speciesEntries[idx] = SpeciesEntry(
-            speciesID: existing.speciesID,
-            scientificName: existing.scientificName,
-            name: existing.name,
-            cnName: existing.cnName,
-            count: max(0, existing.count - 1),
-            burstGroups: existing.burstGroups,
-            singlePhotos: max(0, existing.singlePhotos - 1),
-            isUnidentified: existing.isUnidentified
         )
     }
 
