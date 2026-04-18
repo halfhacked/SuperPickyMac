@@ -379,7 +379,7 @@ struct ContentView: View {
             return true
         case "z":
             guard let photo = selectedPhoto else { return false }
-            let imagePixelWidth = ImageLoader.pixelWidth(path: photo.filePath) ?? previewSize.width * 2
+            let imagePixelWidth = ImageLoader.pixelSize(path: photo.filePath)?.width ?? previewSize.width * 2
 
             let activeZoom = showFullscreen ? fullscreenZoomState : zoomState
             let viewSize = showFullscreen
