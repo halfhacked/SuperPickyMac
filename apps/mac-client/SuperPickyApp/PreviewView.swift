@@ -43,45 +43,25 @@ struct PreviewView: View {
     }
 }
 
-private final class PreviewCache {
-    static let shared = PreviewCache()
+/// NSCache wrapper keyed by file path. Preview holds many small 2000 px
+/// decodes; fullRes holds a few 80 MB decodes to keep zoom instant.
+private final class ImageCache {
+    static let preview = ImageCache(countLimit: 5, byteLimit: 200 * 1024 * 1024)
+    static let fullRes = ImageCache(countLimit: 3, byteLimit: 400 * 1024 * 1024)
+
     private let cache = NSCache<NSString, NSImage>()
 
-    init() {
-        cache.countLimit = 5          // preview images are large — keep very few
-        cache.totalCostLimit = 200 * 1024 * 1024  // 200MB
-    }
-
-    func get(_ key: String) -> NSImage? {
-        cache.object(forKey: key as NSString)
-    }
-
-    func set(_ key: String, image: NSImage) {
-        let pixelsWide = image.representations.first?.pixelsWide ?? Int(image.size.width)
-        let pixelsHigh = image.representations.first?.pixelsHigh ?? Int(image.size.height)
-        let cost = pixelsWide * pixelsHigh * 4
-        cache.setObject(image, forKey: key as NSString, cost: cost)
-    }
-}
-
-/// Full-resolution decodes kept around for instant zoom on recently-viewed
-/// photos. Kept separate from the preview cache because each entry is large
-/// (~80 MB for a 5616 × 3744 ARW).
-private final class FullResCache {
-    static let shared = FullResCache()
-    private let cache = NSCache<NSString, NSImage>()
-
-    init() {
-        cache.countLimit = 3
-        cache.totalCostLimit = 400 * 1024 * 1024  // 400MB
+    init(countLimit: Int, byteLimit: Int) {
+        cache.countLimit = countLimit
+        cache.totalCostLimit = byteLimit
     }
 
     func get(_ key: String) -> NSImage? { cache.object(forKey: key as NSString) }
 
     func set(_ key: String, image: NSImage) {
-        let pixelsWide = image.representations.first?.pixelsWide ?? Int(image.size.width)
-        let pixelsHigh = image.representations.first?.pixelsHigh ?? Int(image.size.height)
-        cache.setObject(image, forKey: key as NSString, cost: pixelsWide * pixelsHigh * 4)
+        let w = image.representations.first?.pixelsWide ?? Int(image.size.width)
+        let h = image.representations.first?.pixelsHigh ?? Int(image.size.height)
+        cache.setObject(image, forKey: key as NSString, cost: w * h * 4)
     }
 }
 
@@ -105,64 +85,55 @@ struct AsyncPreviewImage: View {
         .task(id: filePath) {
             isFullRes = false
             if zoomState.scale > 1.0 {
-                // Already zoomed — full-res is what the user will see. Serve
-                // from cache if possible, otherwise decode now.
-                if let full = FullResCache.shared.get(filePath) {
-                    image = full
-                    isFullRes = true
-                } else if let full = await ImageLoader.load(path: filePath, maxPixelSize: nil) {
-                    FullResCache.shared.set(filePath, image: full)
+                if let full = await loadFullRes(filePath) {
                     image = full
                     isFullRes = true
                 }
                 return
             }
-            // Fit-view: show the fast preview. The full-res cache (if any) is
-            // reserved for the zoom path — swapping an 80 MB NSImage into the
-            // view causes a main-thread redraw that backs up arrow-key nav.
-            if let cached = PreviewCache.shared.get(filePath) {
+            if let cached = ImageCache.preview.get(filePath) {
                 image = cached
             } else if let loaded = await ImageLoader.load(path: filePath, maxPixelSize: 2000) {
-                PreviewCache.shared.set(filePath, image: loaded)
+                ImageCache.preview.set(filePath, image: loaded)
                 image = loaded
             }
-            // Dwell — after 400 ms of no navigation, quietly warm the full-res
-            // cache so a subsequent zoom is instant. The displayed preview is
-            // NOT swapped: rebinding SwiftUI's image to an 80 MB decode forces
-            // a main-thread redraw that backs up arrow-key handling. The cache
-            // hit in the zoom path (below) is what benefits.
-            //
-            // Task cancellation (filePath changes, view disappears) throws out
-            // of the sleep and skips the decode entirely.
+            // Dwell-preload: rebinding an 80 MB NSImage while at fit scale
+            // forces a main-thread redraw that stalls arrow-key handling, so
+            // we only warm the full-res cache — zoom picks it up later.
             try? await Task.sleep(nanoseconds: 400_000_000)
             if Task.isCancelled { return }
-            // Small sources (e.g. 1600 px test JPEGs) — the preview already IS
-            // the full image; just promote it into the full-res cache.
-            if let sourceW = ImageLoader.pixelWidth(path: filePath), sourceW <= 2000 {
-                if let current = image { FullResCache.shared.set(filePath, image: current) }
+            if ImageCache.fullRes.get(filePath) != nil { return }
+            if let size = ImageLoader.pixelSize(path: filePath), max(size.width, size.height) <= 2000 {
+                if let current = image { ImageCache.fullRes.set(filePath, image: current) }
                 return
             }
             if let full = await ImageLoader.load(path: filePath, maxPixelSize: nil) {
                 if Task.isCancelled { return }
-                FullResCache.shared.set(filePath, image: full)
+                ImageCache.fullRes.set(filePath, image: full)
             }
         }
         .onChange(of: zoomState.scale) { _, newScale in
-            // Load full-res when user zooms in
-            if newScale > 1.0 && !isFullRes {
-                isFullRes = true
-                if let cached = FullResCache.shared.get(filePath) {
-                    image = cached
-                    return
-                }
-                Task {
-                    if let fullRes = await ImageLoader.load(path: filePath, maxPixelSize: nil) {
-                        FullResCache.shared.set(filePath, image: fullRes)
-                        image = fullRes
-                    }
+            guard newScale > 1.0, !isFullRes else { return }
+            isFullRes = true
+            if let cached = ImageCache.fullRes.get(filePath) {
+                image = cached
+                return
+            }
+            Task {
+                if let full = await loadFullRes(filePath) {
+                    image = full
+                } else {
+                    isFullRes = false  // allow retry on next zoom
                 }
             }
         }
+    }
+
+    private func loadFullRes(_ path: String) async -> NSImage? {
+        if let cached = ImageCache.fullRes.get(path) { return cached }
+        guard let full = await ImageLoader.load(path: path, maxPixelSize: nil) else { return nil }
+        ImageCache.fullRes.set(path, image: full)
+        return full
     }
 }
 

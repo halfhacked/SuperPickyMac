@@ -51,24 +51,32 @@ enum ImageLoader {
         }
     }
 
-    /// Longest side of the source image in pixels, or 0 if unavailable.
-    private static func sourceMaxDimension(source: CGImageSource) -> Int {
-        guard let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any] else {
-            return 0
-        }
-        let w = (props[kCGImagePropertyPixelWidth as String] as? Int) ?? 0
-        let h = (props[kCGImagePropertyPixelHeight as String] as? Int) ?? 0
-        return max(w, h)
+    /// Source dimensions in pixels (no decode — metadata only).
+    static func pixelSize(path: String) -> CGSize? {
+        let url = URL(fileURLWithPath: path)
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        return sourcePixelSize(source: source)
     }
 
-    /// Read actual pixel width from file metadata (no decode — fast).
-    static func pixelWidth(path: String) -> CGFloat? {
-        let url = URL(fileURLWithPath: path)
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any],
-              let w = props[kCGImagePropertyPixelWidth as String] as? CGFloat else {
+    private static func sourcePixelSize(source: CGImageSource) -> CGSize? {
+        guard let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any],
+              let w = props[kCGImagePropertyPixelWidth as String] as? Int,
+              let h = props[kCGImagePropertyPixelHeight as String] as? Int else {
             return nil
         }
-        return w
+        // `load` decodes with `CreateThumbnailWithTransform: true`, so the
+        // displayed NSImage has EXIF orientation already applied. Swap
+        // width/height for 90°/270° rotations so callers reasoning about
+        // on-screen dimensions (e.g. the `z` key 1:1 zoom) stay consistent.
+        let orientation = props[kCGImagePropertyOrientation as String] as? Int ?? 1
+        let rotated = (5...8).contains(orientation)
+        return rotated
+            ? CGSize(width: h, height: w)
+            : CGSize(width: w, height: h)
+    }
+
+    private static func sourceMaxDimension(source: CGImageSource) -> Int {
+        guard let size = sourcePixelSize(source: source) else { return 0 }
+        return max(Int(size.width), Int(size.height))
     }
 }
