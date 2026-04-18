@@ -261,4 +261,109 @@ import Foundation
         let hierCount = xml.components(separatedBy: "<rdf:li>Bird|Sparrow</rdf:li>").count - 1
         #expect(hierCount == 1)
     }
+
+    // MARK: - Pure-helper tests: keywordBag / hierarchicalBag
+
+    private func match(_ ebird: String, common: String? = nil, scientific: String? = nil,
+                       cn: String? = nil, pinyin: String? = nil) -> SpeciesMatch {
+        SpeciesMatch(
+            scientificName: scientific ?? "Genus \(ebird)",
+            commonName: common,
+            confidence: 0.5,
+            cnName: cn,
+            pinyin: pinyin,
+            thresholdUsed: nil,
+            ebirdCode: ebird
+        )
+    }
+
+    @Test func keywordBagEmitsCommonScientificCnPinyinInOrder() {
+        let bag = XMPWriter.keywordBag(for: [
+            match("baleag", common: "Bald Eagle",
+                  scientific: "Haliaeetus leucocephalus",
+                  cn: "白头海雕", pinyin: "baitouhaidiao"),
+        ], isFlying: false)
+        #expect(bag == ["Bald Eagle", "Haliaeetus leucocephalus", "白头海雕", "baitouhaidiao"])
+    }
+
+    @Test func keywordBagSkipsNilFields() {
+        let bag = XMPWriter.keywordBag(for: [
+            match("baleag", common: "Bald Eagle",
+                  scientific: "Haliaeetus leucocephalus",
+                  cn: nil, pinyin: nil),
+        ], isFlying: false)
+        #expect(bag == ["Bald Eagle", "Haliaeetus leucocephalus"])
+    }
+
+    @Test func keywordBagAppendsFlightLast() {
+        let bag = XMPWriter.keywordBag(for: [
+            match("baleag", common: "Bald Eagle",
+                  scientific: "Haliaeetus leucocephalus"),
+        ], isFlying: true)
+        #expect(bag.last == "In Flight")
+    }
+
+    @Test func keywordBagFlightOnlyWhenAssignedIsEmpty() {
+        let bag = XMPWriter.keywordBag(for: [], isFlying: true)
+        #expect(bag == ["In Flight"])
+    }
+
+    @Test func keywordBagEmptyInputEmptyOutput() {
+        #expect(XMPWriter.keywordBag(for: [], isFlying: false).isEmpty)
+    }
+
+    @Test func keywordBagDedupesCollisionsAcrossSpecies() {
+        let bag = XMPWriter.keywordBag(for: [
+            match("a", common: "Sparrow", scientific: "Species A"),
+            match("b", common: "Sparrow", scientific: "Species B"),
+        ], isFlying: false)
+        #expect(bag == ["Sparrow", "Species A", "Species B"])
+    }
+
+    @Test func keywordBagDedupesCnAcrossSpecies() {
+        let bag = XMPWriter.keywordBag(for: [
+            match("a", common: "Finch A", scientific: "X a", cn: "雀"),
+            match("b", common: "Finch B", scientific: "X b", cn: "雀"),
+        ], isFlying: false)
+        // Both species emit but the shared cnName "雀" appears only once.
+        #expect(bag.filter { $0 == "雀" }.count == 1)
+    }
+
+    @Test func hierarchicalBagPrefixesEveryCommonWithBird() {
+        let bag = XMPWriter.hierarchicalBag(for: [
+            match("a", common: "Bald Eagle"),
+            match("b", common: "Golden Eagle"),
+        ], isFlying: false)
+        #expect(bag == ["Bird|Bald Eagle", "Bird|Golden Eagle"])
+    }
+
+    @Test func hierarchicalBagSkipsMatchesWithoutCommonName() {
+        let bag = XMPWriter.hierarchicalBag(for: [
+            match("a", common: nil),
+            match("b", common: "Osprey"),
+        ], isFlying: false)
+        #expect(bag == ["Bird|Osprey"])
+    }
+
+    @Test func hierarchicalBagAppendsBehaviorInFlightLast() {
+        let bag = XMPWriter.hierarchicalBag(for: [
+            match("a", common: "Osprey"),
+        ], isFlying: true)
+        #expect(bag.last == "Behavior|In Flight")
+    }
+
+    @Test func hierarchicalBagDedupesByCommonNameOnly() {
+        let bag = XMPWriter.hierarchicalBag(for: [
+            match("a", common: "Sparrow", scientific: "Species A"),
+            match("b", common: "Sparrow", scientific: "Species B"),
+        ], isFlying: false)
+        #expect(bag == ["Bird|Sparrow"])
+    }
+
+    @Test func hierarchicalBagEmptyWhenNoCommonNamesAndNotFlying() {
+        let bag = XMPWriter.hierarchicalBag(for: [
+            match("a", common: nil),
+        ], isFlying: false)
+        #expect(bag.isEmpty)
+    }
 }
