@@ -15,14 +15,19 @@ public struct SpeciesEntry: Sendable {
     public let englishName: String
     public let chineseName: String
     public let pinyin: String?
+    public let ebirdCode: String?
 }
 
 public final class SpeciesDatabase: Sendable {
 
     private let byClassID: [Int: SpeciesEntry]
+    /// Flat array for linear-scan autocomplete. Holds the same values as
+    /// `byClassID` but in a form that's cheap to iterate without materializing
+    /// the dictionary's values on each search call.
+    private let all: [SpeciesEntry]
     private let logger = Logger(subsystem: "com.superpicky.mac", category: "SpeciesDB")
 
-    public init(url: URL) throws {
+    public init(url: URL, ebirdByClassID: [Int: String] = [:]) throws {
         var db: OpaquePointer?
         guard sqlite3_open_v2(url.path, &db,
                               SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK,
@@ -55,13 +60,55 @@ public final class SpeciesDatabase: Sendable {
                                           scientificName: scientific,
                                           englishName: english,
                                           chineseName: chinese,
-                                          pinyin: pinyin)
+                                          pinyin: pinyin,
+                                          ebirdCode: ebirdByClassID[classID])
         }
         self.byClassID = dict
+        self.all = Array(dict.values)
     }
 
     public func lookup(classID: Int) -> SpeciesEntry? {
         byClassID[classID]
+    }
+
+    /// Substring autocomplete across english / scientific / chinese / pinyin.
+    /// Ranks prefix matches ahead of substring matches, then alphabetical by
+    /// english name. Linear scan over ~11k entries is fine at typing speeds.
+    public func search(query: String, limit: Int = 20) -> [SpeciesEntry] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !trimmed.isEmpty else { return [] }
+
+        struct Scored {
+            let entry: SpeciesEntry
+            let score: Int
+        }
+
+        var scored: [Scored] = []
+        scored.reserveCapacity(64)
+        for entry in all {
+            let eng = entry.englishName.lowercased()
+            let sci = entry.scientificName.lowercased()
+            let cn  = entry.chineseName.lowercased()
+            let py  = entry.pinyin?.lowercased() ?? ""
+
+            var score = 0
+            if eng.hasPrefix(trimmed) || sci.hasPrefix(trimmed)
+                || cn.hasPrefix(trimmed) || (!py.isEmpty && py.hasPrefix(trimmed)) {
+                score = 3
+            } else if eng.contains(trimmed) || sci.contains(trimmed)
+                || cn.contains(trimmed) || (!py.isEmpty && py.contains(trimmed)) {
+                score = 1
+            }
+            if score > 0 {
+                scored.append(Scored(entry: entry, score: score))
+            }
+        }
+
+        scored.sort { a, b in
+            if a.score != b.score { return a.score > b.score }
+            return a.entry.englishName.localizedCaseInsensitiveCompare(b.entry.englishName) == .orderedAscending
+        }
+        return scored.prefix(limit).map { $0.entry }
     }
 
     /// Locate the bundled `bird_reference.sqlite` inside the SuperPickyInference

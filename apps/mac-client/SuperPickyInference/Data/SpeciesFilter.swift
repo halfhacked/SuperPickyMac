@@ -28,6 +28,15 @@ public final class SpeciesFilter: @unchecked Sendable {
     private let ebirdBundle: Bundle
     /// Inverted map: eBird code ("mallar3") → OSEA class id (integer).
     private let classIDByEbirdCode: [String: Int]
+
+    /// Reverse lookup: OSEA class id → eBird code. Exposed so `SpeciesDatabase`
+    /// can annotate its `SpeciesEntry` rows with a stable external identifier
+    /// without re-parsing the bundled mapping file.
+    public var ebirdCodeByClassID: [Int: String] {
+        var out = [Int: String](minimumCapacity: classIDByEbirdCode.count)
+        for (code, id) in classIDByEbirdCode { out[id] = code }
+        return out
+    }
     private let logger = Logger(subsystem: "com.superpicky.mac", category: "SpeciesFilter")
 
     /// Long-lived SQLite handle. nil if the DB file wasn't present at init

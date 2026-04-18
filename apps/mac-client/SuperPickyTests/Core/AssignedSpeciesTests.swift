@@ -1,0 +1,313 @@
+import Testing
+import Foundation
+@testable import SuperPicky
+
+/// Covers the multi-species assignment behaviour on `Photo` and the
+/// `AppState` mutation APIs (`setAssignedSpecies`, `correctSpecies`)
+/// that back the new species edit panel.
+@Suite(.serialized) struct AssignedSpeciesTests {
+
+    // MARK: - Helpers
+
+    private func makeTempFolder() throws -> URL {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return folder
+    }
+
+    private func makePhoto(folder: URL, filename: String = "IMG_\(UUID().uuidString).CR3") -> Photo {
+        Photo(
+            filename: filename,
+            filePath: folder.appendingPathComponent(filename).path,
+            folderPath: folder.path
+        )
+    }
+
+    private func match(sci: String, common: String?, ebird: String? = nil,
+                       cn: String? = nil, conf: Float = 0.9,
+                       threshold: String? = nil) -> SpeciesMatch {
+        SpeciesMatch(
+            scientificName: sci, commonName: common, confidence: conf,
+            cnName: cn, pinyin: nil, thresholdUsed: threshold, ebirdCode: ebird
+        )
+    }
+
+    // MARK: - SpeciesMatch identity
+
+    @Test func speciesIDPrefersEbirdCodeOverScientificName() {
+        let m = match(sci: "Aquila chrysaetos", common: "Golden Eagle", ebird: "goleag")
+        #expect(m.speciesID == "goleag")
+    }
+
+    @Test func speciesIDFallsBackToScientificNameWhenNoEbirdCode() {
+        let m = match(sci: "Custom Species", common: "My Bird")
+        #expect(m.speciesID == "Custom Species")
+    }
+
+    @Test func speciesMatchDecodesEbirdCodeFromJSON() throws {
+        let json = """
+        {"name": "Aquila chrysaetos", "common_name": "Golden Eagle",
+         "confidence": 0.9, "ebird_code": "goleag"}
+        """.data(using: .utf8)!
+        let m = try JSONDecoder().decode(SpeciesMatch.self, from: json)
+        #expect(m.ebirdCode == "goleag")
+        #expect(m.speciesID == "goleag")
+    }
+
+    // MARK: - Photo.assignedSpecies accessor
+
+    @Test func assignedSpeciesSetterMirrorsPrimaryIntoScalarColumns() throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        var photo = makePhoto(folder: folder)
+        let primary = match(sci: "Aquila chrysaetos", common: "Golden Eagle",
+                            ebird: "goleag", cn: "金雕", conf: 0.92)
+        photo.assignedSpecies = [primary]
+
+        #expect(photo.speciesScientificName == "Aquila chrysaetos")
+        #expect(photo.speciesCommonName == "Golden Eagle")
+        #expect(photo.speciesCnName == "金雕")
+        #expect(photo.speciesConfidence == 0.92)
+        #expect(photo.assignedSpeciesJSON != nil)
+    }
+
+    @Test func assignedSpeciesGetterRoundTripsList() throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        var photo = makePhoto(folder: folder)
+        let list = [
+            match(sci: "Aquila", common: "Eagle", ebird: "eagle"),
+            match(sci: "Accipiter", common: "Hawk", ebird: "hawk"),
+        ]
+        photo.assignedSpecies = list
+        let decoded = photo.assignedSpecies
+        #expect(decoded.count == 2)
+        #expect(decoded.map(\.speciesID) == ["eagle", "hawk"])
+        #expect(decoded.first?.commonName == "Eagle")
+    }
+
+    @Test func assignedSpeciesSetterEmptyClearsScalarColumns() throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        var photo = makePhoto(folder: folder)
+        photo.assignedSpecies = [match(sci: "Aquila", common: "Eagle", ebird: "eagle")]
+        #expect(photo.speciesCommonName == "Eagle")
+
+        photo.assignedSpecies = []
+        #expect(photo.speciesScientificName == nil)
+        #expect(photo.speciesCommonName == nil)
+        #expect(photo.speciesCnName == nil)
+        #expect(photo.speciesPinyin == nil)
+        #expect(photo.speciesConfidence == nil)
+        // Persisted so the getter doesn't re-synthesize from the now-nil scalars.
+        #expect(photo.assignedSpeciesJSON == "[]")
+    }
+
+    @Test func assignedSpeciesGetterFallsBackToScalarColumnsWhenJSONIsNil() throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        var photo = makePhoto(folder: folder)
+        photo.speciesCommonName = "Robin"
+        photo.speciesScientificName = "Turdus migratorius"
+        photo.speciesConfidence = 0.7
+        // assignedSpeciesJSON stays nil — simulates a pre-v8 row.
+        #expect(photo.assignedSpeciesJSON == nil)
+
+        let list = photo.assignedSpecies
+        #expect(list.count == 1)
+        #expect(list.first?.scientificName == "Turdus migratorius")
+        #expect(list.first?.commonName == "Robin")
+        #expect(list.first?.confidence == 0.7)
+        #expect(list.first?.ebirdCode == nil)
+    }
+
+    @Test func assignedSpeciesFallbackSynthesizesFromCommonNameOnly() {
+        var photo = Photo(filename: "x.CR3", filePath: "/tmp/x.CR3", folderPath: "/tmp")
+        photo.speciesCommonName = "Robin"
+        let list = photo.assignedSpecies
+        #expect(list.count == 1)
+        // Scientific name is missing — the getter derives a stable slot from
+        // the common name so `speciesID` isn't empty.
+        #expect(list.first?.scientificName == "Robin")
+        #expect(list.first?.speciesID == "Robin")
+    }
+
+    @Test func assignedSpeciesFallbackEmptyWhenAllScalarNil() {
+        let photo = Photo(filename: "x.CR3", filePath: "/tmp/x.CR3", folderPath: "/tmp")
+        #expect(photo.assignedSpecies.isEmpty)
+    }
+
+    // MARK: - Photo.inheritSpecies
+
+    @Test func inheritSpeciesCopiesAssignedSpeciesJSON() {
+        var donor = Photo(filename: "d.CR3", filePath: "/tmp/d.CR3", folderPath: "/tmp")
+        donor.assignedSpecies = [
+            match(sci: "Aquila", common: "Eagle", ebird: "eagle"),
+            match(sci: "Accipiter", common: "Hawk", ebird: "hawk"),
+        ]
+
+        var recipient = Photo(filename: "r.CR3", filePath: "/tmp/r.CR3", folderPath: "/tmp")
+        recipient.inheritSpecies(from: donor)
+
+        #expect(recipient.assignedSpeciesJSON == donor.assignedSpeciesJSON)
+        #expect(recipient.assignedSpecies.map(\.speciesID) == ["eagle", "hawk"])
+        // Scalar mirrors come along too.
+        #expect(recipient.speciesCommonName == "Eagle")
+    }
+
+    // MARK: - AppState.setAssignedSpecies
+
+    @Test func setAssignedSpeciesPersistsToDB() throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let db = try ReportDatabase(folderPath: folder)
+        var photo = makePhoto(folder: folder, filename: "seed.CR3")
+        photo.assignedSpecies = [match(sci: "Aquila", common: "Eagle", ebird: "eagle")]
+        try db.save(&photo)
+
+        let appState = AppState()
+        appState.loadPhotos(for: folder)
+
+        let hawk = match(sci: "Accipiter", common: "Hawk", ebird: "hawk")
+        appState.setAssignedSpecies(id: photo.id, species: [
+            match(sci: "Aquila", common: "Eagle", ebird: "eagle"),
+            hawk,
+        ])
+
+        // DB round-trip: refetch via a fresh database handle.
+        let db2 = try ReportDatabase(folderPath: folder)
+        let fetched = try db2.fetchPhoto(id: photo.id)
+        let refetched = try #require(fetched)
+        #expect(refetched.assignedSpecies.count == 2)
+        #expect(refetched.assignedSpecies.map(\.speciesID) == ["eagle", "hawk"])
+    }
+
+    @Test func setAssignedSpeciesUpdatesSidebarBuckets() throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let db = try ReportDatabase(folderPath: folder)
+        var photo = makePhoto(folder: folder, filename: "seed.CR3")
+        photo.assignedSpecies = [match(sci: "Aquila", common: "Eagle", ebird: "eagle")]
+        try db.save(&photo)
+
+        let appState = AppState()
+        appState.loadPhotos(for: folder)
+        #expect(appState.speciesEntries.contains { $0.speciesID == "eagle" })
+        #expect(!appState.speciesEntries.contains { $0.speciesID == "hawk" })
+
+        appState.setAssignedSpecies(id: photo.id, species: [
+            match(sci: "Aquila", common: "Eagle", ebird: "eagle"),
+            match(sci: "Accipiter", common: "Hawk", ebird: "hawk"),
+        ])
+
+        #expect(appState.speciesEntries.contains { $0.speciesID == "eagle" })
+        #expect(appState.speciesEntries.contains { $0.speciesID == "hawk" })
+    }
+
+    @Test func setAssignedSpeciesEmptyMovesPhotoToUnidentified() throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let db = try ReportDatabase(folderPath: folder)
+        var photo = makePhoto(folder: folder, filename: "seed.CR3")
+        photo.assignedSpecies = [match(sci: "Aquila", common: "Eagle", ebird: "eagle")]
+        try db.save(&photo)
+
+        let appState = AppState()
+        appState.loadPhotos(for: folder)
+        appState.setAssignedSpecies(id: photo.id, species: [])
+
+        appState.sidebarSelection = .species(nil) // Unidentified bucket
+        appState.applyFilter()
+        #expect(appState.photos.count == 1)
+
+        appState.sidebarSelection = .species("eagle")
+        appState.applyFilter()
+        #expect(appState.photos.isEmpty)
+    }
+
+    // MARK: - AppState.correctSpecies (inline rename shim)
+
+    @Test func correctSpeciesRenamesCommonNameWithoutChangingSpeciesID() throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let db = try ReportDatabase(folderPath: folder)
+        var photo = makePhoto(folder: folder, filename: "seed.CR3")
+        photo.assignedSpecies = [match(sci: "Aquila chrysaetos",
+                                        common: "Bald Eagle", // deliberately wrong
+                                        ebird: "goleag")]
+        try db.save(&photo)
+
+        let appState = AppState()
+        appState.loadPhotos(for: folder)
+        appState.correctSpecies(id: photo.id, commonName: "Golden Eagle")
+
+        let db2 = try ReportDatabase(folderPath: folder)
+        let fetched = try db2.fetchPhoto(id: photo.id)
+        let refetched = try #require(fetched)
+        #expect(refetched.assignedSpecies.first?.commonName == "Golden Eagle")
+        // Stable identity preserved — the sidebar bucket shouldn't jump.
+        #expect(refetched.assignedSpecies.first?.speciesID == "goleag")
+        #expect(refetched.assignedSpecies.first?.scientificName == "Aquila chrysaetos")
+    }
+
+    @Test func correctSpeciesOnUnidentifiedPhotoCreatesCustomEntry() throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let db = try ReportDatabase(folderPath: folder)
+        var photo = makePhoto(folder: folder, filename: "seed.CR3")
+        try db.save(&photo)
+
+        let appState = AppState()
+        appState.loadPhotos(for: folder)
+        appState.correctSpecies(id: photo.id, commonName: "Mystery Bird")
+
+        let db2 = try ReportDatabase(folderPath: folder)
+        let fetched = try db2.fetchPhoto(id: photo.id)
+        let refetched = try #require(fetched)
+        #expect(refetched.assignedSpecies.count == 1)
+        #expect(refetched.assignedSpecies.first?.commonName == "Mystery Bird")
+        #expect(refetched.assignedSpecies.first?.ebirdCode == nil)
+        // Fallback: scientific name == typed text when OSEA has no match.
+        #expect(refetched.assignedSpecies.first?.scientificName == "Mystery Bird")
+    }
+
+    // MARK: - photoHasSpeciesID via .species(...) filter
+
+    @Test func speciesFilterMatchesAnyAssignedEntry() throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let db = try ReportDatabase(folderPath: folder)
+        var a = makePhoto(folder: folder, filename: "a.CR3")
+        a.assignedSpecies = [match(sci: "Aquila", common: "Eagle", ebird: "eagle")]
+        var b = makePhoto(folder: folder, filename: "b.CR3")
+        b.assignedSpecies = [
+            match(sci: "Aquila", common: "Eagle", ebird: "eagle"),
+            match(sci: "Accipiter", common: "Hawk", ebird: "hawk"),
+        ]
+        var c = makePhoto(folder: folder, filename: "c.CR3")
+        c.assignedSpecies = [match(sci: "Accipiter", common: "Hawk", ebird: "hawk")]
+        for var p in [a, b, c] { try db.save(&p) }
+
+        let appState = AppState()
+        appState.loadPhotos(for: folder)
+
+        appState.sidebarSelection = .species("eagle")
+        appState.applyFilter()
+        #expect(appState.photos.count == 2) // a + b
+
+        appState.sidebarSelection = .species("hawk")
+        appState.applyFilter()
+        #expect(appState.photos.count == 2) // b + c
+    }
+}

@@ -22,6 +22,8 @@ struct ContentView: View {
     var onExportAllVisible: (([Photo]) -> Void)?
     var onDeletePhoto: ((UUID) -> Void)?
     var onCorrectSpecies: ((UUID, String) -> Void)?
+    var onAssignedSpeciesChanged: ((UUID, [SpeciesMatch]) -> Void)?
+    var searchSpecies: ((String) -> [SpeciesMatch])?
     @Environment(CullingConfig.self) private var config
     @State private var minimumStars: Int = 0
     @State private var topBurstOnly: Bool = false
@@ -29,6 +31,7 @@ struct ContentView: View {
     @State private var sortOrder: SortOrder = .filename
     @State private var sortAscending: Bool = true
     @State private var showExifPanel = true
+    @State private var showSpeciesEditPanel = false
     @State private var showFullscreen = false
     @State private var zoomState = ZoomState()
     @State private var fullscreenZoomState = ZoomState()
@@ -79,9 +82,22 @@ struct ContentView: View {
                             mouseInView: $mouseInPreview, viewSize: $previewSize,
                             onCorrectSpecies: onCorrectSpecies)
 
-                if showExifPanel, let photo = selectedPhoto {
-                    ExifPanelView(photo: photo)
+                HStack(alignment: .top, spacing: 0) {
+                    Spacer(minLength: 0)
+                    if showSpeciesEditPanel, let photo = selectedPhoto {
+                        SpeciesEditPanelView(
+                            photo: photo,
+                            onAssignedChanged: { species in
+                                onAssignedSpeciesChanged?(photo.id, species)
+                            },
+                            searchSpecies: searchSpecies ?? { _ in [] }
+                        )
                         .transition(.move(edge: .trailing))
+                    }
+                    if showExifPanel, let photo = selectedPhoto {
+                        ExifPanelView(photo: photo)
+                            .transition(.move(edge: .trailing))
+                    }
                 }
             }
             .frame(minHeight: 300)
@@ -271,6 +287,17 @@ struct ContentView: View {
                 .accessibilityIdentifier("ExifToggle")
                 .help(config.localized("Toggle EXIF Info (I)"))
             }
+            ToolbarItem(placement: .automatic) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showSpeciesEditPanel.toggle()
+                    }
+                } label: {
+                    Image(systemName: showSpeciesEditPanel ? "bird.fill" : "bird")
+                }
+                .accessibilityIdentifier("SpeciesEditToggle")
+                .help(config.localized("Edit species (S)"))
+            }
         }
         .alert(config.localized("No Photos"), isPresented: $showNoPhotosAlert) {
             Button(config.localized("OK"), role: .cancel) {}
@@ -324,6 +351,9 @@ struct ContentView: View {
         switch key.characters {
         case "i":
             withAnimation(.easeInOut(duration: 0.2)) { showExifPanel.toggle() }
+            return true
+        case "s":
+            withAnimation(.easeInOut(duration: 0.2)) { showSpeciesEditPanel.toggle() }
             return true
         case "f":
             showFullscreen.toggle()

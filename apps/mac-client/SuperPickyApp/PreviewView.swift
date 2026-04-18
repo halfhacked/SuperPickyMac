@@ -180,6 +180,17 @@ struct InfoBarView: View {
                         Text("\(Int(conf * 100))%")
                             .foregroundStyle(.secondary)
                     }
+                    let extras = max(0, photo.assignedSpecies.count - 1)
+                    if extras > 0 {
+                        Text("+\(extras)")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(.quaternary)
+                            .clipShape(Capsule())
+                            .accessibilityIdentifier("InfoBarExtraSpeciesCount")
+                    }
                 } icon: {
                     Image(systemName: "bird.fill")
                 }
