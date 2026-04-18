@@ -104,50 +104,47 @@ struct AsyncPreviewImage: View {
         }
         .task(id: filePath) {
             isFullRes = false
-            // Full-res cache beats the preview cache — same size or bigger.
-            if let full = FullResCache.shared.get(filePath) {
-                image = full
-                isFullRes = true
-                return
-            }
             if zoomState.scale > 1.0 {
-                // Already zoomed in — load full-res directly.
-                if let full = await ImageLoader.load(path: filePath, maxPixelSize: nil) {
+                // Already zoomed — full-res is what the user will see. Serve
+                // from cache if possible, otherwise decode now.
+                if let full = FullResCache.shared.get(filePath) {
+                    image = full
+                    isFullRes = true
+                } else if let full = await ImageLoader.load(path: filePath, maxPixelSize: nil) {
                     FullResCache.shared.set(filePath, image: full)
                     image = full
                     isFullRes = true
                 }
                 return
             }
-            // Show the fast preview first.
+            // Fit-view: show the fast preview. The full-res cache (if any) is
+            // reserved for the zoom path — swapping an 80 MB NSImage into the
+            // view causes a main-thread redraw that backs up arrow-key nav.
             if let cached = PreviewCache.shared.get(filePath) {
                 image = cached
             } else if let loaded = await ImageLoader.load(path: filePath, maxPixelSize: 2000) {
                 PreviewCache.shared.set(filePath, image: loaded)
                 image = loaded
             }
-            // Dwell — if the user hasn't navigated away after 400 ms, quietly
-            // upgrade to full-res in the background so a subsequent zoom is
-            // instant. Task cancellation (new filePath or view disappearing)
-            // throws out of the sleep and skips the upgrade.
+            // Dwell — after 400 ms of no navigation, quietly warm the full-res
+            // cache so a subsequent zoom is instant. The displayed preview is
+            // NOT swapped: rebinding SwiftUI's image to an 80 MB decode forces
+            // a main-thread redraw that backs up arrow-key handling. The cache
+            // hit in the zoom path (below) is what benefits.
+            //
+            // Task cancellation (filePath changes, view disappears) throws out
+            // of the sleep and skips the decode entirely.
             try? await Task.sleep(nanoseconds: 400_000_000)
             if Task.isCancelled { return }
-            // Skip the upgrade when the source is already ≤ the preview size —
-            // the preview already IS full-res (e.g. 1600 px test JPEGs).
+            // Small sources (e.g. 1600 px test JPEGs) — the preview already IS
+            // the full image; just promote it into the full-res cache.
             if let sourceW = ImageLoader.pixelWidth(path: filePath), sourceW <= 2000 {
-                isFullRes = true
                 if let current = image { FullResCache.shared.set(filePath, image: current) }
                 return
             }
             if let full = await ImageLoader.load(path: filePath, maxPixelSize: nil) {
                 if Task.isCancelled { return }
                 FullResCache.shared.set(filePath, image: full)
-                // Only swap in if the user hasn't zoomed in (which already
-                // requested its own full-res load).
-                if !isFullRes {
-                    image = full
-                    isFullRes = true
-                }
             }
         }
         .onChange(of: zoomState.scale) { _, newScale in
