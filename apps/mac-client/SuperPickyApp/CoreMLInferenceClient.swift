@@ -90,9 +90,9 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
 
     // MARK: - Native species identification
 
-    /// Populate SpeciesFilter's Avonet cache concurrently. Six parallel
-    /// `identify` calls all cache-missing on the same cell would serialize
-    /// on the SQLite FULLMUTEX and stall each call for the full query time.
+    /// Populate `SpeciesFilter.chainCache` — the cache `identify` actually
+    /// reads — before ML fan-out, so six concurrent first-lookups don't
+    /// all cache-miss on the Avonet SQLite FULLMUTEX at once.
     func prewarmGPSCells(_ cells: [(lat: Double, lon: Double)]) async {
         guard let filter = speciesFilter, !cells.isEmpty else { return }
         await withTaskGroup(of: Void.self) { group in
@@ -100,7 +100,7 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
                 let lat = cell.lat
                 let lon = cell.lon
                 group.addTask {
-                    _ = filter.allowedClassIDs(lat: lat, lon: lon)
+                    _ = filter.allowedSpeciesChain(lat: lat, lon: lon)
                 }
             }
             for await _ in group {}

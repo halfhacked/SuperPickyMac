@@ -6,7 +6,15 @@ final class ReportDatabase: Sendable {
 
     init(folderPath: URL, name: String = ".report.db") throws {
         let dbPath = folderPath.appendingPathComponent(name).path
-        dbQueue = try DatabaseQueue(path: dbPath)
+        // The report DB is a derived cache — XMP sidecars hold the durable
+        // copy — so trading a narrow power-loss window for cheaper per-
+        // commit fsync (WAL + synchronous=NORMAL) is the right call.
+        var config = Configuration()
+        config.prepareDatabase { db in
+            try db.execute(sql: "PRAGMA journal_mode = WAL")
+            try db.execute(sql: "PRAGMA synchronous = NORMAL")
+        }
+        dbQueue = try DatabaseQueue(path: dbPath, configuration: config)
         try migrate()
     }
 
