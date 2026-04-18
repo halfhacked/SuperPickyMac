@@ -308,6 +308,27 @@ final class CullingWorkflowUITests: XCTestCase {
         // (CI) the species section is below the fold; scroll it into view
         // so Remove_/Add_/MakePrimary_ buttons and SearchField are hittable.
         scrollPanelToBottom()
+        resetEagleSpeciesToBaleagOnly()
+    }
+
+    /// Self-heal for tests that share the eagle photo: each test assumes
+    /// the mock fixture's initial state (goleag in Candidates, baleag in
+    /// Assigned). Prior tests that modify assignments may leak state if a
+    /// `tapButton` coordinate click silently missed on CI, so normalize
+    /// the eagle's species here before every test body runs.
+    private func resetEagleSpeciesToBaleagOnly() {
+        let app = Self.app!
+        // Drop goleag if it's still in Assigned from a prior test.
+        if app.buttons["SpeciesEditPanel_Remove_goleag"].exists {
+            tapButton(app.buttons["SpeciesEditPanel_Remove_goleag"])
+            _ = app.buttons["SpeciesEditPanel_Add_goleag"].waitForExistence(timeout: 2)
+        }
+        // Restore baleag if it was removed.
+        if !app.buttons["SpeciesEditPanel_Remove_baleag"].exists,
+           app.buttons["SpeciesEditPanel_Add_baleag"].exists {
+            tapButton(app.buttons["SpeciesEditPanel_Add_baleag"])
+            _ = app.buttons["SpeciesEditPanel_Remove_baleag"].waitForExistence(timeout: 2)
+        }
     }
 
     /// Scrolls the ExifPanel down so the species section becomes visible.
