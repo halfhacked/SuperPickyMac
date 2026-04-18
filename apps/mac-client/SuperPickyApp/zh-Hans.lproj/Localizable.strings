@@ -177,3 +177,13 @@
 "Zoom locked (click to unlock)" = "缩放已锁定（点击解锁）";
 "Lock zoom (sync both panels)" = "锁定缩放（同步两个面板）";
 "Unknown" = "未知";
+"Assigned" = "已标记";
+"OSEA Candidates" = "OSEA 候选";
+"Add Species" = "添加鸟种";
+"Search species" = "搜索鸟种";
+"No species assigned" = "未标记鸟种";
+"Make primary" = "设为主种";
+"Region" = "区域";
+"Global" = "全球";
+"Manual" = "手动";
+"Edit species (S)" = "编辑鸟种 (S)";
