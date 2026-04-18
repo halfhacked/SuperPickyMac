@@ -14,7 +14,6 @@ struct AdvancedTab: View {
                         .monospacedDigit()
                         .frame(width: 40)
                 }
-                .disabled(config.skillLevel != .custom)
                 HStack {
                     Text(config.localized("Aesthetics"))
                     Slider(value: $config.aestheticsThreshold, in: 2.0...8.0, step: 0.1)
@@ -22,7 +21,6 @@ struct AdvancedTab: View {
                         .monospacedDigit()
                         .frame(width: 40)
                 }
-                .disabled(config.skillLevel != .custom)
                 HStack {
                     Text(config.localized("Min Confidence"))
                     Slider(value: $config.minConfidence, in: 0.3...0.7, step: 0.05)

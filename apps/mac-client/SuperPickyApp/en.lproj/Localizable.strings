@@ -120,10 +120,6 @@
 "%lld of %lld" = "%lld of %lld";
 "%lld%%" = "%lld%%";
 "Processing %@" = "Processing %@";
-"Beginner" = "Beginner";
-"Intermediate" = "Intermediate";
-"Master" = "Master";
-"Custom" = "Custom";
 "Picks" = "Picks";
 "Top percentage" = "Top percentage";
 "Percentage of top-rated photos to flag as picks." = "Percentage of top-rated photos to flag as picks.";

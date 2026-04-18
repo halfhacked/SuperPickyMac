@@ -6,21 +6,6 @@ struct CullingTab: View {
     var body: some View {
         @Bindable var config = config
         Form {
-            Section {
-                Picker(config.localized("Skill Level"), selection: Binding(
-                    get: { config.skillLevel },
-                    set: { config.applySkillLevel($0) }
-                )) {
-                    Text(config.localized("Beginner")).tag(SkillLevel.beginner)
-                    Text(config.localized("Intermediate")).tag(SkillLevel.intermediate)
-                    Text(config.localized("Master")).tag(SkillLevel.master)
-                    Text(config.localized("Custom")).tag(SkillLevel.custom)
-                }
-                Text(config.localized("Skill level sets default thresholds for sharpness and aesthetics scoring."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
             Section(config.localized("Detection")) {
                 Toggle(config.localized("Enable exposure detection"), isOn: $config.exposureDetectionEnabled)
                 if config.exposureDetectionEnabled {
