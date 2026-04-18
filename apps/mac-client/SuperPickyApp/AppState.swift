@@ -375,36 +375,38 @@ final class AppState {
     /// photo between buckets. Persists to DB and XMP sidecar.
     func correctSpecies(id: UUID, commonName: String) {
         let trimmed = commonName.trimmingCharacters(in: .whitespaces)
-        mutatePhoto(id: id) { photo in
-            var list = photo.assignedSpecies
-            guard var first = list.first else {
-                // No existing species — treat the rename as assigning a
-                // new custom entry with `trimmed` as both scientific and
-                // common name, so the photo leaves the Unidentified bucket.
-                if !trimmed.isEmpty {
-                    photo.assignedSpecies = [SpeciesMatch(
-                        scientificName: trimmed,
-                        commonName: trimmed,
-                        confidence: 0,
-                        cnName: nil,
-                        pinyin: nil,
-                        thresholdUsed: "manual",
-                        ebirdCode: nil
-                    )]
+        for memberID in burstMemberIDs(for: id) {
+            mutatePhoto(id: memberID) { photo in
+                var list = photo.assignedSpecies
+                guard var first = list.first else {
+                    // No existing species — treat the rename as assigning a
+                    // new custom entry with `trimmed` as both scientific and
+                    // common name, so the photo leaves the Unidentified bucket.
+                    if !trimmed.isEmpty {
+                        photo.assignedSpecies = [SpeciesMatch(
+                            scientificName: trimmed,
+                            commonName: trimmed,
+                            confidence: 0,
+                            cnName: nil,
+                            pinyin: nil,
+                            thresholdUsed: "manual",
+                            ebirdCode: nil
+                        )]
+                    }
+                    return
                 }
-                return
+                first = SpeciesMatch(
+                    scientificName: first.scientificName,
+                    commonName: trimmed.isEmpty ? nil : trimmed,
+                    confidence: first.confidence,
+                    cnName: first.cnName,
+                    pinyin: first.pinyin,
+                    thresholdUsed: first.thresholdUsed,
+                    ebirdCode: first.ebirdCode
+                )
+                list[0] = first
+                photo.assignedSpecies = list
             }
-            first = SpeciesMatch(
-                scientificName: first.scientificName,
-                commonName: trimmed.isEmpty ? nil : trimmed,
-                confidence: first.confidence,
-                cnName: first.cnName,
-                pinyin: first.pinyin,
-                thresholdUsed: first.thresholdUsed,
-                ebirdCode: first.ebirdCode
-            )
-            list[0] = first
-            photo.assignedSpecies = list
         }
         buildSpeciesHierarchy()
     }
