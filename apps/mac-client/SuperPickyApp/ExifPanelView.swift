@@ -186,56 +186,27 @@ struct ExifPanelView: View {
         .padding(.vertical, 3)
     }
 
-    // MARK: - Formatters
+    // MARK: - Formatters (thin wrappers over ExifFormatters)
 
     private func formatNumber(_ value: Double) -> String {
-        if value == value.rounded() {
-            return "\(Int(value))"
-        }
-        return String(format: "%.1f", value)
+        ExifFormatters.number(value)
     }
 
     private func formatExposure(_ data: EXIFData) -> String {
-        var parts: [String] = []
-        if let shutter = data.shutterSpeed { parts.append(shutter) }
-        if let aperture = data.aperture { parts.append("f/\(formatNumber(aperture))") }
-        if let iso = data.iso { parts.append("ISO \(iso)") }
-        if parts.isEmpty { return "—" }
-        // "1/2000 at f/6.3, ISO 1600"
-        if parts.count >= 2, data.shutterSpeed != nil, data.aperture != nil {
-            let shutter = parts.removeFirst()
-            let aperture = parts.removeFirst()
-            var result = "\(shutter) at \(aperture)"
-            if !parts.isEmpty { result += ", \(parts.joined(separator: ", "))" }
-            return result
-        }
-        return parts.joined(separator: ", ")
+        ExifFormatters.exposure(shutterSpeed: data.shutterSpeed,
+                                aperture: data.aperture,
+                                iso: data.iso)
     }
 
     private func formatDate(_ raw: String) -> String {
-        // EXIF "yyyy:MM:dd HH:mm:ss" → localized medium date + short time.
-        let parser = DateFormatter()
-        parser.dateFormat = "yyyy:MM:dd HH:mm:ss"
-        parser.locale = Locale(identifier: "en_US_POSIX")
-        guard let date = parser.date(from: raw) else { return raw }
-
-        let display = DateFormatter()
-        display.locale = config.appLanguage.locale
-        display.dateStyle = .medium
-        display.timeStyle = .short
-        return display.string(from: date)
+        ExifFormatters.date(raw, locale: config.appLanguage.locale)
     }
 
     private func formatLocation(_ data: EXIFData) -> String? {
-        let parts = [data.city, data.state, data.country].compactMap { $0 }
-        return parts.isEmpty ? nil : parts.joined(separator: ", ")
+        ExifFormatters.location(city: data.city, state: data.state, country: data.country)
     }
 
     private func formatCoordinates(_ data: EXIFData) -> String? {
-        guard let lat = data.latitude, let lon = data.longitude else { return nil }
-        let latDir = lat >= 0 ? "N" : "S"
-        let lonDir = lon >= 0 ? "E" : "W"
-        return String(format: "%.4f\u{00B0} %@, %.4f\u{00B0} %@",
-                      abs(lat), latDir, abs(lon), lonDir)
+        ExifFormatters.coordinates(latitude: data.latitude, longitude: data.longitude)
     }
 }
