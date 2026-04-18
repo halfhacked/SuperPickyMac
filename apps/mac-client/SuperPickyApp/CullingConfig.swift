@@ -47,30 +47,6 @@ enum AppTheme: String, CaseIterable, Codable, Sendable {
     }
 }
 
-enum SkillLevel: String, CaseIterable, Codable, Sendable {
-    case beginner, intermediate, master, custom
-
-    /// Preset sharpness threshold, or nil for custom (user controls manually).
-    var sharpnessThreshold: Float? {
-        switch self {
-        case .beginner: 300
-        case .intermediate: 380
-        case .master: 520
-        case .custom: nil
-        }
-    }
-
-    /// Preset aesthetics threshold, or nil for custom (user controls manually).
-    var aestheticsThreshold: Float? {
-        switch self {
-        case .beginner: 4.5
-        case .intermediate: 4.8
-        case .master: 5.5
-        case .custom: nil
-        }
-    }
-}
-
 @Observable
 final class CullingConfig {
     var sharpnessThreshold: Float { didSet { save() } }
@@ -82,7 +58,6 @@ final class CullingConfig {
     var autoAdvance: Bool { didSet { save() } }
     var appLanguage: AppLanguage { didSet { save() } }
     var appTheme: AppTheme { didSet { save() } }
-    var skillLevel: SkillLevel { didSet { save() } }
     var minConfidence: Float { didSet { save() } }
     var minAesthetics: Float { didSet { save() } }
     var pickedTopPercentage: Int { didSet { save() } }
@@ -108,7 +83,6 @@ final class CullingConfig {
         self.autoAdvance = defaults.object(forKey: "autoAdvance") as? Bool ?? false
         self.appLanguage = AppLanguage(rawValue: defaults.string(forKey: "appLanguage") ?? "") ?? .en
         self.appTheme = AppTheme(rawValue: defaults.string(forKey: "appTheme") ?? "") ?? .dark
-        self.skillLevel = SkillLevel(rawValue: defaults.string(forKey: "skillLevel") ?? "") ?? .intermediate
         self.minConfidence = defaults.object(forKey: "minConfidence") as? Float ?? 0.5
         self.minAesthetics = defaults.object(forKey: "minAesthetics") as? Float ?? 3.5
         self.pickedTopPercentage = defaults.object(forKey: "pickedTopPercentage") as? Int ?? 25
@@ -118,18 +92,6 @@ final class CullingConfig {
         self.birdIdConfidence = defaults.object(forKey: "birdIdConfidence") as? Int ?? 70
         self.flightDetectionEnabled = defaults.object(forKey: "flightDetectionEnabled") as? Bool ?? true
         self.speciesSortOrder = SpeciesSortOrder(rawValue: defaults.string(forKey: "speciesSortOrder") ?? "") ?? .name
-    }
-
-    /// Apply a skill level preset. For beginner/intermediate/master, updates thresholds.
-    /// For custom, preserves current thresholds.
-    func applySkillLevel(_ level: SkillLevel) {
-        skillLevel = level
-        if let sharpness = level.sharpnessThreshold {
-            sharpnessThreshold = sharpness
-        }
-        if let aesthetics = level.aestheticsThreshold {
-            aestheticsThreshold = aesthetics
-        }
     }
 
     private func save() {
@@ -143,7 +105,6 @@ final class CullingConfig {
         defaults.set(autoAdvance, forKey: "autoAdvance")
         defaults.set(appLanguage.rawValue, forKey: "appLanguage")
         defaults.set(appTheme.rawValue, forKey: "appTheme")
-        defaults.set(skillLevel.rawValue, forKey: "skillLevel")
         defaults.set(minConfidence, forKey: "minConfidence")
         defaults.set(minAesthetics, forKey: "minAesthetics")
         defaults.set(pickedTopPercentage, forKey: "pickedTopPercentage")

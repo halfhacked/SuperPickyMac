@@ -120,10 +120,6 @@
 "%lld of %lld" = "%lld / %lld";
 "%lld%%" = "%lld%%";
 "Processing %@" = "正在处理 %@";
-"Beginner" = "入门";
-"Intermediate" = "进阶";
-"Master" = "大师";
-"Custom" = "自定义";
 "Picks" = "精选";
 "Top percentage" = "精选百分比";
 "Percentage of top-rated photos to flag as picks." = "评分最高的照片中，按此百分比标记为精选。";
