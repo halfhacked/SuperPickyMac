@@ -61,19 +61,12 @@ struct ThumbnailDecodeBandwidthTests {
         return (elapsed, Double(files.count) / elapsed)
     }
 
-    @Test
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["EXTERNAL_ARW_FOLDER"] != nil
+                       && ProcessInfo.processInfo.environment["LOCAL_ARW_FOLDER"] != nil))
     func externalVsLocal() async throws {
         let env = ProcessInfo.processInfo.environment
-        guard let extPath = env["EXTERNAL_ARW_FOLDER"],
-              let localPath = env["LOCAL_ARW_FOLDER"] else {
-            Issue.record("""
-                Set EXTERNAL_ARW_FOLDER and LOCAL_ARW_FOLDER env vars.
-                Copy ~20 ARWs from the external folder to the local one
-                before running. The test will decode both sets and print
-                the per-location rate.
-                """)
-            return
-        }
+        let extPath = env["EXTERNAL_ARW_FOLDER"]!
+        let localPath = env["LOCAL_ARW_FOLDER"]!
         let external = URL(fileURLWithPath: extPath)
         let local = URL(fileURLWithPath: localPath)
 
