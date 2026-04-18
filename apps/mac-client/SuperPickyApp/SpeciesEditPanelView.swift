@@ -166,6 +166,7 @@ struct SpeciesEditPanelView: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("SpeciesEditPanel_MakePrimary_\(match.speciesID)")
                 .help(config.localized("Make primary"))
             }
             Button {
@@ -275,23 +276,10 @@ struct SpeciesEditPanelView: View {
     }
 
     private func commitSearchQuery() {
+        // Unmatched text is ignored — only SpeciesDatabase entries are allowed
+        // to avoid typos/unlisted names polluting the sidebar and XMP keywords.
         let trimmed = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        let match: SpeciesMatch
-        if let first = searchResults.first {
-            match = first
-        } else {
-            // No autocomplete match — treat as user-entered custom species.
-            match = SpeciesMatch(
-                scientificName: trimmed,
-                commonName: trimmed,
-                confidence: 0,
-                cnName: nil,
-                pinyin: nil,
-                thresholdUsed: "manual",
-                ebirdCode: nil
-            )
-        }
+        guard !trimmed.isEmpty, let match = searchResults.first else { return }
         var list = assigned
         guard !assignedIDs.contains(match.speciesID) else {
             searchQuery = ""
