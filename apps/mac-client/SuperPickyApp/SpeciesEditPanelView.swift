@@ -18,7 +18,9 @@ struct SpeciesEditPanelView: View {
     @State private var searchResults: [SpeciesMatch] = []
 
     private var assigned: [SpeciesMatch] { photo.assignedSpecies }
-    private var candidates: [SpeciesMatch] { decodeCandidates() }
+    private var candidates: [SpeciesMatch] {
+        SpeciesAssignmentEditor.decodeCandidates(fromJSON: photo.speciesTop5JSON)
+    }
     private var assignedIDs: Set<String> { Set(assigned.map(\.speciesID)) }
 
     var body: some View {
@@ -68,7 +70,7 @@ struct SpeciesEditPanelView: View {
 
     @ViewBuilder
     private var candidatesSection: some View {
-        let available = candidates.filter { !assignedIDs.contains($0.speciesID) }
+        let available = SpeciesAssignmentEditor.unassignedCandidates(from: candidates, excluding: assigned)
         if !available.isEmpty {
             sectionHeader(config.localized("OSEA Candidates"))
             VStack(alignment: .leading, spacing: 2) {
@@ -156,10 +158,7 @@ struct SpeciesEditPanelView: View {
             Spacer()
             if !isPrimary {
                 Button {
-                    var list = assigned
-                    let entry = list.remove(at: index)
-                    list.insert(entry, at: 0)
-                    onAssignedChanged(list)
+                    onAssignedChanged(SpeciesAssignmentEditor.makePrimary(at: index, in: assigned))
                 } label: {
                     Image(systemName: "arrow.up.circle")
                         .font(.system(size: 12))
@@ -170,9 +169,7 @@ struct SpeciesEditPanelView: View {
                 .help(config.localized("Make primary"))
             }
             Button {
-                var list = assigned
-                list.remove(at: index)
-                onAssignedChanged(list)
+                onAssignedChanged(SpeciesAssignmentEditor.remove(at: index, from: assigned))
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 12))
@@ -207,9 +204,9 @@ struct SpeciesEditPanelView: View {
             }
             Spacer()
             Button {
-                var list = assigned
-                list.append(match)
-                onAssignedChanged(list)
+                if let updated = SpeciesAssignmentEditor.add(match, to: assigned) {
+                    onAssignedChanged(updated)
+                }
             } label: {
                 Image(systemName: "plus.circle.fill")
                     .font(.system(size: 13))
@@ -222,9 +219,9 @@ struct SpeciesEditPanelView: View {
 
     private func searchResultRow(match: SpeciesMatch) -> some View {
         Button {
-            var list = assigned
-            list.append(match)
-            onAssignedChanged(list)
+            if let updated = SpeciesAssignmentEditor.add(match, to: assigned) {
+                onAssignedChanged(updated)
+            }
             searchQuery = ""
             searchResults = []
         } label: {
@@ -266,28 +263,14 @@ struct SpeciesEditPanelView: View {
         }
     }
 
-    private func decodeCandidates() -> [SpeciesMatch] {
-        guard let json = photo.speciesTop5JSON,
-              let data = json.data(using: .utf8),
-              let list = try? JSONDecoder().decode([SpeciesMatch].self, from: data) else {
-            return []
-        }
-        return list
-    }
-
     private func commitSearchQuery() {
         // Unmatched text is ignored — only SpeciesDatabase entries are allowed
         // to avoid typos/unlisted names polluting the sidebar and XMP keywords.
         let trimmed = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, let match = searchResults.first else { return }
-        var list = assigned
-        guard !assignedIDs.contains(match.speciesID) else {
-            searchQuery = ""
-            searchResults = []
-            return
+        if let updated = SpeciesAssignmentEditor.add(match, to: assigned) {
+            onAssignedChanged(updated)
         }
-        list.append(match)
-        onAssignedChanged(list)
         searchQuery = ""
         searchResults = []
     }
