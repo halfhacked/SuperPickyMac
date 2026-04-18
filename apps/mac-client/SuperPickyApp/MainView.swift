@@ -1,6 +1,49 @@
 import SwiftUI
 import os
 
+/// Coalesces per-photo `onPhotoProcessed` deliveries into batched main-actor
+/// commits so that SwiftUI runs one view transaction per flush tick instead
+/// of one per photo.
+@MainActor
+final class PhotoIngestBatcher {
+    private let appState: AppState
+    private let pipeline: PipelineCoordinator
+    private var pending: [Photo] = []
+    private var scheduled: Bool = false
+    private static let flushDelayNanos: UInt64 = 100_000_000
+
+    init(appState: AppState, pipeline: PipelineCoordinator) {
+        self.appState = appState
+        self.pipeline = pipeline
+    }
+
+    func enqueue(_ photo: Photo?) async {
+        if let photo { pending.append(photo) }
+        appState.processingProcessed = pipeline.processedCount
+        appState.processingTotal = pipeline.totalCount
+        if pipeline.totalCount > 0 {
+            appState.processingProgress =
+                Double(pipeline.processedCount) / Double(pipeline.totalCount)
+        }
+        if scheduled { return }
+        scheduled = true
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: Self.flushDelayNanos)
+            self?.flush()
+        }
+    }
+
+    func flush() {
+        scheduled = false
+        guard !pending.isEmpty else { return }
+        let batch = pending
+        pending.removeAll(keepingCapacity: true)
+        for photo in batch {
+            appState.appendProcessedPhoto(photo)
+        }
+    }
+}
+
 struct MainView: View {
     @Environment(CullingConfig.self) private var config
     let modelState: ModelDownloadState
@@ -335,6 +378,7 @@ struct MainView: View {
         appState.loadPhotos(for: folder)
 
         processingTask = Task {
+            let batcher = await PhotoIngestBatcher(appState: appState, pipeline: pipeline)
             await pipeline.process(
                 folder: folder,
                 ratingConfig: ratingConfig,
@@ -347,18 +391,10 @@ struct MainView: View {
                 burstHashTolerance: config.burstHashTolerance,
                 pickedTopPercentage: config.pickedTopPercentage,
                 onPhotoProcessed: { photo in
-                    await MainActor.run {
-                        appState.processingProcessed = pipeline.processedCount
-                        appState.processingTotal = pipeline.totalCount
-                        if pipeline.totalCount > 0 {
-                            appState.processingProgress = Double(pipeline.processedCount) / Double(pipeline.totalCount)
-                        }
-                        if let photo {
-                            appState.appendProcessedPhoto(photo)
-                        }
-                    }
+                    await batcher.enqueue(photo)
                 }
             )
+            await batcher.flush()
 
             // On cancel, `cancelProcessing()` already cleared UI state —
             // don't rebuild the species hierarchy for a partial run.
