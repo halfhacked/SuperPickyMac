@@ -75,9 +75,7 @@ jobs:
           xcodebuild test \
             -scheme SuperPicky \
             -destination 'platform=macOS' \
-            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test40_SpeciesEditToggleExists \
             -only-testing:SuperPickyUITests/CullingWorkflowUITests/test41_ToggleOpensPanelWithAssignedSpecies \
-            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test42_KeyboardShortcutSToggles \
             -only-testing:SuperPickyUITests/CullingWorkflowUITests/test43_CandidatesListShowsNonAssignedTop5 \
             -only-testing:SuperPickyUITests/CullingWorkflowUITests/test44_AddCandidateMovesToAssigned \
             -only-testing:SuperPickyUITests/CullingWorkflowUITests/test45_RemoveSecondarySpecies \

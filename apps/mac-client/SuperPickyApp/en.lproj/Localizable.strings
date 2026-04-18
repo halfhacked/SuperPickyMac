@@ -109,7 +109,7 @@
 "Tags" = "Tags";
 "Threshold" = "Threshold";
 "Thresholds" = "Thresholds";
-"Toggle EXIF Info (I)" = "Toggle EXIF Info (I)";
+"Toggle Info (I)" = "Toggle Info (I)";
 "Undo" = "Undo";
 "Unidentified" = "Unidentified";
 "View" = "View";
@@ -136,7 +136,7 @@
 "Navigate photos" = "Navigate photos";
 "Fullscreen viewer" = "Fullscreen viewer";
 "Compare mode" = "Compare mode";
-"Toggle EXIF info" = "Toggle EXIF info";
+"Toggle info" = "Toggle info";
 "Toggle zoom (100% ↔ fit)" = "Toggle zoom (100% ↔ fit)";
 "Adjust brightness" = "Adjust brightness";
 "Set star rating" = "Set star rating";
@@ -186,4 +186,3 @@
 "Region" = "Region";
 "Global" = "Global";
 "Manual" = "Manual";
-"Edit species (S)" = "Edit species (S)";
