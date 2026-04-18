@@ -164,4 +164,175 @@ import Foundation
         )
         #expect(result.rating == 5)
     }
+
+    // MARK: - Eye-visibility degradation
+
+    @Test func eyeVisibilityAtHalfOrAboveDoesNotDegrade() {
+        // visibility 0.5 → weight = max(0.5, min(1.0, 0.5*2)) = 1.0 → unchanged
+        let result = engine.calculate(
+            detected: true, confidence: 0.9,
+            sharpness: 500, aesthetics: 6.0,
+            bestEyeVisibility: 0.5,
+            config: config
+        )
+        #expect(result.rating == 5)
+    }
+
+    @Test func eyeVisibilityLowDegradesRating() {
+        // visibility 0.25 → weight = max(0.5, min(1.0, 0.25*2)) = 0.5
+        // rating 5 * 0.5 = 2.5 → Swift Float.rounded() default is
+        // .toNearestOrAwayFromZero so 2.5 rounds up to 3.
+        let result = engine.calculate(
+            detected: true, confidence: 0.9,
+            sharpness: 500, aesthetics: 6.0,
+            bestEyeVisibility: 0.25,
+            config: config
+        )
+        #expect(result.rating == 3)
+    }
+
+    @Test func eyeVisibilityFloorAppliesAtZero() {
+        // visibility 0 → weight = max(0.5, min(1.0, 0)) = 0.5 (floor)
+        // rating 4 * 0.5 = 2.0 → 2
+        let result = engine.calculate(
+            detected: true, confidence: 0.9,
+            sharpness: 500, aesthetics: 4.5,  // would be 4
+            bestEyeVisibility: 0.0,
+            config: config
+        )
+        #expect(result.rating == 2)
+    }
+
+    @Test func eyeVisibilityIntermediateScalesLinearly() {
+        // visibility 0.4 → weight = max(0.5, min(1.0, 0.8)) = 0.8
+        // rating 5 * 0.8 = 4.0 → 4
+        let result = engine.calculate(
+            detected: true, confidence: 0.9,
+            sharpness: 500, aesthetics: 6.0,
+            bestEyeVisibility: 0.4,
+            config: config
+        )
+        #expect(result.rating == 4)
+    }
+
+    // MARK: - Focus weight effects
+
+    @Test func focusWeightBelowOneCanDegradeRating() {
+        // focus weights 0.5 applied to both → adjSharpness = 250, adjAesthetics = 3.0
+        // 250 < 240? no, 250 >= 240 (moderate). 3.0 < 4.15 (moderate aesthetics).
+        // → only one above moderate → 2-star path.
+        let result = engine.calculate(
+            detected: true, confidence: 0.9,
+            sharpness: 500, aesthetics: 6.0,
+            focusSharpnessWeight: 0.5,
+            focusAestheticsWeight: 0.5,
+            config: config
+        )
+        #expect(result.rating == 2)
+    }
+
+    // MARK: - Reason string: focus classification
+
+    @Test func reasonSaysFocusBestWhenWeightAboveOne() {
+        let result = engine.calculate(
+            detected: true, confidence: 0.9,
+            sharpness: 500, aesthetics: 6.0,
+            focusSharpnessWeight: 1.2,
+            config: config
+        )
+        #expect(result.reason.contains("focus:best"))
+    }
+
+    @Test func reasonSaysFocusGoodForWeightBetween09And1() {
+        let result = engine.calculate(
+            detected: true, confidence: 0.9,
+            sharpness: 500, aesthetics: 6.0,
+            focusSharpnessWeight: 0.95,
+            config: config
+        )
+        #expect(result.reason.contains("focus:good"))
+    }
+
+    @Test func reasonSaysFocusGoodAtWeightExactlyOne() {
+        // Boundary: weight == 1.0 falls into the "focus:good" branch (>= 0.9)
+        // since "focus:best" requires strictly > 1.0.
+        let result = engine.calculate(
+            detected: true, confidence: 0.9,
+            sharpness: 500, aesthetics: 6.0,
+            focusSharpnessWeight: 1.0,
+            config: config
+        )
+        #expect(result.reason.contains("focus:good"))
+    }
+
+    @Test func reasonSaysFocusFairForWeightBetween07And09() {
+        let result = engine.calculate(
+            detected: true, confidence: 0.9,
+            sharpness: 500, aesthetics: 6.0,
+            focusSharpnessWeight: 0.75,
+            config: config
+        )
+        #expect(result.reason.contains("focus:fair"))
+    }
+
+    @Test func reasonSaysFocusMissForWeightBelow07() {
+        let result = engine.calculate(
+            detected: true, confidence: 0.9,
+            sharpness: 500, aesthetics: 6.0,
+            focusSharpnessWeight: 0.5,
+            config: config
+        )
+        #expect(result.reason.contains("focus:miss"))
+    }
+
+    // MARK: - Reason string: visibility suffix
+
+    @Test func reasonIncludesVisibilityWhenDegraded() {
+        let result = engine.calculate(
+            detected: true, confidence: 0.9,
+            sharpness: 500, aesthetics: 6.0,
+            bestEyeVisibility: 0.3,
+            config: config
+        )
+        #expect(result.reason.contains("vis:0.30"))
+    }
+
+    @Test func reasonOmitsVisibilityWhenFullyVisible() {
+        let result = engine.calculate(
+            detected: true, confidence: 0.9,
+            sharpness: 500, aesthetics: 6.0,
+            bestEyeVisibility: 1.0,
+            config: config
+        )
+        #expect(!result.reason.contains("vis:"))
+    }
+
+    // MARK: - Reason string: combined flags
+
+    @Test func reasonCombinesAllFlags() {
+        let result = engine.calculate(
+            detected: true, confidence: 0.9,
+            sharpness: 500, aesthetics: 6.0,
+            bestEyeVisibility: 0.3,
+            isOverexposed: true,
+            focusSharpnessWeight: 1.2,
+            isFlying: true,
+            config: config
+        )
+        #expect(result.reason.contains("focus:best"))
+        #expect(result.reason.contains("vis:"))
+        #expect(result.reason.contains("overexposed"))
+        #expect(result.reason.contains("flying"))
+    }
+
+    @Test func reasonReportsUnderexposureSeparately() {
+        let result = engine.calculate(
+            detected: true, confidence: 0.9,
+            sharpness: 500, aesthetics: 6.0,
+            isUnderexposed: true,
+            config: config
+        )
+        #expect(result.reason.contains("underexposed"))
+        #expect(!result.reason.contains("overexposed"))
+    }
 }
