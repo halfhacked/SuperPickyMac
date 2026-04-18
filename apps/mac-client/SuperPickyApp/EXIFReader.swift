@@ -153,9 +153,10 @@ enum EXIFReader {
         return nil
     }
 
-    private static func formatShutterSpeed(_ exposure: Double) -> String {
+    /// EXIF exposure time in seconds → display string. Fractional seconds
+    /// render as `"1/2000"`; 1+ seconds render as `"2s"` or `"1.5s"`.
+    static func formatShutterSpeed(_ exposure: Double) -> String {
         if exposure >= 1.0 {
-            // Format as "Ns" — remove trailing zero for whole numbers
             if exposure == exposure.rounded() {
                 return "\(Int(exposure))s"
             }
@@ -166,8 +167,7 @@ enum EXIFReader {
     }
 
     /// Reads `dc:subject` items from a sibling `<stem>.xmp` sidecar. Returns
-    /// an empty array when the sidecar is absent or unparseable. Intentionally
-    /// lightweight — we only extract the one field the EXIF panel displays.
+    /// an empty array when the sidecar is absent or unparseable.
     private static func readXMPKeywords(imagePath: String) -> [String] {
         let url = URL(fileURLWithPath: imagePath).deletingPathExtension()
             .appendingPathExtension("xmp")
@@ -175,11 +175,15 @@ enum EXIFReader {
               let xml = String(data: data, encoding: .utf8) else {
             return []
         }
-        // XMP `dc:subject` is an rdf:Bag of rdf:li strings. A narrow regex
-        // captures just the text between the opening <rdf:li …> and closing
-        // </rdf:li>, scoped to the first dc:subject block.
+        return parseXMPKeywords(xml: xml)
+    }
+
+    /// Pure regex-based parse of the first `<dc:subject>` block in an XMP
+    /// string. Exposed `internal` so it can be unit-tested without file I/O.
+    static func parseXMPKeywords(xml: String) -> [String] {
         guard let subjectRange = xml.range(of: "<dc:subject>"),
-              let endRange = xml.range(of: "</dc:subject>", range: subjectRange.upperBound..<xml.endIndex) else {
+              let endRange = xml.range(of: "</dc:subject>",
+                                       range: subjectRange.upperBound..<xml.endIndex) else {
             return []
         }
         let block = String(xml[subjectRange.upperBound..<endRange.lowerBound])
@@ -190,7 +194,10 @@ enum EXIFReader {
         return matches.map { xmlUnescape(nsBlock.substring(with: $0.range(at: 1))) }
     }
 
-    private static func xmlUnescape(_ s: String) -> String {
+    /// Reverses the five XML entity replacements emitted by `XMPWriter`.
+    /// Order matters: unescape `&amp;` last so `&amp;lt;` round-trips to
+    /// `&lt;` rather than becoming `<`.
+    static func xmlUnescape(_ s: String) -> String {
         var out = s
         out = out.replacingOccurrences(of: "&apos;", with: "'")
         out = out.replacingOccurrences(of: "&quot;", with: "\"")
@@ -200,7 +207,10 @@ enum EXIFReader {
         return out
     }
 
-    private static func describeMeteringMode(_ mode: Int?) -> String? {
+    /// EXIF metering-mode code → human label. Falls back to
+    /// `"Unknown (<n>)"` for non-standard codes, `nil` when the code itself
+    /// is absent (skips the panel row entirely).
+    static func describeMeteringMode(_ mode: Int?) -> String? {
         switch mode {
         case 1: return "Average"
         case 2: return "Center-weighted"

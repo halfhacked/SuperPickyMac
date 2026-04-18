@@ -208,4 +208,153 @@ import ImageIO
         #expect(result != nil)
         #expect(result!.shutterSpeed == "2.5s")
     }
+
+    // MARK: - formatShutterSpeed (pure)
+
+    @Test func formatShutterSpeedFractionalRoundsDenominator() {
+        #expect(EXIFReader.formatShutterSpeed(1.0 / 2000) == "1/2000")
+        #expect(EXIFReader.formatShutterSpeed(1.0 / 500) == "1/500")
+        #expect(EXIFReader.formatShutterSpeed(0.0003) == "1/3333")
+    }
+
+    @Test func formatShutterSpeedWholeSecondsDropDecimal() {
+        #expect(EXIFReader.formatShutterSpeed(1) == "1s")
+        #expect(EXIFReader.formatShutterSpeed(30) == "30s")
+    }
+
+    @Test func formatShutterSpeedFractionalSecondsKeepDecimal() {
+        #expect(EXIFReader.formatShutterSpeed(2.5) == "2.5s")
+        #expect(EXIFReader.formatShutterSpeed(1.3) == "1.3s")
+    }
+
+    @Test func formatShutterSpeedOneSecondEdgeUsesSecondsForm() {
+        #expect(EXIFReader.formatShutterSpeed(1.0) == "1s")
+    }
+
+    // MARK: - xmlUnescape (pure)
+
+    @Test func xmlUnescapeReversesAllFiveEntities() {
+        #expect(EXIFReader.xmlUnescape("&amp;") == "&")
+        #expect(EXIFReader.xmlUnescape("&lt;") == "<")
+        #expect(EXIFReader.xmlUnescape("&gt;") == ">")
+        #expect(EXIFReader.xmlUnescape("&quot;") == "\"")
+        #expect(EXIFReader.xmlUnescape("&apos;") == "'")
+    }
+
+    @Test func xmlUnescapeHandlesMixedAndRepeated() {
+        #expect(EXIFReader.xmlUnescape("Tom &amp; Jerry &amp; Co") == "Tom & Jerry & Co")
+        #expect(EXIFReader.xmlUnescape("&lt;tag&gt;") == "<tag>")
+    }
+
+    @Test func xmlUnescapeLeavesPlainStringUntouched() {
+        #expect(EXIFReader.xmlUnescape("no entities here") == "no entities here")
+        #expect(EXIFReader.xmlUnescape("") == "")
+    }
+
+    @Test func xmlUnescapeOrderProtectsAgainstDoubleDecode() {
+        // "&amp;lt;" decodes to "&lt;" (one level), not "<".
+        // Holds because `&amp;` is unescaped last.
+        #expect(EXIFReader.xmlUnescape("&amp;lt;") == "&lt;")
+    }
+
+    // MARK: - describeMeteringMode (pure)
+
+    @Test func describeMeteringModeKnownCodes() {
+        #expect(EXIFReader.describeMeteringMode(1) == "Average")
+        #expect(EXIFReader.describeMeteringMode(2) == "Center-weighted")
+        #expect(EXIFReader.describeMeteringMode(3) == "Spot")
+        #expect(EXIFReader.describeMeteringMode(4) == "Multi-spot")
+        #expect(EXIFReader.describeMeteringMode(5) == "Multi-segment")
+        #expect(EXIFReader.describeMeteringMode(6) == "Partial")
+    }
+
+    @Test func describeMeteringModeUnknownCodeFallsBack() {
+        #expect(EXIFReader.describeMeteringMode(0) == "Unknown (0)")
+        #expect(EXIFReader.describeMeteringMode(255) == "Unknown (255)")
+        #expect(EXIFReader.describeMeteringMode(-1) == "Unknown (-1)")
+    }
+
+    @Test func describeMeteringModeNilIsNil() {
+        #expect(EXIFReader.describeMeteringMode(nil) == nil)
+    }
+
+    // MARK: - parseXMPKeywords (pure)
+
+    @Test func parseXMPKeywordsExtractsRdfLiEntries() {
+        let xml = """
+        <x:xmpmeta xmlns:x="adobe:ns:meta/">
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+            <rdf:Description xmlns:dc="http://purl.org/dc/elements/1.1/">
+              <dc:subject>
+                <rdf:Bag>
+                  <rdf:li>Bald Eagle</rdf:li>
+                  <rdf:li>Haliaeetus leucocephalus</rdf:li>
+                </rdf:Bag>
+              </dc:subject>
+            </rdf:Description>
+          </rdf:RDF>
+        </x:xmpmeta>
+        """
+        #expect(EXIFReader.parseXMPKeywords(xml: xml) == ["Bald Eagle", "Haliaeetus leucocephalus"])
+    }
+
+    @Test func parseXMPKeywordsEmptyWhenSubjectMissing() {
+        let xml = "<?xml version=\"1.0\"?><root><other>stuff</other></root>"
+        #expect(EXIFReader.parseXMPKeywords(xml: xml).isEmpty)
+    }
+
+    @Test func parseXMPKeywordsEmptyWhenCloseTagMissing() {
+        // Opening <dc:subject> with no </dc:subject> is graceful: empty list.
+        let xml = "<dc:subject><rdf:Bag><rdf:li>orphan</rdf:li></rdf:Bag>"
+        #expect(EXIFReader.parseXMPKeywords(xml: xml).isEmpty)
+    }
+
+    @Test func parseXMPKeywordsIgnoresRdfLiOutsideSubjectBlock() {
+        // A hierarchicalSubject block with rdf:li's should NOT leak into
+        // the subject keywords result.
+        let xml = """
+        <rdf:RDF>
+          <dc:subject>
+            <rdf:Bag>
+              <rdf:li>only this one</rdf:li>
+            </rdf:Bag>
+          </dc:subject>
+          <lr:hierarchicalSubject>
+            <rdf:Bag>
+              <rdf:li>Bird|Eagle</rdf:li>
+            </rdf:Bag>
+          </lr:hierarchicalSubject>
+        </rdf:RDF>
+        """
+        #expect(EXIFReader.parseXMPKeywords(xml: xml) == ["only this one"])
+    }
+
+    @Test func parseXMPKeywordsUnescapesEntities() {
+        let xml = """
+        <dc:subject>
+          <rdf:Bag>
+            <rdf:li>Tom &amp; Jerry</rdf:li>
+            <rdf:li>&lt;tag&gt;</rdf:li>
+          </rdf:Bag>
+        </dc:subject>
+        """
+        #expect(EXIFReader.parseXMPKeywords(xml: xml) == ["Tom & Jerry", "<tag>"])
+    }
+
+    @Test func parseXMPKeywordsHandlesAttributedRdfLi() {
+        // Some writers add attributes to rdf:li (xml:lang="x-default" etc).
+        let xml = """
+        <dc:subject>
+          <rdf:Bag>
+            <rdf:li xml:lang="x-default">With Lang</rdf:li>
+          </rdf:Bag>
+        </dc:subject>
+        """
+        #expect(EXIFReader.parseXMPKeywords(xml: xml) == ["With Lang"])
+    }
+
+    @Test func parseXMPKeywordsEmptyBagReturnsEmpty() {
+        let xml = "<dc:subject><rdf:Bag></rdf:Bag></dc:subject>"
+        #expect(EXIFReader.parseXMPKeywords(xml: xml).isEmpty)
+    }
 }
