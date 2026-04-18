@@ -137,6 +137,40 @@ import GRDB
         #expect(fetched == nil)
     }
 
+    @Test func v8MigrationBackfillsAssignedSpeciesFromScalarColumns() throws {
+        let tempDir = try makeTempDir()
+        // Fresh DB via ReportDatabase — already at v8.
+        let db = try ReportDatabase(folderPath: tempDir)
+
+        // Insert a photo using ONLY the legacy scalar columns (simulating a
+        // row written before the assignedSpecies accessor existed). Then
+        // verify the accessor falls back to synthesizing a one-element
+        // list so existing tests and persisted data keep working.
+        var legacy = Photo(
+            filename: "legacy.CR3",
+            filePath: tempDir.appendingPathComponent("legacy.CR3").path,
+            folderPath: tempDir.path
+        )
+        legacy.speciesScientificName = "Falco peregrinus"
+        legacy.speciesCommonName = "Peregrine Falcon"
+        legacy.speciesConfidence = 0.88
+        try db.save(&legacy)
+
+        // Clear assignedSpeciesJSON to mimic a pre-migration row that the
+        // backfill wouldn't have seen (or any row where it's still nil),
+        // then re-fetch to confirm the accessor fallback.
+        let fetched = try db.fetchPhoto(id: legacy.id)
+        var row = try #require(fetched)
+        row.assignedSpeciesJSON = nil
+        try db.save(&row)
+
+        let reread = try db.fetchPhoto(id: legacy.id)
+        let refetched = try #require(reread)
+        #expect(refetched.assignedSpecies.count == 1)
+        #expect(refetched.assignedSpecies.first?.scientificName == "Falco peregrinus")
+        #expect(refetched.assignedSpecies.first?.commonName == "Peregrine Falcon")
+    }
+
     @Test func deleteNonManualPhotos_preservesManualRatings() throws {
         let dir = try makeTempDir()
         var db = try ReportDatabase(folderPath: dir)

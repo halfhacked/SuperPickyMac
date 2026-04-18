@@ -10,7 +10,8 @@ struct XMPWriter {
 
     /// Generate XMP string for a photo
     static func generate(photo: Photo) -> String {
-        let hasKeywords = photo.speciesCommonName != nil || photo.speciesCnName != nil || photo.isFlying
+        let assigned = photo.assignedSpecies
+        let hasKeywords = !assigned.isEmpty || photo.isFlying
         let hasLocation = photo.locationCity != nil || photo.locationState != nil
             || photo.locationCountry != nil || photo.locationCountryCode != nil
             || photo.locationSublocation != nil
@@ -32,17 +33,23 @@ struct XMPWriter {
         if hasKeywords {
             xml += "      <dc:subject>\n"
             xml += "        <rdf:Bag>\n"
-            if let common = photo.speciesCommonName {
-                xml += "          <rdf:li>\(xmlEscape(common))</rdf:li>\n"
-            }
-            if let scientific = photo.speciesScientificName {
-                xml += "          <rdf:li>\(xmlEscape(scientific))</rdf:li>\n"
-            }
-            if let cn = photo.speciesCnName {
-                xml += "          <rdf:li>\(xmlEscape(cn))</rdf:li>\n"
-            }
-            if let pinyin = photo.speciesPinyin {
-                xml += "          <rdf:li>\(xmlEscape(pinyin))</rdf:li>\n"
+            // Emit a keyword per assigned species, deduplicating so a
+            // photo tagged with two species whose common names collide
+            // doesn't produce duplicate rdf:li entries.
+            var emitted = Set<String>()
+            for match in assigned {
+                if let common = match.commonName, emitted.insert(common).inserted {
+                    xml += "          <rdf:li>\(xmlEscape(common))</rdf:li>\n"
+                }
+                if emitted.insert(match.scientificName).inserted {
+                    xml += "          <rdf:li>\(xmlEscape(match.scientificName))</rdf:li>\n"
+                }
+                if let cn = match.cnName, emitted.insert(cn).inserted {
+                    xml += "          <rdf:li>\(xmlEscape(cn))</rdf:li>\n"
+                }
+                if let pinyin = match.pinyin, emitted.insert(pinyin).inserted {
+                    xml += "          <rdf:li>\(xmlEscape(pinyin))</rdf:li>\n"
+                }
             }
             if photo.isFlying {
                 xml += "          <rdf:li>In Flight</rdf:li>\n"
@@ -52,8 +59,12 @@ struct XMPWriter {
 
             xml += "      <lr:hierarchicalSubject>\n"
             xml += "        <rdf:Bag>\n"
-            if let common = photo.speciesCommonName {
-                xml += "          <rdf:li>Bird|\(xmlEscape(common))</rdf:li>\n"
+            var hierEmitted = Set<String>()
+            for match in assigned {
+                guard let common = match.commonName else { continue }
+                if hierEmitted.insert(common).inserted {
+                    xml += "          <rdf:li>Bird|\(xmlEscape(common))</rdf:li>\n"
+                }
             }
             if photo.isFlying {
                 xml += "          <rdf:li>Behavior|In Flight</rdf:li>\n"

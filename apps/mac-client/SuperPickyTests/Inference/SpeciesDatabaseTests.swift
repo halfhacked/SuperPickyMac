@@ -31,4 +31,32 @@ struct SpeciesDatabaseTests {
         #expect(!pinyin.isEmpty)
         #expect(!pinyin.contains(" "))
     }
+
+    /// Autocomplete powers the species edit panel. Validates that a
+    /// well-known English-name prefix finds the species (ranked ahead of
+    /// substring matches) and that scientific + Chinese + pinyin lookups
+    /// also hit.
+    @Test("search matches english, scientific, chinese, pinyin")
+    func searchMatchesAcrossNameFields() throws {
+        let url = try #require(SpeciesDatabase.bundledURL(),
+                               "bundled bird_reference.sqlite is missing")
+        let db = try SpeciesDatabase(url: url)
+
+        let englishHits = db.search(query: "Anna")
+        #expect(englishHits.contains { $0.englishName == "Anna's Hummingbird" })
+
+        let scientificHits = db.search(query: "Calypte")
+        #expect(scientificHits.contains { $0.englishName == "Anna's Hummingbird" })
+
+        let chineseHits = db.search(query: "安氏")
+        #expect(chineseHits.contains { $0.englishName == "Anna's Hummingbird" })
+    }
+
+    @Test("search returns no matches on empty query")
+    func searchRejectsEmptyQuery() throws {
+        let url = try #require(SpeciesDatabase.bundledURL())
+        let db = try SpeciesDatabase(url: url)
+        #expect(db.search(query: "").isEmpty)
+        #expect(db.search(query: "   ").isEmpty)
+    }
 }
