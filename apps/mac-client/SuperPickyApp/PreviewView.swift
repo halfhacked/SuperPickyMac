@@ -64,6 +64,27 @@ private final class PreviewCache {
     }
 }
 
+/// Full-resolution decodes kept around for instant zoom on recently-viewed
+/// photos. Kept separate from the preview cache because each entry is large
+/// (~80 MB for a 5616 × 3744 ARW).
+private final class FullResCache {
+    static let shared = FullResCache()
+    private let cache = NSCache<NSString, NSImage>()
+
+    init() {
+        cache.countLimit = 3
+        cache.totalCostLimit = 400 * 1024 * 1024  // 400MB
+    }
+
+    func get(_ key: String) -> NSImage? { cache.object(forKey: key as NSString) }
+
+    func set(_ key: String, image: NSImage) {
+        let pixelsWide = image.representations.first?.pixelsWide ?? Int(image.size.width)
+        let pixelsHigh = image.representations.first?.pixelsHigh ?? Int(image.size.height)
+        cache.setObject(image, forKey: key as NSString, cost: pixelsWide * pixelsHigh * 4)
+    }
+}
+
 /// Loads a full-size preview image asynchronously.
 struct AsyncPreviewImage: View {
     let filePath: String
@@ -83,19 +104,49 @@ struct AsyncPreviewImage: View {
         }
         .task(id: filePath) {
             isFullRes = false
-            // Check cache first (preview resolution only — not full-res)
-            if let cached = PreviewCache.shared.get(filePath) {
-                image = cached
+            // Full-res cache beats the preview cache — same size or bigger.
+            if let full = FullResCache.shared.get(filePath) {
+                image = full
+                isFullRes = true
                 return
             }
             if zoomState.scale > 1.0 {
-                // Already zoomed in — load full-res directly (don't cache)
+                // Already zoomed in — load full-res directly.
+                if let full = await ImageLoader.load(path: filePath, maxPixelSize: nil) {
+                    FullResCache.shared.set(filePath, image: full)
+                    image = full
+                    isFullRes = true
+                }
+                return
+            }
+            // Show the fast preview first.
+            if let cached = PreviewCache.shared.get(filePath) {
+                image = cached
+            } else if let loaded = await ImageLoader.load(path: filePath, maxPixelSize: 2000) {
+                PreviewCache.shared.set(filePath, image: loaded)
+                image = loaded
+            }
+            // Dwell — if the user hasn't navigated away after 400 ms, quietly
+            // upgrade to full-res in the background so a subsequent zoom is
+            // instant. Task cancellation (new filePath or view disappearing)
+            // throws out of the sleep and skips the upgrade.
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            if Task.isCancelled { return }
+            // Skip the upgrade when the source is already ≤ the preview size —
+            // the preview already IS full-res (e.g. 1600 px test JPEGs).
+            if let sourceW = ImageLoader.pixelWidth(path: filePath), sourceW <= 2000 {
                 isFullRes = true
-                image = await ImageLoader.load(path: filePath, maxPixelSize: nil)
-            } else {
-                if let loaded = await ImageLoader.load(path: filePath, maxPixelSize: 2000) {
-                    PreviewCache.shared.set(filePath, image: loaded)
-                    image = loaded
+                if let current = image { FullResCache.shared.set(filePath, image: current) }
+                return
+            }
+            if let full = await ImageLoader.load(path: filePath, maxPixelSize: nil) {
+                if Task.isCancelled { return }
+                FullResCache.shared.set(filePath, image: full)
+                // Only swap in if the user hasn't zoomed in (which already
+                // requested its own full-res load).
+                if !isFullRes {
+                    image = full
+                    isFullRes = true
                 }
             }
         }
@@ -103,8 +154,13 @@ struct AsyncPreviewImage: View {
             // Load full-res when user zooms in
             if newScale > 1.0 && !isFullRes {
                 isFullRes = true
+                if let cached = FullResCache.shared.get(filePath) {
+                    image = cached
+                    return
+                }
                 Task {
                     if let fullRes = await ImageLoader.load(path: filePath, maxPixelSize: nil) {
+                        FullResCache.shared.set(filePath, image: fullRes)
                         image = fullRes
                     }
                 }
