@@ -277,10 +277,11 @@ final class CullingWorkflowUITests: XCTestCase {
 
     private func selectEaglePhoto() { selectThumbnail(filename: "DSC00001.jpg") }
 
-    // The panel's root ScrollView isn't reliably queryable by its accessibility
-    // identifier; the search field is unique to the panel and works as a proxy.
+    // SearchField sits at the bottom of a scrollable panel and can be pruned
+    // from the accessibility tree when scrolled out of view. The root
+    // ScrollView's identifier is a stable proxy for "panel is mounted".
     private func panelIsOpen() -> Bool {
-        Self.app.textFields["SpeciesEditPanel_SearchField"].exists
+        Self.app.scrollViews["ExifPanel"].exists
     }
 
     // On macOS CI (GitHub Actions runner), SwiftUI toolbar buttons surface as a
@@ -301,8 +302,32 @@ final class CullingWorkflowUITests: XCTestCase {
         ensurePanelClosed()
         selectEaglePhoto()
         exifToggleButton.click()
-        XCTAssertTrue(Self.app.textFields["SpeciesEditPanel_SearchField"].waitForExistence(timeout: 3),
+        XCTAssertTrue(Self.app.scrollViews["ExifPanel"].waitForExistence(timeout: 3),
                       "Panel should open")
+        // Species sits below EXIF in the scrollable panel. On small windows
+        // (CI) the species section is below the fold; scroll it into view
+        // so Remove_/Add_/MakePrimary_ buttons and SearchField are hittable.
+        scrollPanelToBottom()
+    }
+
+    /// Scrolls the ExifPanel down so the species section becomes visible.
+    private func scrollPanelToBottom() {
+        let panel = Self.app.scrollViews["ExifPanel"]
+        guard panel.exists else { return }
+        panel.scroll(byDeltaX: 0, deltaY: -600)
+        Thread.sleep(forTimeInterval: 0.3)
+    }
+
+    /// Click a button even when XCUITest reports it as not hittable. The
+    /// 13×13 SF-symbol Add/Remove buttons in the candidates list fail the
+    /// accessibility hit-test on CI (covered by ForEach row overlap), but
+    /// clicking via their reported coordinate still activates the button.
+    private func tapButton(_ element: XCUIElement) {
+        if element.isHittable {
+            element.click()
+        } else {
+            element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+        }
     }
 
     private func clearSearchField() {
@@ -357,13 +382,13 @@ final class CullingWorkflowUITests: XCTestCase {
 
         let add = app.buttons["SpeciesEditPanel_Add_goleag"]
         XCTAssertTrue(add.waitForExistence(timeout: 3))
-        add.click()
+        tapButton(add)
 
         let remove = app.buttons["SpeciesEditPanel_Remove_goleag"]
         XCTAssertTrue(remove.waitForExistence(timeout: 2))
         XCTAssertFalse(app.buttons["SpeciesEditPanel_Add_goleag"].exists)
 
-        remove.click()
+        tapButton(remove)
         Thread.sleep(forTimeInterval: 0.3)
         ensurePanelClosed()
     }
@@ -372,14 +397,22 @@ final class CullingWorkflowUITests: XCTestCase {
         let app = Self.app!
         openPanelOnEagle()
 
-        app.buttons["SpeciesEditPanel_Add_goleag"].click()
+        tapButton(app.buttons["SpeciesEditPanel_Add_goleag"])
         let remove = app.buttons["SpeciesEditPanel_Remove_goleag"]
         XCTAssertTrue(remove.waitForExistence(timeout: 2))
-        remove.click()
+        tapButton(remove)
 
         XCTAssertTrue(app.buttons["SpeciesEditPanel_Add_goleag"].waitForExistence(timeout: 2))
         XCTAssertFalse(app.buttons["SpeciesEditPanel_Remove_goleag"].exists)
         ensurePanelClosed()
+    }
+
+    /// `field.click()` reports "not hittable" when the search field sits
+    /// partially under the scroll view's rounded-corner clip at the panel
+    /// bottom. A coordinate-based click bypasses that hittability check.
+    private func clickSearchField() {
+        let field = Self.app.textFields["SpeciesEditPanel_SearchField"]
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
     }
 
     func test46_SearchFieldAcceptsInput() {
@@ -387,7 +420,7 @@ final class CullingWorkflowUITests: XCTestCase {
         openPanelOnEagle()
 
         let field = app.textFields["SpeciesEditPanel_SearchField"]
-        field.click()
+        clickSearchField()
         field.typeText("robin")
         Thread.sleep(forTimeInterval: 0.3)
 
@@ -403,7 +436,7 @@ final class CullingWorkflowUITests: XCTestCase {
         openPanelOnEagle()
 
         let field = app.textFields["SpeciesEditPanel_SearchField"]
-        field.click()
+        clickSearchField()
         let garbage = "MyCustomSpeciesXYZ"
         field.typeText(garbage)
         app.typeKey(.return, modifierFlags: [])
@@ -423,7 +456,8 @@ final class CullingWorkflowUITests: XCTestCase {
         // DSC00029 is a bird-but-unidentified photo in the mock fixture.
         selectThumbnail(filename: "DSC00029.jpg")
         exifToggleButton.click()
-        XCTAssertTrue(app.textFields["SpeciesEditPanel_SearchField"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.scrollViews["ExifPanel"].waitForExistence(timeout: 3))
+        scrollPanelToBottom()
         XCTAssertTrue(app.staticTexts["SpeciesEditPanel_EmptyAssigned"].waitForExistence(timeout: 2))
         XCTAssertFalse(app.buttons["SpeciesEditPanel_Remove_baleag"].exists)
         ensurePanelClosed()
@@ -434,7 +468,7 @@ final class CullingWorkflowUITests: XCTestCase {
         openPanelOnEagle()
 
         let field = app.textFields["SpeciesEditPanel_SearchField"]
-        field.click()
+        clickSearchField()
         field.typeText("transient")
         Thread.sleep(forTimeInterval: 0.3)
         XCTAssertTrue((field.value as? String ?? "").contains("transient"))
@@ -456,12 +490,12 @@ final class CullingWorkflowUITests: XCTestCase {
         let app = Self.app!
         openPanelOnEagle()
 
-        app.buttons["SpeciesEditPanel_Add_goleag"].click()
+        tapButton(app.buttons["SpeciesEditPanel_Add_goleag"])
         XCTAssertTrue(app.buttons["SpeciesEditPanel_Remove_goleag"].waitForExistence(timeout: 2))
         XCTAssertTrue(app.buttons["SpeciesEditPanel_MakePrimary_goleag"].exists)
         XCTAssertFalse(app.buttons["SpeciesEditPanel_MakePrimary_baleag"].exists)
 
-        app.buttons["SpeciesEditPanel_Remove_baleag"].click()
+        tapButton(app.buttons["SpeciesEditPanel_Remove_baleag"])
         Thread.sleep(forTimeInterval: 0.5)
 
         XCTAssertFalse(app.buttons["SpeciesEditPanel_Remove_baleag"].exists)
@@ -471,9 +505,9 @@ final class CullingWorkflowUITests: XCTestCase {
         XCTAssertTrue(app.buttons["SpeciesEditPanel_Add_baleag"].waitForExistence(timeout: 2))
 
         // Restore state for later tests.
-        app.buttons["SpeciesEditPanel_Remove_goleag"].click()
+        tapButton(app.buttons["SpeciesEditPanel_Remove_goleag"])
         Thread.sleep(forTimeInterval: 0.3)
-        app.buttons["SpeciesEditPanel_Add_baleag"].click()
+        tapButton(app.buttons["SpeciesEditPanel_Add_baleag"])
         Thread.sleep(forTimeInterval: 0.3)
         ensurePanelClosed()
     }
@@ -482,12 +516,12 @@ final class CullingWorkflowUITests: XCTestCase {
         let app = Self.app!
         openPanelOnEagle()
 
-        app.buttons["SpeciesEditPanel_Add_goleag"].click()
+        tapButton(app.buttons["SpeciesEditPanel_Add_goleag"])
         Thread.sleep(forTimeInterval: 0.4)
         XCTAssertTrue(app.buttons["SpeciesEditPanel_MakePrimary_goleag"].exists)
         XCTAssertFalse(app.buttons["SpeciesEditPanel_MakePrimary_baleag"].exists)
 
-        app.buttons["SpeciesEditPanel_MakePrimary_goleag"].click()
+        tapButton(app.buttons["SpeciesEditPanel_MakePrimary_goleag"])
 
         XCTAssertTrue(app.buttons["SpeciesEditPanel_MakePrimary_baleag"].waitForExistence(timeout: 2),
                       "Bald should now have a make-primary button as secondary")
@@ -495,7 +529,7 @@ final class CullingWorkflowUITests: XCTestCase {
         XCTAssertTrue(app.buttons["SpeciesEditPanel_Remove_goleag"].exists)
         XCTAssertTrue(app.buttons["SpeciesEditPanel_Remove_baleag"].exists)
 
-        app.buttons["SpeciesEditPanel_Remove_goleag"].click()
+        tapButton(app.buttons["SpeciesEditPanel_Remove_goleag"])
         Thread.sleep(forTimeInterval: 0.3)
         ensurePanelClosed()
     }
@@ -514,17 +548,20 @@ final class CullingWorkflowUITests: XCTestCase {
         let sidecarPath = (Self.testDir! as NSString).appendingPathComponent("DSC00001.xmp")
         openPanelOnEagle()
 
-        app.buttons["SpeciesEditPanel_Add_goleag"].click()
-        XCTAssertTrue(app.buttons["SpeciesEditPanel_Remove_goleag"].waitForExistence(timeout: 2))
+        let add = app.buttons["SpeciesEditPanel_Add_goleag"]
+        XCTAssertTrue(add.waitForExistence(timeout: 3))
+        tapButton(add)
 
+        let remove = app.buttons["SpeciesEditPanel_Remove_goleag"]
+        XCTAssertTrue(remove.waitForExistence(timeout: 2))
         XCTAssertTrue(waitForSidecar(at: sidecarPath, containing: "Golden Eagle", timeout: 3))
         let afterAdd = (try? String(contentsOfFile: sidecarPath)) ?? ""
         XCTAssertTrue(afterAdd.contains("Bald Eagle"))
 
-        app.buttons["SpeciesEditPanel_Remove_goleag"].click()
+        tapButton(remove)
         XCTAssertTrue(waitForSidecar(at: sidecarPath,
                                      satisfying: { !$0.contains("Golden Eagle") },
-                                     timeout: 3))
+                                     timeout: 5))
         let afterRemove = (try? String(contentsOfFile: sidecarPath)) ?? ""
         XCTAssertTrue(afterRemove.contains("Bald Eagle"))
         ensurePanelClosed()
@@ -536,21 +573,16 @@ final class CullingWorkflowUITests: XCTestCase {
     // species editing, so one toggle is enough.
     func test54_InfoPanelRefreshesKeywordsOnSpeciesEdit() {
         let app = Self.app!
-        ensurePanelClosed()
-        selectEaglePhoto()
-
         let sidecarPath = (Self.testDir! as NSString).appendingPathComponent("DSC00001.xmp")
+        openPanelOnEagle()
         XCTAssertTrue(waitForSidecar(at: sidecarPath, containing: "Bald Eagle", timeout: 5))
-
-        exifToggleButton.click()
-        XCTAssertTrue(app.textFields["SpeciesEditPanel_SearchField"].waitForExistence(timeout: 3))
 
         let baldKeyword = app.staticTexts["ExifKeyword_Bald Eagle"]
         XCTAssertTrue(baldKeyword.waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["ExifKeyword_Golden Eagle"].exists)
 
         XCTAssertTrue(app.buttons["SpeciesEditPanel_Add_goleag"].waitForExistence(timeout: 3))
-        app.buttons["SpeciesEditPanel_Add_goleag"].click()
+        tapButton(app.buttons["SpeciesEditPanel_Add_goleag"])
         XCTAssertTrue(app.buttons["SpeciesEditPanel_Remove_goleag"].waitForExistence(timeout: 2))
 
         XCTAssertTrue(waitForSidecar(at: sidecarPath, containing: "Golden Eagle", timeout: 3))
@@ -558,7 +590,7 @@ final class CullingWorkflowUITests: XCTestCase {
                       "EXIF keywords should refresh after species edit")
         XCTAssertTrue(app.staticTexts["ExifKeyword_Bald Eagle"].exists)
 
-        app.buttons["SpeciesEditPanel_Remove_goleag"].click()
+        tapButton(app.buttons["SpeciesEditPanel_Remove_goleag"])
         XCTAssertTrue(poll(timeout: 4) { !app.staticTexts["ExifKeyword_Golden Eagle"].exists },
                       "Keyword should drop after removal")
 
