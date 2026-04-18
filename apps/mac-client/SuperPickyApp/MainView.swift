@@ -2,8 +2,7 @@ import SwiftUI
 import os
 
 /// Coalesces per-photo `onPhotoProcessed` deliveries into batched main-actor
-/// commits so that SwiftUI runs one view transaction per flush tick instead
-/// of one per photo.
+/// commits.
 @MainActor
 final class PhotoIngestBatcher {
     private let appState: AppState
@@ -19,12 +18,6 @@ final class PhotoIngestBatcher {
 
     func enqueue(_ photo: Photo?) async {
         if let photo { pending.append(photo) }
-        appState.processingProcessed = pipeline.processedCount
-        appState.processingTotal = pipeline.totalCount
-        if pipeline.totalCount > 0 {
-            appState.processingProgress =
-                Double(pipeline.processedCount) / Double(pipeline.totalCount)
-        }
         if scheduled { return }
         scheduled = true
         Task { @MainActor [weak self] in
@@ -35,6 +28,16 @@ final class PhotoIngestBatcher {
 
     func flush() {
         scheduled = false
+        let p = pipeline.processedCount
+        let t = pipeline.totalCount
+        if appState.processingProcessed != p { appState.processingProcessed = p }
+        if appState.processingTotal != t { appState.processingTotal = t }
+        if t > 0 {
+            let progress = Double(p) / Double(t)
+            if appState.processingProgress != progress {
+                appState.processingProgress = progress
+            }
+        }
         guard !pending.isEmpty else { return }
         let batch = pending
         pending.removeAll(keepingCapacity: true)
@@ -396,12 +399,9 @@ struct MainView: View {
             )
             await batcher.flush()
 
-            // Always run loadPhotos — it re-fetches from the DB and
-            // runs the full `buildSpeciesHierarchy` rebuild, which is
-            // how burst groups and dominant-species attribution get
-            // materialized (we skip that work in the per-photo hot
-            // path). Required on cancel, refresh, and normal completion
-            // alike so the sidebar reflects the actual DB state.
+            // Run unconditionally — cancelled runs also need the
+            // sidebar to reflect the DB state (burst reassignment
+            // is deferred to this rebuild).
             await MainActor.run {
                 appState.processingFolder = nil
                 appState.processingProgress = 0

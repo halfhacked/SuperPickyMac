@@ -208,18 +208,11 @@ final class AppState {
         }
     }
 
-    /// O(1) incremental update — adds/removes the photo in its species
-    /// bucket without touching the rest of the hierarchy.
-    ///
-    /// Burst-member photos take the same incremental path during ingest:
-    /// the alternative (a full `SpeciesHierarchyBuilder.build` per burst
-    /// photo) was O(n) on the main thread and dominated scroll latency
-    /// on 1k+ photo folders. Side effect: while processing, a burst-
-    /// member photo is attributed to its own species entry instead of
-    /// the burst's dominant species, and burst groups don't appear in
-    /// the sidebar until end-of-run. `loadPhotos` runs a correct full
-    /// rebuild at completion, so the finished UI matches the previous
-    /// behavior.
+    /// O(1) incremental update. Burst reassignment (dominant species can
+    /// flip across members) is skipped here and materialized by the full
+    /// rebuild in `loadPhotos` at end-of-run; during ingest, burst
+    /// members show under their own species and burst groups don't
+    /// appear in the sidebar.
     private func updateSpeciesHierarchy(removing old: Photo?, adding photo: Photo) {
         if let old { remove(old) }
         add(photo)
