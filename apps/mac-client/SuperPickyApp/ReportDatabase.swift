@@ -124,7 +124,10 @@ final class ReportDatabase: Sendable {
                 WHERE speciesScientificName IS NOT NULL
             """)
             for row in rows {
-                let id: String = row["id"]
+                // Existing DBs store `id` as BLOB (GRDB's default UUID encoding)
+                // even though the schema declared `.text`. Pass it through as a
+                // raw DatabaseValue so we don't need to assume the storage type.
+                let id: DatabaseValue = row["id"]
                 let sci: String = row["speciesScientificName"]
                 let match = SpeciesMatch(
                     scientificName: sci,
