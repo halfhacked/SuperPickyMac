@@ -391,4 +391,32 @@ import Foundation
         let solo = try #require(try db.fetchPhoto(id: seeded.soloID))
         #expect(solo.assignedSpecies.first?.commonName == "Bald Eagle")
     }
+
+    @Test func setAssignedSpeciesOnSoloPhotoDoesNotTouchOtherPhotos() throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let db = try ReportDatabase(folderPath: folder)
+        let eagle = match(sci: "Aquila", common: "Eagle", ebird: "eagle")
+
+        var solo = makePhoto(folder: folder, filename: "solo.CR3")
+        solo.assignedSpecies = [eagle]
+        try db.save(&solo)
+
+        var other = makePhoto(folder: folder, filename: "other.CR3")
+        other.assignedSpecies = [eagle]
+        try db.save(&other)
+
+        let appState = AppState()
+        appState.loadPhotos(for: folder)
+
+        let hawk = match(sci: "Accipiter", common: "Hawk", ebird: "hawk")
+        appState.setAssignedSpecies(id: solo.id, species: [hawk])
+
+        let db2 = try ReportDatabase(folderPath: folder)
+        let soloAfter = try #require(try db2.fetchPhoto(id: solo.id))
+        let otherAfter = try #require(try db2.fetchPhoto(id: other.id))
+        #expect(soloAfter.assignedSpecies.map(\.speciesID) == ["hawk"])
+        #expect(otherAfter.assignedSpecies.map(\.speciesID) == ["eagle"])
+    }
 }
