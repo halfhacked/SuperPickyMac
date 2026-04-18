@@ -186,19 +186,28 @@ final class PipelineCoordinator: @unchecked Sendable {
         var lastTimestamp: Double?
         var lastPHash: UInt64?
 
-        // Serial write-behind chain for `db.save` + `XMPWriter.write`. Photo.id
-        // is a client-side UUID (not assigned by GRDB), so saves don't need to
-        // complete before the next finalize iteration reads photo state. Moving
-        // them off the serial finalize path removes ~2 ms × N photos from the
-        // main-loop critical path. Drain before the picked-flag phase (which
-        // reads from the DB).
-        var writeBehindChain: Task<Void, Never> = Task {}
+        // Parallel write-behind across N serial lanes. Writes for the
+        // same photo must stay in one lane (initial save + burst-flag
+        // update race otherwise), so the lane is derived from the
+        // photo path. Called only from the serial finalize loop.
+        let writeBehindLanes = 4
+        var writeBehindChains: [Task<Void, Never>] =
+            (0..<writeBehindLanes).map { _ in Task {} }
         @Sendable
-        func writeBehind(_ work: @escaping @Sendable () async -> Void) {
-            let prev = writeBehindChain
-            writeBehindChain = Task.detached(priority: .utility) {
+        func writeBehind(key: String, _ work: @escaping @Sendable () async -> Void) {
+            let lane = (abs(key.hashValue)) % writeBehindLanes
+            let prev = writeBehindChains[lane]
+            writeBehindChains[lane] = Task.detached(priority: .utility) {
                 _ = await prev.value
                 await work()
+            }
+        }
+        @Sendable
+        func allWriteBehindLanes() async {
+            await withTaskGroup(of: Void.self) { group in
+                for chain in writeBehindChains {
+                    group.addTask { _ = await chain.value }
+                }
             }
         }
 
@@ -230,7 +239,7 @@ final class PipelineCoordinator: @unchecked Sendable {
 
             let snapshot = photo
             let gpsCoord = gpsByPath[url.path]
-            writeBehind { [logger, reverseGeocoder = self.reverseGeocoder] in
+            writeBehind(key: url.path) { [logger, reverseGeocoder = self.reverseGeocoder] in
                 var p = snapshot
                 if let gps = gpsCoord,
                    let loc = await reverseGeocoder.resolve(lat: gps.lat, lon: gps.lon) {
@@ -295,7 +304,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                             let toSave = burstPhotos[i]
                             let burstGPS = gpsByPath[toSave.filePath]
                             let rewriteXMP = shouldInherit
-                            writeBehind { [logger, reverseGeocoder = self.reverseGeocoder] in
+                            writeBehind(key: toSave.filePath) { [logger, reverseGeocoder = self.reverseGeocoder] in
                                 var p = toSave
                                 // GRDB save is a full REPLACE; re-apply location so
                                 // the burst update doesn't clobber it.
@@ -401,7 +410,7 @@ final class PipelineCoordinator: @unchecked Sendable {
         }
         let mlEnd = DispatchTime.now()
 
-        await writeBehindChain.value
+        await allWriteBehindLanes()
         let wbEnd = DispatchTime.now()
 
         await runPickedFlagCalculation(db: db, topPercentage: pickedTopPercentage)

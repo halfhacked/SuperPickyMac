@@ -208,20 +208,19 @@ final class AppState {
         }
     }
 
-    /// Incremental species-hierarchy update. Touches only the bucket(s)
-    /// affected by this single photo — adding 1 row to an existing entry
-    /// is constant work, not a full `SpeciesHierarchyBuilder.build` pass.
+    /// O(1) incremental update — adds/removes the photo in its species
+    /// bucket without touching the rest of the hierarchy.
+    ///
+    /// Burst-member photos take the same incremental path during ingest:
+    /// the alternative (a full `SpeciesHierarchyBuilder.build` per burst
+    /// photo) was O(n) on the main thread and dominated scroll latency
+    /// on 1k+ photo folders. Side effect: while processing, a burst-
+    /// member photo is attributed to its own species entry instead of
+    /// the burst's dominant species, and burst groups don't appear in
+    /// the sidebar until end-of-run. `loadPhotos` runs a correct full
+    /// rebuild at completion, so the finished UI matches the previous
+    /// behavior.
     private func updateSpeciesHierarchy(removing old: Photo?, adding photo: Photo) {
-        // Burst reassignment across species is too subtle to get right
-        // incrementally (dominant species can flip). Fall back to a full
-        // rebuild — but run it off-main with a debounce, otherwise every
-        // burst photo during a large-folder ingest stalls the main
-        // thread with O(n) work and throughput collapses to O(n²).
-        if (old?.burstGroupID != nil) || (photo.burstGroupID != nil) {
-            scheduleAsyncHierarchyRebuild()
-            return
-        }
-
         if let old { remove(old) }
         add(photo)
         speciesEntries = SpeciesHierarchyBuilder.sorted(
@@ -230,35 +229,6 @@ final class AppState {
             displayName: speciesDisplayName,
             locale: speciesSortLocale
         )
-    }
-
-    @ObservationIgnored private var pendingHierarchyRebuild: Task<Void, Never>?
-
-    /// Coalesce many burst-photo arrivals into a single background rebuild.
-    /// Snapshot is COW so the copy is O(1). The sleep is the debounce
-    /// window — constant bursts during processing delay the rebuild
-    /// until the flurry pauses, which is fine because `loadPhotos`
-    /// already does a correct full rebuild at end-of-run.
-    private func scheduleAsyncHierarchyRebuild() {
-        pendingHierarchyRebuild?.cancel()
-        let snapshot = allPhotos
-        let order = speciesSortOrder
-        let displayName = speciesDisplayName
-        let locale = speciesSortLocale
-        pendingHierarchyRebuild = Task.detached(priority: .userInitiated) { [weak self] in
-            try? await Task.sleep(nanoseconds: 200_000_000)
-            if Task.isCancelled { return }
-            let entries = SpeciesHierarchyBuilder.build(
-                from: snapshot,
-                sortOrder: order,
-                displayName: displayName,
-                locale: locale
-            )
-            if Task.isCancelled { return }
-            await MainActor.run {
-                self?.speciesEntries = entries
-            }
-        }
     }
 
     private func add(_ photo: Photo) {
