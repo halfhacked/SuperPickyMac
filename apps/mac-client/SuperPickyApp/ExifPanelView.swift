@@ -110,9 +110,9 @@ struct ExifPanelView: View {
                                     .padding(.vertical, 3)
                                     .background(.quaternary)
                                     .clipShape(Capsule())
+                                    .accessibilityIdentifier("ExifKeyword_\(keyword)")
                             }
                         }
-                        .accessibilityIdentifier("Exif_Keywords")
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                     }
@@ -138,7 +138,11 @@ struct ExifPanelView: View {
         .shadow(color: .black.opacity(0.2), radius: 8, x: -2, y: 2)
         .padding(8)
         .accessibilityIdentifier("ExifPanel")
-        .task(id: photo.id) {
+        // Keywords come from the XMP sidecar, which the species edit panel
+        // rewrites on every edit — key on assignedSpeciesJSON so the task
+        // re-fires and re-reads keywords when species change (photo.id alone
+        // stays stable across edits).
+        .task(id: [photo.id.uuidString, photo.assignedSpeciesJSON ?? ""]) {
             loaded = false
             exifData = await Task.detached {
                 EXIFReader.read(from: photo.filePath)

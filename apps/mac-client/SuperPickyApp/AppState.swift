@@ -6,20 +6,30 @@ enum SidebarSelection: Hashable {
     case rating(Int)
     case flying
     case picks
-    case species(String)
+    /// Species bucket keyed by stable `SpeciesMatch.speciesID` (eBird code
+    /// or scientific-name fallback). `nil` selects the Unidentified bucket.
+    case species(String?)
     case burstGroup(UUID)
-    case singles(String) // species name
+    /// Singles under a species, keyed by the same stable ID as `.species`.
+    case singles(String?)
 }
 
 /// Species with its burst groups for the sidebar hierarchy.
+///
+/// `speciesID` is the stable identity (eBird code or scientific name); all
+/// filter / selection comparisons go through it. `name` is the English
+/// common name used as both the default display label and the input to
+/// `CullingConfig.localizedName(en:cn:)` for runtime-localized rendering.
 struct SpeciesEntry: Identifiable {
+    let speciesID: String?
+    let scientificName: String?
     let name: String
     let cnName: String?
     let count: Int
     let burstGroups: [BurstGroupEntry]
     let singlePhotos: Int
     let isUnidentified: Bool
-    var id: String { name }
+    var id: String { speciesID ?? "__unidentified__" }
 }
 
 struct BurstGroupEntry: Identifiable {
@@ -45,6 +55,12 @@ final class AppState {
     /// Locale used for alphabetical comparison — drives ICU collation
     /// (e.g. pinyin for `zh-Hans`, gojūon for `ja`).
     var speciesSortLocale: Locale = .current
+
+    /// Autocomplete backend used by the species edit panel. MainView wires
+    /// this to `SpeciesDatabase.search(query:limit:)` once at startup so the
+    /// UI never depends directly on `SuperPickyInference` types.
+    /// Default returns no matches, which keeps unit tests self-contained.
+    @ObservationIgnored var speciesSearch: (_ query: String) -> [SpeciesMatch] = { _ in [] }
 
     var ratingCounts: [Int: Int] {
         var counts: [Int: Int] = [:]
@@ -225,13 +241,18 @@ final class AppState {
     }
 
     private func add(_ photo: Photo) {
-        let hasSpecies = photo.speciesScientificName != nil
-        let name = photo.speciesCommonName ?? photo.speciesScientificName ?? String(localized: "Unidentified")
-        if let idx = speciesEntries.firstIndex(where: { $0.name == name }) {
+        let primary = photo.assignedSpecies.first
+        let hasSpecies = primary != nil
+        let id = primary?.speciesID
+        let name = primary?.commonName ?? primary?.scientificName ?? String(localized: "Unidentified")
+        let key: String = id ?? "__unidentified__"
+        if let idx = speciesEntries.firstIndex(where: { ($0.speciesID ?? "__unidentified__") == key }) {
             let existing = speciesEntries[idx]
             speciesEntries[idx] = SpeciesEntry(
+                speciesID: existing.speciesID,
+                scientificName: existing.scientificName ?? primary?.scientificName,
                 name: existing.name,
-                cnName: existing.cnName ?? photo.speciesCnName,
+                cnName: existing.cnName ?? primary?.cnName,
                 count: existing.count + 1,
                 burstGroups: existing.burstGroups,
                 singlePhotos: existing.singlePhotos + 1,
@@ -239,8 +260,10 @@ final class AppState {
             )
         } else {
             speciesEntries.append(SpeciesEntry(
+                speciesID: id,
+                scientificName: primary?.scientificName,
                 name: name,
-                cnName: photo.speciesCnName,
+                cnName: primary?.cnName,
                 count: 1,
                 burstGroups: [],
                 singlePhotos: 1,
@@ -250,14 +273,17 @@ final class AppState {
     }
 
     private func remove(_ photo: Photo) {
-        let name = photo.speciesCommonName ?? photo.speciesScientificName ?? String(localized: "Unidentified")
-        guard let idx = speciesEntries.firstIndex(where: { $0.name == name }) else { return }
+        let primary = photo.assignedSpecies.first
+        let key: String = primary?.speciesID ?? "__unidentified__"
+        guard let idx = speciesEntries.firstIndex(where: { ($0.speciesID ?? "__unidentified__") == key }) else { return }
         let existing = speciesEntries[idx]
         if existing.count <= 1 && existing.burstGroups.isEmpty {
             speciesEntries.remove(at: idx)
             return
         }
         speciesEntries[idx] = SpeciesEntry(
+            speciesID: existing.speciesID,
+            scientificName: existing.scientificName,
             name: existing.name,
             cnName: existing.cnName,
             count: max(0, existing.count - 1),
@@ -277,22 +303,22 @@ final class AppState {
             return photo.isFlying
         case .picks:
             return photo.isPick
-        case .species(let name):
-            let isUnidentified = speciesEntries.first { $0.name == name }?.isUnidentified ?? false
-            if isUnidentified {
-                return photo.speciesScientificName == nil
-            }
-            return photo.speciesCommonName == name || photo.speciesScientificName == name
+        case .species(let speciesID):
+            return photoHasSpeciesID(photo, speciesID: speciesID)
         case .burstGroup(let groupID):
             return photo.burstGroupID == groupID
-        case .singles(let speciesName):
+        case .singles(let speciesID):
             guard photo.burstGroupID == nil else { return false }
-            let isUnidentified = speciesEntries.first { $0.name == speciesName }?.isUnidentified ?? false
-            if isUnidentified {
-                return photo.speciesScientificName == nil
-            }
-            return photo.speciesCommonName == speciesName || photo.speciesScientificName == speciesName
+            return photoHasSpeciesID(photo, speciesID: speciesID)
         }
+    }
+
+    /// Multi-species-aware membership check. `nil` matches photos with an
+    /// empty `assignedSpecies` list (Unidentified bucket).
+    private func photoHasSpeciesID(_ photo: Photo, speciesID: String?) -> Bool {
+        let assigned = photo.assignedSpecies
+        if speciesID == nil { return assigned.isEmpty }
+        return assigned.contains { $0.speciesID == speciesID }
     }
 
     /// Clear all photo data (when folder is removed).
@@ -377,11 +403,53 @@ final class AppState {
         logger.info("Deleted photo: \(photo.filename)")
     }
 
-    /// Override the species name for a photo. Persists to DB and XMP sidecar.
+    /// Inline-rename hook for the info bar: rewrite the primary (first)
+    /// entry's common name without touching its stable `speciesID`. This
+    /// preserves sidebar bucketing — a cosmetic rename doesn't jump the
+    /// photo between buckets. Persists to DB and XMP sidecar.
     func correctSpecies(id: UUID, commonName: String) {
         let trimmed = commonName.trimmingCharacters(in: .whitespaces)
         mutatePhoto(id: id) { photo in
-            photo.speciesCommonName = trimmed.isEmpty ? nil : trimmed
+            var list = photo.assignedSpecies
+            guard var first = list.first else {
+                // No existing species — treat the rename as assigning a
+                // new custom entry with `trimmed` as both scientific and
+                // common name, so the photo leaves the Unidentified bucket.
+                if !trimmed.isEmpty {
+                    photo.assignedSpecies = [SpeciesMatch(
+                        scientificName: trimmed,
+                        commonName: trimmed,
+                        confidence: 0,
+                        cnName: nil,
+                        pinyin: nil,
+                        thresholdUsed: "manual",
+                        ebirdCode: nil
+                    )]
+                }
+                return
+            }
+            first = SpeciesMatch(
+                scientificName: first.scientificName,
+                commonName: trimmed.isEmpty ? nil : trimmed,
+                confidence: first.confidence,
+                cnName: first.cnName,
+                pinyin: first.pinyin,
+                thresholdUsed: first.thresholdUsed,
+                ebirdCode: first.ebirdCode
+            )
+            list[0] = first
+            photo.assignedSpecies = list
+        }
+        buildSpeciesHierarchy()
+    }
+
+    /// Replace the full assigned-species list for a photo. Used by the
+    /// species edit panel. `species.first` becomes the primary (which the
+    /// accessor mirrors into the scalar columns), every entry appears in
+    /// the sidebar hierarchy, and the XMP sidecar picks up all of them.
+    func setAssignedSpecies(id: UUID, species: [SpeciesMatch]) {
+        mutatePhoto(id: id) { photo in
+            photo.assignedSpecies = species
         }
         buildSpeciesHierarchy()
     }
@@ -435,24 +503,13 @@ final class AppState {
             photos = allPhotos.filter { $0.isFlying }
         case .picks:
             photos = allPhotos.filter { $0.isPick }
-        case .species(let name):
-            // Find the entry to check if it's the unidentified group
-            let isUnidentified = speciesEntries.first { $0.name == name }?.isUnidentified ?? false
-            if isUnidentified {
-                photos = allPhotos.filter { $0.speciesScientificName == nil }
-            } else {
-                photos = allPhotos.filter {
-                    $0.speciesCommonName == name || $0.speciesScientificName == name
-                }
-            }
+        case .species(let speciesID):
+            photos = allPhotos.filter { photoHasSpeciesID($0, speciesID: speciesID) }
         case .burstGroup(let groupID):
             photos = allPhotos.filter { $0.burstGroupID == groupID }
-        case .singles(let speciesName):
-            let isUnidentified = speciesEntries.first { $0.name == speciesName }?.isUnidentified ?? false
+        case .singles(let speciesID):
             photos = allPhotos.filter { photo in
-                photo.burstGroupID == nil && (isUnidentified
-                    ? photo.speciesScientificName == nil
-                    : (photo.speciesCommonName == speciesName || photo.speciesScientificName == speciesName))
+                photo.burstGroupID == nil && photoHasSpeciesID(photo, speciesID: speciesID)
             }
         case nil:
             photos = allPhotos
