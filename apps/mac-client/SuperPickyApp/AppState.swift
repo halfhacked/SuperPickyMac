@@ -224,37 +224,12 @@ final class AppState {
         }
     }
 
-    /// Incremental species-hierarchy update. Touches only the bucket(s)
-    /// affected by this single photo in the single-species fast path; a
-    /// multi-species assignedList, or a change that flips which species
-    /// appear, falls through to the debounced full rebuild.
+    /// O(1) incremental update. Burst reassignment (dominant species can
+    /// flip across members) is skipped here and materialized by the full
+    /// rebuild in `loadPhotos` at end-of-run; during ingest, burst
+    /// members show under their own species and burst groups don't
+    /// appear in the sidebar.
     private func updateSpeciesHierarchy(removing old: Photo?, adding photo: Photo) {
-        // Burst reassignment across species is too subtle to get right
-        // incrementally (dominant species can flip). Fall back to a full
-        // rebuild — but run it off-main with a debounce, otherwise every
-        // burst photo during a large-folder ingest stalls the main
-        // thread with O(n) work and throughput collapses to O(n²).
-        if (old?.burstGroupID != nil) || (photo.burstGroupID != nil) {
-            scheduleAsyncHierarchyRebuild()
-            return
-        }
-
-        // Multi-species photos touch multiple buckets, and a single-species
-        // edit that changes the primary ID (user correction) moves the
-        // photo between buckets in non-obvious ways. The incremental
-        // add/remove helpers only know how to handle one bucket per call,
-        // so fall back to a debounced full rebuild whenever the assigned
-        // list has more than one entry or differs between old and new.
-        let oldAssigned = old?.assignedSpecies ?? []
-        let newAssigned = photo.assignedSpecies
-        let needsRebuild = oldAssigned.count > 1
-            || newAssigned.count > 1
-            || oldAssigned.map(\.speciesID) != newAssigned.map(\.speciesID)
-        if needsRebuild {
-            scheduleAsyncHierarchyRebuild()
-            return
-        }
-
         if let old { remove(old) }
         add(photo)
         speciesEntries = SpeciesHierarchyBuilder.sorted(
@@ -265,37 +240,6 @@ final class AppState {
         )
     }
 
-    @ObservationIgnored private var pendingHierarchyRebuild: Task<Void, Never>?
-
-    /// Coalesce many burst-photo arrivals into a single background rebuild.
-    /// Snapshot is COW so the copy is O(1). The sleep is the debounce
-    /// window — constant bursts during processing delay the rebuild
-    /// until the flurry pauses, which is fine because `loadPhotos`
-    /// already does a correct full rebuild at end-of-run.
-    private func scheduleAsyncHierarchyRebuild() {
-        pendingHierarchyRebuild?.cancel()
-        let snapshot = allPhotos
-        let order = speciesSortOrder
-        let displayName = speciesDisplayName
-        let locale = speciesSortLocale
-        pendingHierarchyRebuild = Task.detached(priority: .userInitiated) { [weak self] in
-            try? await Task.sleep(nanoseconds: 200_000_000)
-            if Task.isCancelled { return }
-            let entries = SpeciesHierarchyBuilder.build(
-                from: snapshot,
-                sortOrder: order,
-                displayName: displayName,
-                locale: locale
-            )
-            if Task.isCancelled { return }
-            await MainActor.run {
-                self?.speciesEntries = entries
-            }
-        }
-    }
-
-    /// Single-species fast-path add. Only called when `updateSpeciesHierarchy`
-    /// confirmed the photo has exactly one assigned species (or zero).
     private func add(_ photo: Photo) {
         let primary = photo.assignedSpecies.first
         let hasSpecies = primary != nil

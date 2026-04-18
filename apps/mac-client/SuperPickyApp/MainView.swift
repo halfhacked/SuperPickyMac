@@ -2,6 +2,52 @@ import SwiftUI
 import SuperPickyInference
 import os
 
+/// Coalesces per-photo `onPhotoProcessed` deliveries into batched main-actor
+/// commits.
+@MainActor
+final class PhotoIngestBatcher {
+    private let appState: AppState
+    private let pipeline: PipelineCoordinator
+    private var pending: [Photo] = []
+    private var scheduled: Bool = false
+    private static let flushDelayNanos: UInt64 = 100_000_000
+
+    init(appState: AppState, pipeline: PipelineCoordinator) {
+        self.appState = appState
+        self.pipeline = pipeline
+    }
+
+    func enqueue(_ photo: Photo?) async {
+        if let photo { pending.append(photo) }
+        if scheduled { return }
+        scheduled = true
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: Self.flushDelayNanos)
+            self?.flush()
+        }
+    }
+
+    func flush() {
+        scheduled = false
+        let p = pipeline.processedCount
+        let t = pipeline.totalCount
+        if appState.processingProcessed != p { appState.processingProcessed = p }
+        if appState.processingTotal != t { appState.processingTotal = t }
+        if t > 0 {
+            let progress = Double(p) / Double(t)
+            if appState.processingProgress != progress {
+                appState.processingProgress = progress
+            }
+        }
+        guard !pending.isEmpty else { return }
+        let batch = pending
+        pending.removeAll(keepingCapacity: true)
+        for photo in batch {
+            appState.appendProcessedPhoto(photo)
+        }
+    }
+}
+
 struct MainView: View {
     @Environment(CullingConfig.self) private var config
     let modelState: ModelDownloadState
@@ -366,6 +412,7 @@ struct MainView: View {
         appState.loadPhotos(for: folder)
 
         processingTask = Task {
+            let batcher = await PhotoIngestBatcher(appState: appState, pipeline: pipeline)
             await pipeline.process(
                 folder: folder,
                 ratingConfig: ratingConfig,
@@ -378,22 +425,14 @@ struct MainView: View {
                 burstHashTolerance: config.burstHashTolerance,
                 pickedTopPercentage: config.pickedTopPercentage,
                 onPhotoProcessed: { photo in
-                    await MainActor.run {
-                        appState.processingProcessed = pipeline.processedCount
-                        appState.processingTotal = pipeline.totalCount
-                        if pipeline.totalCount > 0 {
-                            appState.processingProgress = Double(pipeline.processedCount) / Double(pipeline.totalCount)
-                        }
-                        if let photo {
-                            appState.appendProcessedPhoto(photo)
-                        }
-                    }
+                    await batcher.enqueue(photo)
                 }
             )
+            await batcher.flush()
 
-            // On cancel, `cancelProcessing()` already cleared UI state —
-            // don't rebuild the species hierarchy for a partial run.
-            if Task.isCancelled { return }
+            // Run unconditionally — cancelled runs also need the
+            // sidebar to reflect the DB state (burst reassignment
+            // is deferred to this rebuild).
             await MainActor.run {
                 appState.processingFolder = nil
                 appState.processingProgress = 0
@@ -401,7 +440,7 @@ struct MainView: View {
                 appState.processingTotal = 0
                 appState.loadPhotos(for: folder)
             }
-            if !isTestMode { NSSound.beep() }
+            if !Task.isCancelled, !isTestMode { NSSound.beep() }
         }
     }
 }
