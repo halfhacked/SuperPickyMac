@@ -5,25 +5,13 @@ struct ThresholdCalibratorView: View {
     @Environment(CullingConfig.self) private var config
 
     private var predictedRating: Int? {
-        guard let photo, let confidence = photo.birdConfidence else { return nil }
-        let allKeypointsHidden = (photo.leftEyeVis ?? 0) < 0.3
-            && (photo.rightEyeVis ?? 0) < 0.3
-            && (photo.beakVis ?? 0) < 0.3
-        let cfg = RatingEngine.Config(
-            sharpnessThreshold: config.sharpnessThreshold,
-            aestheticsThreshold: config.aestheticsThreshold
+        PhotoRatingPredictor.predict(
+            photo: photo,
+            config: RatingEngine.Config(
+                sharpnessThreshold: config.sharpnessThreshold,
+                aestheticsThreshold: config.aestheticsThreshold
+            )
         )
-        return RatingEngine().calculate(
-            detected: true,
-            confidence: confidence,
-            sharpness: photo.sharpnessScore ?? 0,
-            aesthetics: photo.aestheticsScore,
-            allKeypointsHidden: allKeypointsHidden,
-            isOverexposed: photo.exposureStatus == ExposureStatus.overexposed.rawValue,
-            isUnderexposed: photo.exposureStatus == ExposureStatus.underexposed.rawValue,
-            isFlying: photo.isFlying,
-            config: cfg
-        ).rating
     }
 
     var body: some View {
