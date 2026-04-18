@@ -286,9 +286,11 @@ final class CullingWorkflowUITests: XCTestCase {
     // On macOS CI (GitHub Actions runner), SwiftUI toolbar buttons surface as a
     // nested Button→Button pair that share the accessibility identifier, so a
     // plain subscript query matches twice. `.firstMatch` picks the outer one.
-    private var speciesEditToggleButton: XCUIElement {
-        Self.app.buttons.matching(identifier: "SpeciesEditToggle").firstMatch
+    private func toolbarButton(_ identifier: String) -> XCUIElement {
+        Self.app.buttons.matching(identifier: identifier).firstMatch
     }
+    private var speciesEditToggleButton: XCUIElement { toolbarButton("SpeciesEditToggle") }
+    private var exifToggleButton: XCUIElement { toolbarButton("ExifToggle") }
 
     private func ensurePanelClosed() {
         guard panelIsOpen() else { return }
@@ -564,7 +566,7 @@ final class CullingWorkflowUITests: XCTestCase {
 
         let baldKeyword = app.staticTexts["ExifKeyword_Bald Eagle"]
         if !baldKeyword.exists {
-            app.buttons["ExifToggle"].click()
+            exifToggleButton.click()
         }
         XCTAssertTrue(baldKeyword.waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["ExifKeyword_Golden Eagle"].exists)
@@ -585,7 +587,7 @@ final class CullingWorkflowUITests: XCTestCase {
 
         ensurePanelClosed()
         if baldKeyword.exists {
-            app.buttons["ExifToggle"].click()
+            exifToggleButton.click()
             Thread.sleep(forTimeInterval: 0.3)
         }
     }
