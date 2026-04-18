@@ -289,19 +289,18 @@ final class CullingWorkflowUITests: XCTestCase {
     private func toolbarButton(_ identifier: String) -> XCUIElement {
         Self.app.buttons.matching(identifier: identifier).firstMatch
     }
-    private var speciesEditToggleButton: XCUIElement { toolbarButton("SpeciesEditToggle") }
-    private var exifToggleButton: XCUIElement { toolbarButton("ExifToggle") }
+    private var exifToggleButton: XCUIElement { Self.app.buttons["ExifToggle"] }
 
     private func ensurePanelClosed() {
         guard panelIsOpen() else { return }
-        speciesEditToggleButton.click()
-        Thread.sleep(forTimeInterval: 0.4)
+        exifToggleButton.click()
+        _ = poll(timeout: 2) { !panelIsOpen() }
     }
 
     private func openPanelOnEagle() {
         ensurePanelClosed()
         selectEaglePhoto()
-        speciesEditToggleButton.click()
+        exifToggleButton.click()
         XCTAssertTrue(Self.app.textFields["SpeciesEditPanel_SearchField"].waitForExistence(timeout: 3),
                       "Panel should open")
     }
@@ -338,32 +337,10 @@ final class CullingWorkflowUITests: XCTestCase {
         }
     }
 
-    func test40_SpeciesEditToggleExists() {
-        XCTAssertTrue(Self.app.buttons["SpeciesEditToggle"].waitForExistence(timeout: 5))
-    }
-
     func test41_ToggleOpensPanelWithAssignedSpecies() {
         openPanelOnEagle()
         XCTAssertTrue(Self.app.buttons["SpeciesEditPanel_Remove_baleag"].waitForExistence(timeout: 2))
         ensurePanelClosed()
-    }
-
-    func test42_KeyboardShortcutSToggles() {
-        let app = Self.app!
-        ensurePanelClosed()
-        selectEaglePhoto()
-
-        // PhotoPreview click hands focus back to the NSEvent key monitor.
-        app.images["PhotoPreview"].click()
-        Thread.sleep(forTimeInterval: 0.3)
-
-        app.typeKey("s", modifierFlags: [])
-        let field = app.textFields["SpeciesEditPanel_SearchField"]
-        XCTAssertTrue(field.waitForExistence(timeout: 2), "`s` should open panel")
-
-        app.typeKey("s", modifierFlags: [])
-        Thread.sleep(forTimeInterval: 0.4)
-        XCTAssertFalse(field.exists, "`s` again should close panel")
     }
 
     func test43_CandidatesListShowsNonAssignedTop5() {
@@ -445,7 +422,7 @@ final class CullingWorkflowUITests: XCTestCase {
         ensurePanelClosed()
         // DSC00029 is a bird-but-unidentified photo in the mock fixture.
         selectThumbnail(filename: "DSC00029.jpg")
-        speciesEditToggleButton.click()
+        exifToggleButton.click()
         XCTAssertTrue(app.textFields["SpeciesEditPanel_SearchField"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["SpeciesEditPanel_EmptyAssigned"].waitForExistence(timeout: 2))
         XCTAssertFalse(app.buttons["SpeciesEditPanel_Remove_baleag"].exists)
@@ -555,7 +532,8 @@ final class CullingWorkflowUITests: XCTestCase {
 
     // Regression: the EXIF panel's `.task(id:)` was keyed only on photo.id,
     // so species edits (which rewrite the XMP sidecar without changing the
-    // id) left the keywords list stale.
+    // id) left the keywords list stale. The panel now hosts both EXIF and
+    // species editing, so one toggle is enough.
     func test54_InfoPanelRefreshesKeywordsOnSpeciesEdit() {
         let app = Self.app!
         ensurePanelClosed()
@@ -564,14 +542,13 @@ final class CullingWorkflowUITests: XCTestCase {
         let sidecarPath = (Self.testDir! as NSString).appendingPathComponent("DSC00001.xmp")
         XCTAssertTrue(waitForSidecar(at: sidecarPath, containing: "Bald Eagle", timeout: 5))
 
+        exifToggleButton.click()
+        XCTAssertTrue(app.textFields["SpeciesEditPanel_SearchField"].waitForExistence(timeout: 3))
+
         let baldKeyword = app.staticTexts["ExifKeyword_Bald Eagle"]
-        if !baldKeyword.exists {
-            exifToggleButton.click()
-        }
         XCTAssertTrue(baldKeyword.waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["ExifKeyword_Golden Eagle"].exists)
 
-        speciesEditToggleButton.click()
         XCTAssertTrue(app.buttons["SpeciesEditPanel_Add_goleag"].waitForExistence(timeout: 3))
         app.buttons["SpeciesEditPanel_Add_goleag"].click()
         XCTAssertTrue(app.buttons["SpeciesEditPanel_Remove_goleag"].waitForExistence(timeout: 2))
@@ -586,9 +563,5 @@ final class CullingWorkflowUITests: XCTestCase {
                       "Keyword should drop after removal")
 
         ensurePanelClosed()
-        if baldKeyword.exists {
-            exifToggleButton.click()
-            Thread.sleep(forTimeInterval: 0.3)
-        }
     }
 }

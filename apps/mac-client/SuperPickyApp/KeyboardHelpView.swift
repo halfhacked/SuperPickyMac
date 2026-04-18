@@ -8,7 +8,7 @@ struct KeyboardHelpView: View {
         ("← →", "Navigate photos"),
         ("F", "Fullscreen viewer"),
         ("C", "Compare mode"),
-        ("I", "Toggle EXIF info"),
+        ("I", "Toggle info"),
         ("Z", "Toggle zoom (100% ↔ fit)"),
         ("= / -", "Adjust brightness"),
         ("0–5", "Set star rating"),

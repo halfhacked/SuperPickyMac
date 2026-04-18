@@ -31,7 +31,6 @@ struct ContentView: View {
     @State private var sortOrder: SortOrder = .filename
     @State private var sortAscending: Bool = true
     @State private var showExifPanel = true
-    @State private var showSpeciesEditPanel = false
     @State private var showFullscreen = false
     @State private var zoomState = ZoomState()
     @State private var fullscreenZoomState = ZoomState()
@@ -84,8 +83,8 @@ struct ContentView: View {
 
                 HStack(alignment: .top, spacing: 0) {
                     Spacer(minLength: 0)
-                    if showSpeciesEditPanel, let photo = selectedPhoto {
-                        SpeciesEditPanelView(
+                    if showExifPanel, let photo = selectedPhoto {
+                        ExifPanelView(
                             photo: photo,
                             onAssignedChanged: { species in
                                 onAssignedSpeciesChanged?(photo.id, species)
@@ -93,10 +92,6 @@ struct ContentView: View {
                             searchSpecies: searchSpecies ?? { _ in [] }
                         )
                         .transition(.move(edge: .trailing))
-                    }
-                    if showExifPanel, let photo = selectedPhoto {
-                        ExifPanelView(photo: photo)
-                            .transition(.move(edge: .trailing))
                     }
                 }
             }
@@ -285,18 +280,7 @@ struct ContentView: View {
                     Image(systemName: showExifPanel ? "info.circle.fill" : "info.circle")
                 }
                 .accessibilityIdentifier("ExifToggle")
-                .help(config.localized("Toggle EXIF Info (I)"))
-            }
-            ToolbarItem(placement: .automatic) {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        showSpeciesEditPanel.toggle()
-                    }
-                } label: {
-                    Image(systemName: showSpeciesEditPanel ? "bird.fill" : "bird")
-                }
-                .accessibilityIdentifier("SpeciesEditToggle")
-                .help(config.localized("Edit species (S)"))
+                .help(config.localized("Toggle Info (I)"))
             }
         }
         .alert(config.localized("No Photos"), isPresented: $showNoPhotosAlert) {
@@ -351,9 +335,6 @@ struct ContentView: View {
         switch key.characters {
         case "i":
             withAnimation(.easeInOut(duration: 0.2)) { showExifPanel.toggle() }
-            return true
-        case "s":
-            withAnimation(.easeInOut(duration: 0.2)) { showSpeciesEditPanel.toggle() }
             return true
         case "f":
             showFullscreen.toggle()
