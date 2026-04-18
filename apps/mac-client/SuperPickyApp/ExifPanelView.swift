@@ -34,8 +34,7 @@ struct ExifPanelView: View {
             }
             .padding(.vertical, 8)
         }
-        .frame(width: 280, alignment: .top)
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(width: 280)
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .shadow(color: .black.opacity(0.2), radius: 8, x: -2, y: 2)
@@ -297,6 +296,8 @@ struct ExifPanelView: View {
                     Image(systemName: "arrow.up.circle")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
+                        .padding(6)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("SpeciesEditPanel_MakePrimary_\(match.speciesID)")
@@ -308,6 +309,8 @@ struct ExifPanelView: View {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
+                    .padding(6)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("SpeciesEditPanel_Remove_\(match.speciesID)")
@@ -345,6 +348,8 @@ struct ExifPanelView: View {
                 Image(systemName: "plus.circle.fill")
                     .font(.system(size: 13))
                     .foregroundStyle(Color.accentColor)
+                    .padding(6)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("SpeciesEditPanel_Add_\(match.speciesID)")
