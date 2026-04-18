@@ -289,7 +289,7 @@ final class CullingWorkflowUITests: XCTestCase {
     private func toolbarButton(_ identifier: String) -> XCUIElement {
         Self.app.buttons.matching(identifier: identifier).firstMatch
     }
-    private var exifToggleButton: XCUIElement { Self.app.buttons["ExifToggle"] }
+    private var exifToggleButton: XCUIElement { toolbarButton("ExifToggle") }
 
     private func ensurePanelClosed() {
         guard panelIsOpen() else { return }
