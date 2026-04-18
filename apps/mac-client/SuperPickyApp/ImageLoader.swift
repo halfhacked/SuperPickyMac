@@ -6,7 +6,8 @@ import AppKit
 /// Shared image loading utility — used by PreviewView, FullscreenViewer, and ThumbnailStripView.
 enum ImageLoader {
     /// Load an image at a given max pixel size, or full resolution if nil.
-    /// Uses embedded preview for speed (IfAbsent), or full decode for full-res.
+    /// Uses the embedded preview when it's large enough (fast path for RAW),
+    /// otherwise decodes the full image and downsamples.
     static func load(path: String, maxPixelSize: Int? = nil) async -> NSImage? {
         let url = URL(fileURLWithPath: path)
 
@@ -19,9 +20,18 @@ enum ImageLoader {
 
                 let cgImage: CGImage?
                 if let maxPixelSize {
+                    // RAWs embed a ~1600 px preview that satisfies `maxPixelSize`;
+                    // use it (IfAbsent). Smaller sources (e.g. 1600 px JPEGs
+                    // with only a 160 px embedded thumbnail) must fall through
+                    // to a real decode — `IfAbsent` would prefer the tiny
+                    // thumbnail and the preview ends up blurry.
+                    let sourceSide = sourceMaxDimension(source: source)
+                    let useEmbedded = sourceSide > maxPixelSize
                     cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, [
                         kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
-                        kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
+                        (useEmbedded
+                         ? kCGImageSourceCreateThumbnailFromImageIfAbsent
+                         : kCGImageSourceCreateThumbnailFromImageAlways): true,
                         kCGImageSourceCreateThumbnailWithTransform: true,
                     ] as CFDictionary)
                 } else {
@@ -39,6 +49,16 @@ enum ImageLoader {
                 continuation.resume(returning: nsImage)
             }
         }
+    }
+
+    /// Longest side of the source image in pixels, or 0 if unavailable.
+    private static func sourceMaxDimension(source: CGImageSource) -> Int {
+        guard let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any] else {
+            return 0
+        }
+        let w = (props[kCGImagePropertyPixelWidth as String] as? Int) ?? 0
+        let h = (props[kCGImagePropertyPixelHeight as String] as? Int) ?? 0
+        return max(w, h)
     }
 
     /// Read actual pixel width from file metadata (no decode — fast).
