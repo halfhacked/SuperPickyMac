@@ -59,4 +59,67 @@ struct SpeciesDatabaseTests {
         #expect(db.search(query: "").isEmpty)
         #expect(db.search(query: "   ").isEmpty)
     }
+
+    /// Pinyin initials are derived from `chinese_simplified` and shipped in
+    /// the bundled DB. A regression in the build or backfill step would
+    /// silently leave the column NULL and break the initials-shorthand
+    /// search (e.g. typing "bthd" to find 白头海雕).
+    @Test("Bundled species DB exposes pinyin initials for known species")
+    func pinyinInitialsPopulatedForKnownSpecies() throws {
+        let url = try #require(SpeciesDatabase.bundledURL(),
+                               "bundled bird_reference.sqlite is missing")
+        let db = try SpeciesDatabase(url: url)
+
+        let expected: [(english: String, initials: String)] = [
+            ("Anna's Hummingbird", "asfn"),   // 安氏蜂鸟
+            ("Bald Eagle", "bthd"),           // 白头海雕
+            ("Golden Eagle", "jd"),           // 金雕
+        ]
+        for pair in expected {
+            let match = (0..<InferenceConstants.oseaNumClasses)
+                .lazy
+                .compactMap { db.lookup(classID: $0) }
+                .first { $0.englishName == pair.english }
+            let entry = try #require(match, "\(pair.english) missing from bundled DB")
+            #expect(entry.pinyinInitials == pair.initials,
+                    "expected \(pair.english) initials \(pair.initials), got \(entry.pinyinInitials ?? "nil")")
+        }
+    }
+
+    /// Users who think in Chinese species names can type the first letter of
+    /// each pinyin syllable as a shorthand. The initials-prefix match must
+    /// surface the expected species ahead of unrelated substring matches.
+    @Test("search finds species by pinyin initials shorthand")
+    func searchByPinyinInitials() throws {
+        let url = try #require(SpeciesDatabase.bundledURL())
+        let db = try SpeciesDatabase(url: url)
+
+        // Full initials hit.
+        let bald = db.search(query: "bthd")
+        #expect(bald.contains { $0.englishName == "Bald Eagle" })
+
+        // Prefix of initials also hits (user is still typing).
+        let golden = db.search(query: "jd")
+        #expect(golden.contains { $0.englishName == "Golden Eagle" })
+
+        // Matching is case-insensitive.
+        let annaUpper = db.search(query: "ASFN")
+        #expect(annaUpper.contains { $0.englishName == "Anna's Hummingbird" })
+    }
+
+    /// Initials matching is prefix-only — a 2-letter substring of the
+    /// middle of an initials string shouldn't match. Otherwise a query
+    /// like "sh" would drown the results in unrelated hits.
+    @Test("pinyin initials matching is prefix-only, not substring")
+    func searchByInitialsIsPrefixOnly() throws {
+        let url = try #require(SpeciesDatabase.bundledURL())
+        let db = try SpeciesDatabase(url: url)
+
+        // "fn" is the tail of Anna's Hummingbird initials "asfn". A
+        // substring-based implementation would match; a prefix-based one
+        // won't (unless some other species legitimately has initials
+        // starting with "fn" and matches on its own merits).
+        let results = db.search(query: "fn")
+        #expect(!results.contains { $0.englishName == "Anna's Hummingbird" })
+    }
 }

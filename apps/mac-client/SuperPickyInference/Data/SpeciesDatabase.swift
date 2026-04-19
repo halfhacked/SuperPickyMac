@@ -15,6 +15,7 @@ public struct SpeciesEntry: Sendable {
     public let englishName: String
     public let chineseName: String
     public let pinyin: String?
+    public let pinyinInitials: String?
     public let ebirdCode: String?
 }
 
@@ -37,7 +38,8 @@ public final class SpeciesDatabase: Sendable {
         defer { sqlite3_close(db) }
 
         let sql = """
-            SELECT model_class_id, scientific_name, english_name, chinese_simplified, pinyin
+            SELECT model_class_id, scientific_name, english_name, chinese_simplified,
+                   pinyin, pinyin_initials
             FROM BirdCountInfo
             WHERE model_class_id IS NOT NULL
         """
@@ -56,11 +58,15 @@ public final class SpeciesDatabase: Sendable {
             let pinyin: String? = sqlite3_column_type(stmt, 4) == SQLITE_NULL
                 ? nil
                 : String(cString: sqlite3_column_text(stmt, 4))
+            let pinyinInitials: String? = sqlite3_column_type(stmt, 5) == SQLITE_NULL
+                ? nil
+                : String(cString: sqlite3_column_text(stmt, 5))
             dict[classID] = SpeciesEntry(classID: classID,
                                           scientificName: scientific,
                                           englishName: english,
                                           chineseName: chinese,
                                           pinyin: pinyin,
+                                          pinyinInitials: pinyinInitials,
                                           ebirdCode: ebirdByClassID[classID])
         }
         self.byClassID = dict
@@ -71,12 +77,21 @@ public final class SpeciesDatabase: Sendable {
         byClassID[classID]
     }
 
-    /// Substring autocomplete across english / scientific / chinese / pinyin.
+    /// Substring autocomplete across english / scientific / chinese / pinyin,
+    /// plus prefix match on pinyin initials (e.g. "bthd" -> 白头海雕).
     /// Ranks prefix matches ahead of substring matches, then alphabetical by
     /// english name. Linear scan over ~11k entries is fine at typing speeds.
+    ///
+    /// Initials are matched by prefix only (not substring): initials strings
+    /// are short and noisy — a 2-letter substring like "sh" would otherwise
+    /// match hundreds of species. Queries of 2+ ASCII letters are eligible
+    /// for initials matching; single-letter queries are too broad.
     public func search(query: String, limit: Int = 20) -> [SpeciesEntry] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !trimmed.isEmpty else { return [] }
+
+        let initialsEligible = trimmed.count >= 2
+            && trimmed.allSatisfy { $0.isASCII && $0.isLetter }
 
         struct Scored {
             let entry: SpeciesEntry
@@ -90,11 +105,16 @@ public final class SpeciesDatabase: Sendable {
             let sci = entry.scientificName.lowercased()
             let cn  = entry.chineseName.lowercased()
             let py  = entry.pinyin?.lowercased() ?? ""
+            let pyi = entry.pinyinInitials?.lowercased() ?? ""
 
             var score = 0
             if eng.hasPrefix(trimmed) || sci.hasPrefix(trimmed)
                 || cn.hasPrefix(trimmed) || (!py.isEmpty && py.hasPrefix(trimmed)) {
                 score = 3
+            } else if initialsEligible && !pyi.isEmpty && pyi.hasPrefix(trimmed) {
+                // Initials-prefix matches rank just below full-prefix matches
+                // so a literal-name match always wins, but above substring.
+                score = 2
             } else if eng.contains(trimmed) || sci.contains(trimmed)
                 || cn.contains(trimmed) || (!py.isEmpty && py.contains(trimmed)) {
                 score = 1
