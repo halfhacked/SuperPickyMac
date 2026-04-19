@@ -4,12 +4,11 @@ struct ThumbnailStripView: View {
     let photos: [Photo]
     @Binding var selectedPhotoID: UUID?
 
-    private var selectedBurstGroupID: UUID? {
-        guard let id = selectedPhotoID else { return nil }
-        return photos.first(where: { $0.id == id })?.burstGroupID
-    }
-
     var body: some View {
+        let selectedBurstGroupID: UUID? = {
+            guard let id = selectedPhotoID else { return nil }
+            return photos.first(where: { $0.id == id })?.burstGroupID
+        }()
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: true) {
                 LazyHStack(spacing: 4) {
