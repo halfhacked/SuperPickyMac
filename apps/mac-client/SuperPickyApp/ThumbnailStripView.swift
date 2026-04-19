@@ -4,12 +4,24 @@ struct ThumbnailStripView: View {
     let photos: [Photo]
     @Binding var selectedPhotoID: UUID?
 
+    private var selectedBurstGroupID: UUID? {
+        guard let id = selectedPhotoID else { return nil }
+        return photos.first(where: { $0.id == id })?.burstGroupID
+    }
+
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: true) {
                 LazyHStack(spacing: 4) {
                     ForEach(photos) { photo in
-                        ThumbnailCell(photo: photo, isSelected: photo.id == selectedPhotoID)
+                        ThumbnailCell(
+                            photo: photo,
+                            isSelected: photo.id == selectedPhotoID,
+                            isDimmed: ThumbnailCell.shouldDim(
+                                photoBurstGroupID: photo.burstGroupID,
+                                selectedBurstGroupID: selectedBurstGroupID
+                            )
+                        )
                             .id(photo.id)
                             .onTapGesture {
                                 selectedPhotoID = photo.id
@@ -35,6 +47,15 @@ struct ThumbnailStripView: View {
 struct ThumbnailCell: View {
     let photo: Photo
     let isSelected: Bool
+    let isDimmed: Bool
+
+    /// A thumbnail is dimmed only when the selected photo is part of a burst
+    /// and this thumbnail belongs to a different burst (or to no burst at all).
+    /// Singletons (selected photo has no burst) leave every thumbnail at full opacity.
+    static func shouldDim(photoBurstGroupID: UUID?, selectedBurstGroupID: UUID?) -> Bool {
+        guard let selected = selectedBurstGroupID else { return false }
+        return photoBurstGroupID != selected
+    }
 
     var body: some View {
         ZStack {
@@ -78,6 +99,8 @@ struct ThumbnailCell: View {
             RoundedRectangle(cornerRadius: 4)
                 .stroke(isSelected ? Color.accentColor : (photo.isPick ? Color.orange.opacity(0.6) : .clear), lineWidth: 2)
         )
+        .opacity(isDimmed ? 0.4 : 1.0)
+        .animation(.easeInOut(duration: 0.15), value: isDimmed)
         .accessibilityIdentifier("Thumbnail_\(photo.filename)")
     }
 }
