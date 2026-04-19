@@ -13,6 +13,9 @@ struct BirdIDTab: View {
                 Text(config.localized("BirdLife International v9")).tag(NamingStandard.birdlife)
                 Text(config.localized("Scientific Names Only")).tag(NamingStandard.scientific)
             }
+            Text(config.localized("Taxonomy used for common and scientific species names written to EXIF."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
 
             Section(config.localized("Confidence")) {
                 SliderRow(label: config.localized("Bird ID Confidence"),
