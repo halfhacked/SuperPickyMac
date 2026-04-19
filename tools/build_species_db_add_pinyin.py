@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-# Adds a `pinyin` column to BirdCountInfo in
+# Adds `pinyin` and `pinyin_initials` columns to BirdCountInfo in
 # apps/mac-client/SuperPickyInference/Resources/bird_reference.sqlite,
-# populating it by joining ~/projects/superpicky/ioc/birdname.db#birds
-# on scientific_name == latin_name. Pinyin syllables are concatenated
-# (spaces stripped) to match the keyword-search convention.
+# populating them by joining ~/projects/superpicky/ioc/birdname.db#birds
+# on scientific_name == latin_name. Full pinyin is the syllables
+# concatenated without spaces; initials is the first letter of each
+# syllable joined (e.g. "bai tou hai diao" -> "bthd").
 #
-# Idempotent: running twice leaves the column in place and re-populates.
+# Idempotent: running twice leaves the columns in place and re-populates.
 
 import argparse
 import os
@@ -44,8 +45,12 @@ def main() -> int:
         cols = {r[1] for r in cur.execute("PRAGMA table_info(BirdCountInfo)")}
         if "pinyin" not in cols:
             cur.execute("ALTER TABLE BirdCountInfo ADD COLUMN pinyin TEXT")
+        if "pinyin_initials" not in cols:
+            cur.execute("ALTER TABLE BirdCountInfo ADD COLUMN pinyin_initials TEXT")
 
-        # Pull {latin -> pinyin_no_spaces} from the superpicky ioc db.
+        # Pull {latin -> (pinyin_no_spaces, pinyin_initials)} from the
+        # superpicky ioc db. pinyin_name is space-separated per syllable,
+        # so initials are the first letter of each syllable joined.
         src = sqlite3.connect(f"file:{source}?mode=ro", uri=True)
         try:
             rows = src.execute(
@@ -57,7 +62,12 @@ def main() -> int:
 
         by_latin = {}
         for latin, pinyin in rows:
-            by_latin[latin] = "".join(pinyin.split())
+            syllables = [s for s in pinyin.split() if s]
+            if not syllables:
+                continue
+            full = "".join(syllables)
+            initials = "".join(s[0].lower() for s in syllables)
+            by_latin[latin] = (full, initials)
 
         target_rows = cur.execute(
             "SELECT id, scientific_name FROM BirdCountInfo"
@@ -65,13 +75,14 @@ def main() -> int:
         updated = 0
         missing = 0
         for row_id, scientific in target_rows:
-            pinyin = by_latin.get(scientific)
-            if pinyin is None:
+            entry = by_latin.get(scientific)
+            if entry is None:
                 missing += 1
                 continue
+            pinyin, initials = entry
             cur.execute(
-                "UPDATE BirdCountInfo SET pinyin = ? WHERE id = ?",
-                (pinyin, row_id),
+                "UPDATE BirdCountInfo SET pinyin = ?, pinyin_initials = ? WHERE id = ?",
+                (pinyin, initials, row_id),
             )
             updated += 1
 
