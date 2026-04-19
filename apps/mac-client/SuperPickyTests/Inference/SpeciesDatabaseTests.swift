@@ -74,6 +74,10 @@ struct SpeciesDatabaseTests {
             ("Anna's Hummingbird", "asfn"),   // 安氏蜂鸟
             ("Bald Eagle", "bthd"),           // 白头海雕
             ("Golden Eagle", "jd"),           // 金雕
+            // 鵟 is a rare CJK polyphone (kuáng/wáng); exercises the
+            // DP-tokenizer / pypinyin-fallback path in the backfill, not
+            // the common-character path above.
+            ("Red-tailed Hawk", "hwk"),       // 红尾鵟
         ]
         for pair in expected {
             let match = (0..<InferenceConstants.oseaNumClasses)
