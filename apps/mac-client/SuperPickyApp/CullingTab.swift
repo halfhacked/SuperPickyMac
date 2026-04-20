@@ -13,6 +13,9 @@ struct CullingTab: View {
                               value: snappedBinding($config.exposureThreshold, step: 0.01),
                               range: 0.05...0.20,
                               display: "\(Int(config.exposureThreshold * 100))%")
+                    Text(config.localized("Fraction of clipped pixels that flags a photo as over- or under-exposed. Lower values flag more photos."))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
                 Toggle(config.localized("Enable flight detection"), isOn: $config.flightDetectionEnabled)
             }

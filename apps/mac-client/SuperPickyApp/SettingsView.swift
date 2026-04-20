@@ -11,8 +11,6 @@ struct SettingsView: View {
                 .tabItem { Label(config.localized("Culling"), systemImage: "slider.horizontal.3") }
             BirdIDTab()
                 .tabItem { Label(config.localized("Bird ID"), systemImage: "bird") }
-            ProcessingTab()
-                .tabItem { Label(config.localized("Processing"), systemImage: "arrow.triangle.2.circlepath") }
             AdvancedTab()
                 .tabItem { Label(config.localized("Advanced"), systemImage: "wrench.and.screwdriver") }
         }
