@@ -78,7 +78,6 @@
 "Process new folder" = "Process new folder";
 "Processing" = "Processing";
 "Processing complete!" = "Processing complete!";
-"Processing settings will appear here." = "Processing settings will appear here.";
 "Quit" = "Quit";
 "Rating ≥ %lld (⌘0 to reset)" = "Rating ≥ %lld (⌘0 to reset)";
 "Ratings" = "Ratings";
@@ -131,6 +130,15 @@
 "Confidence" = "Confidence";
 "Bird ID Confidence" = "Bird ID Confidence";
 "Species below this confidence will not be written to EXIF." = "Species below this confidence will not be written to EXIF.";
+"Fraction of clipped pixels that flags a photo as over- or under-exposed. Lower values flag more photos." = "Fraction of clipped pixels that flags a photo as over- or under-exposed. Lower values flag more photos.";
+"Taxonomy used for common and scientific species names written to EXIF." = "Taxonomy used for common and scientific species names written to EXIF.";
+"Tenengrad sharpness-score floor. Photos below this are rated low." = "Tenengrad sharpness-score floor. Photos below this are rated low.";
+"Aesthetics-model score floor. Photos below this are rated low." = "Aesthetics-model score floor. Photos below this are rated low.";
+"Bird-detection confidence floor. Below this, the photo is treated as having no bird." = "Bird-detection confidence floor. Below this, the photo is treated as having no bird.";
+"Hard aesthetics floor — photos below this can never reach the top picks." = "Hard aesthetics floor — photos below this can never reach the top picks.";
+"Maximum frames-per-second gap for grouping consecutive frames as a burst. Higher values group more loosely." = "Maximum frames-per-second gap for grouping consecutive frames as a burst. Higher values group more loosely.";
+"Minimum frames required to form a burst. Smaller groups are treated as singletons." = "Minimum frames required to form a burst. Smaller groups are treated as singletons.";
+"Perceptual-hash distance allowed within a burst. Higher tolerates more composition drift between frames." = "Perceptual-hash distance allowed within a burst. Higher tolerates more composition drift between frames.";
 "Keyboard Shortcuts" = "Keyboard Shortcuts";
 "Press any key to dismiss" = "Press any key to dismiss";
 "Navigate photos" = "Navigate photos";
