@@ -78,7 +78,6 @@
 "Process new folder" = "处理新文件夹";
 "Processing" = "处理";
 "Processing complete!" = "处理完成！";
-"Processing settings will appear here." = "处理设置将在此显示。";
 "Quit" = "退出";
 "Rating ≥ %lld (⌘0 to reset)" = "评分 ≥ %lld（⌘0 重置）";
 "Ratings" = "评分";
@@ -131,6 +130,15 @@
 "Confidence" = "置信度";
 "Bird ID Confidence" = "鸟种识别置信度";
 "Species below this confidence will not be written to EXIF." = "低于此置信度的鸟种不会写入 EXIF。";
+"Fraction of clipped pixels that flags a photo as over- or under-exposed. Lower values flag more photos." = "像素裁剪比例达到此值时将照片标记为过曝或欠曝。数值越低，标记的照片越多。";
+"Taxonomy used for common and scientific species names written to EXIF." = "写入 EXIF 的鸟种俗名与学名所使用的分类体系。";
+"Tenengrad sharpness-score floor. Photos below this are rated low." = "Tenengrad 锐度评分下限。低于此值的照片评分较低。";
+"Aesthetics-model score floor. Photos below this are rated low." = "美学模型评分下限。低于此值的照片评分较低。";
+"Bird-detection confidence floor. Below this, the photo is treated as having no bird." = "鸟类检测置信度下限。低于此值时照片视为未检测到鸟。";
+"Hard aesthetics floor — photos below this can never reach the top picks." = "最低美学分——低于此值的照片永远无法成为精选。";
+"Maximum frames-per-second gap for grouping consecutive frames as a burst. Higher values group more loosely." = "将相邻帧归入同一连拍组的最大帧率间隔。数值越大，分组越宽松。";
+"Minimum frames required to form a burst. Smaller groups are treated as singletons." = "构成一个连拍组所需的最少帧数。少于此数的分组视为单张。";
+"Perceptual-hash distance allowed within a burst. Higher tolerates more composition drift between frames." = "同一连拍组内允许的感知哈希距离。数值越大，对帧间构图漂移越宽容。";
 "Keyboard Shortcuts" = "键盘快捷键";
 "Press any key to dismiss" = "按任意键关闭";
 "Navigate photos" = "浏览照片";
