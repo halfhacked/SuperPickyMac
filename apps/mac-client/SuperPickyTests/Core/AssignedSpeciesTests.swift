@@ -33,6 +33,33 @@ import Foundation
         )
     }
 
+    /// Seed a fresh folder + DB with a 3-photo burst (all sharing `burstID`)
+    /// plus one solo photo (no burst group). Returns the folder URL, the
+    /// burst member IDs (in seed order), and the solo photo's ID. Callers
+    /// are responsible for deleting the folder.
+    private func seedBurstAndSolo(
+        burstPrimary: SpeciesMatch
+    ) throws -> (folder: URL, burstIDs: [UUID], soloID: UUID) {
+        let folder = try makeTempFolder()
+        let db = try ReportDatabase(folderPath: folder)
+
+        let burstID = UUID()
+        var burstIDs: [UUID] = []
+        for i in 0..<3 {
+            var p = makePhoto(folder: folder, filename: "burst_\(i).CR3")
+            p.burstGroupID = burstID
+            p.assignedSpecies = [burstPrimary]
+            try db.save(&p)
+            burstIDs.append(p.id)
+        }
+
+        var solo = makePhoto(folder: folder, filename: "solo.CR3")
+        solo.assignedSpecies = [burstPrimary]
+        try db.save(&solo)
+
+        return (folder, burstIDs, solo.id)
+    }
+
     // MARK: - SpeciesMatch identity
 
     @Test func speciesIDPrefersEbirdCodeOverScientificName() {
@@ -309,5 +336,87 @@ import Foundation
         appState.sidebarSelection = .species("hawk")
         appState.applyFilter()
         #expect(appState.photos.count == 2) // b + c
+    }
+
+    // MARK: - Burst fan-out
+
+    @Test func setAssignedSpeciesFansOutToAllBurstMembers() throws {
+        let seeded = try seedBurstAndSolo(
+            burstPrimary: match(sci: "Aquila", common: "Eagle", ebird: "eagle")
+        )
+        defer { try? FileManager.default.removeItem(at: seeded.folder) }
+
+        let appState = AppState()
+        appState.loadPhotos(for: seeded.folder)
+
+        // Edit the species list on ONE burst member; expect all three to
+        // receive the new list while the solo photo stays untouched.
+        let newList = [
+            match(sci: "Accipiter", common: "Hawk", ebird: "hawk"),
+            match(sci: "Buteo", common: "Buzzard", ebird: "buzzard"),
+        ]
+        appState.setAssignedSpecies(id: seeded.burstIDs[0], species: newList)
+
+        let db = try ReportDatabase(folderPath: seeded.folder)
+        for id in seeded.burstIDs {
+            let fetched = try #require(try db.fetchPhoto(id: id))
+            #expect(fetched.assignedSpecies.map(\.speciesID) == ["hawk", "buzzard"])
+        }
+        let solo = try #require(try db.fetchPhoto(id: seeded.soloID))
+        #expect(solo.assignedSpecies.map(\.speciesID) == ["eagle"])
+    }
+
+    @Test func correctSpeciesFansOutToAllBurstMembers() throws {
+        let seeded = try seedBurstAndSolo(
+            burstPrimary: match(sci: "Aquila chrysaetos",
+                                common: "Bald Eagle", // deliberately wrong
+                                ebird: "goleag")
+        )
+        defer { try? FileManager.default.removeItem(at: seeded.folder) }
+
+        let appState = AppState()
+        appState.loadPhotos(for: seeded.folder)
+
+        appState.correctSpecies(id: seeded.burstIDs[0], commonName: "Golden Eagle")
+
+        let db = try ReportDatabase(folderPath: seeded.folder)
+        for id in seeded.burstIDs {
+            let fetched = try #require(try db.fetchPhoto(id: id))
+            let primary = try #require(fetched.assignedSpecies.first)
+            #expect(primary.commonName == "Golden Eagle")
+            // Stable identity preserved — sidebar bucket must not jump.
+            #expect(primary.speciesID == "goleag")
+            #expect(primary.scientificName == "Aquila chrysaetos")
+        }
+        let solo = try #require(try db.fetchPhoto(id: seeded.soloID))
+        #expect(solo.assignedSpecies.first?.commonName == "Bald Eagle")
+    }
+
+    @Test func setAssignedSpeciesOnSoloPhotoDoesNotTouchOtherPhotos() throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let db = try ReportDatabase(folderPath: folder)
+        let eagle = match(sci: "Aquila", common: "Eagle", ebird: "eagle")
+
+        var solo = makePhoto(folder: folder, filename: "solo.CR3")
+        solo.assignedSpecies = [eagle]
+        try db.save(&solo)
+
+        var other = makePhoto(folder: folder, filename: "other.CR3")
+        other.assignedSpecies = [eagle]
+        try db.save(&other)
+
+        let appState = AppState()
+        appState.loadPhotos(for: folder)
+
+        let hawk = match(sci: "Accipiter", common: "Hawk", ebird: "hawk")
+        appState.setAssignedSpecies(id: solo.id, species: [hawk])
+
+        let db2 = try ReportDatabase(folderPath: folder)
+        let soloAfter = try #require(try db2.fetchPhoto(id: solo.id))
+        let otherAfter = try #require(try db2.fetchPhoto(id: other.id))
+        #expect(soloAfter.assignedSpecies.map(\.speciesID) == ["hawk"])
+        #expect(otherAfter.assignedSpecies.map(\.speciesID) == ["eagle"])
     }
 }
