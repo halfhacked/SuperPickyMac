@@ -419,4 +419,41 @@ import Foundation
         #expect(soloAfter.assignedSpecies.map(\.speciesID) == ["hawk"])
         #expect(otherAfter.assignedSpecies.map(\.speciesID) == ["eagle"])
     }
+
+    @Test func burstFanOutWithSecondarySpeciesAppearsUnderBothSidebarBuckets() throws {
+        // Start with a burst where every member is tagged Eagle.
+        // Edit one member's species list to [Eagle, Hawk] — fan-out
+        // propagates [Eagle, Hawk] to every burst member. The sidebar
+        // hierarchy then shows the burst under BOTH Eagle and Hawk.
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let db = try ReportDatabase(folderPath: folder)
+        let eagle = match(sci: "Aquila", common: "Eagle", ebird: "eagle")
+
+        let burstID = UUID()
+        var burstIDs: [UUID] = []
+        for i in 0..<3 {
+            var p = makePhoto(folder: folder, filename: "burst_\(i).CR3")
+            p.burstGroupID = burstID
+            p.assignedSpecies = [eagle]
+            try db.save(&p)
+            burstIDs.append(p.id)
+        }
+
+        let appState = AppState()
+        appState.loadPhotos(for: folder)
+
+        let hawk = match(sci: "Accipiter", common: "Hawk", ebird: "hawk")
+        appState.setAssignedSpecies(id: burstIDs[0], species: [eagle, hawk])
+
+        let eagleEntry = appState.speciesEntries.first { $0.speciesID == "eagle" }
+        let hawkEntry = appState.speciesEntries.first { $0.speciesID == "hawk" }
+        #expect(eagleEntry?.burstGroups.count == 1)
+        #expect(eagleEntry?.burstGroups.first?.count == 3)
+        #expect(hawkEntry?.burstGroups.count == 1)
+        #expect(hawkEntry?.burstGroups.first?.count == 3)
+        #expect(eagleEntry?.burstGroups.first?.id == burstID)
+        #expect(hawkEntry?.burstGroups.first?.id == burstID)
+    }
 }
