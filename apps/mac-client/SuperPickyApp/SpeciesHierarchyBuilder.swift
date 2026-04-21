@@ -4,9 +4,10 @@ import Foundation
 ///
 /// A photo may carry multiple species in its `assignedSpecies` list; the
 /// builder emits one contribution *per assigned species*, so a photo
-/// tagged with both A and B appears under both buckets. The primary
-/// (first) entry still drives burst-dominant-species assignment so a
-/// burst lives under one species only.
+/// tagged with both A and B appears under both buckets. Bursts follow
+/// the same rule: a burst whose members are tagged with species A and B
+/// appears under both A and B, each with a `BurstGroupEntry` carrying
+/// the full burst size.
 ///
 /// Bucket identity is `SpeciesMatch.speciesID` (eBird code or, when the
 /// user entered a custom species, the scientific name). Never the
@@ -24,32 +25,13 @@ struct SpeciesHierarchyBuilder {
         displayName: (SpeciesEntry) -> String = { $0.name },
         locale: Locale = .current
     ) -> [SpeciesEntry] {
-        // Assign each burst to its dominant species by highest confidence
-        // primary ID. A burst spanning multiple species classifications
-        // appears only once. Uses the PRIMARY species (assignedSpecies.first)
-        // — not the union — so multi-species tagging on individual photos
-        // doesn't duplicate bursts across buckets.
-        var burstPrimaryByGroup: [UUID: String] = [:]
-        var burstBestConfidence: [UUID: (id: String, confidence: Float)] = [:]
+        // Group burst members by group ID so each burst emits one
+        // BurstGroupEntry per bucket it's attached to, carrying the full
+        // burst size.
         var burstPhotos: [UUID: [Photo]] = [:]
-
         for photo in photos {
             guard let groupID = photo.burstGroupID else { continue }
             burstPhotos[groupID, default: []].append(photo)
-
-            guard let primary = photo.assignedSpecies.first else { continue }
-            let confidence = primary.confidence
-            if let current = burstBestConfidence[groupID] {
-                if confidence > current.confidence {
-                    burstBestConfidence[groupID] = (primary.speciesID, confidence)
-                }
-            } else {
-                burstBestConfidence[groupID] = (primary.speciesID, confidence)
-            }
-        }
-
-        for groupID in burstPhotos.keys {
-            burstPrimaryByGroup[groupID] = burstBestConfidence[groupID]?.id ?? unidentifiedKey
         }
 
         // Group photos by species ID. A multi-species photo contributes
@@ -82,16 +64,15 @@ struct SpeciesHierarchyBuilder {
         }
 
         let entries = bySpeciesID.map { id, bucket -> SpeciesEntry in
-            // Only include burst groups whose primary species matches this
-            // bucket. A multi-species photo still counts in every bucket,
-            // but each of its bursts shows up under only one species.
+            // A burst attaches to every bucket any of its members is
+            // tagged with. Because `bucket.photos` already filters to
+            // photos whose `assignedSpecies` includes `id`, any burst
+            // member seen here implies the burst is tagged with `id`.
             var burstGroupIDs: Set<UUID> = []
             var singleCount = 0
             for photo in bucket.photos {
                 if let groupID = photo.burstGroupID {
-                    if burstPrimaryByGroup[groupID] == id {
-                        burstGroupIDs.insert(groupID)
-                    }
+                    burstGroupIDs.insert(groupID)
                 } else {
                     singleCount += 1
                 }
