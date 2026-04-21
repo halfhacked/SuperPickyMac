@@ -357,11 +357,11 @@ import Foundation
         #expect(appState.photos.count == 1)
     }
 
-    @Test func multiSpeciesPhotoInBurstAppearsOnceUnderDominantSpeciesBucket() throws {
+    @Test func multiSpeciesBurstAppearsUnderEveryTaggedSpecies() throws {
         // Burst members each tagged primary=Eagle; one of them also carries
-        // a secondary Hawk tag. The burst bucket assignment should stick
-        // with Eagle (driven by PRIMARY species confidence, not the union)
-        // so the same burst doesn't show up under both Eagle and Hawk.
+        // a secondary Hawk tag. The burst should appear under BOTH Eagle
+        // and Hawk in the sidebar so the secondary bucket isn't an empty
+        // drill-down.
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
 
@@ -389,11 +389,16 @@ import Foundation
         let eagle = appState.speciesEntries.first { $0.speciesID == "eagle" }
         let hawk = appState.speciesEntries.first { $0.speciesID == "hawk" }
 
-        // Eagle owns the burst; Hawk still has the one photo as a single
-        // contribution (count=1) but no burst under its bucket.
+        // Both buckets show the burst with the full burst size.
         #expect(eagle?.burstGroups.count == 1)
         #expect(eagle?.burstGroups.first?.count == 2)
-        #expect(hawk?.burstGroups.isEmpty == true)
+        #expect(hawk?.burstGroups.count == 1)
+        #expect(hawk?.burstGroups.first?.count == 2)
+        #expect(eagle?.burstGroups.first?.id == hawk?.burstGroups.first?.id)
+
+        // Bucket-level count: Eagle counts both members (both tagged Eagle);
+        // Hawk counts only the member actually tagged Hawk.
+        #expect(eagle?.count == 2)
         #expect(hawk?.count == 1)
     }
 
