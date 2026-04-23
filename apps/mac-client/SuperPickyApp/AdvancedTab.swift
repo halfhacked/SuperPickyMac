@@ -77,13 +77,16 @@ struct SliderRow<V: BinaryFloatingPoint>: View where V.Stride: BinaryFloatingPoi
         LabeledContent {
             HStack(spacing: 8) {
                 Slider(value: $value, in: range)
+                    .accessibilityIdentifier("SliderRow_\(label)_Slider")
                 Text(display)
                     .monospacedDigit()
                     .frame(width: 40, alignment: .trailing)
+                    .accessibilityIdentifier("SliderRow_\(label)_Value")
             }
         } label: {
             Text(label)
         }
+        .accessibilityIdentifier("SliderRow_\(label)")
     }
 }
 
