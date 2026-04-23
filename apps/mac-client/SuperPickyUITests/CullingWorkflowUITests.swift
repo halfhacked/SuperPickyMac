@@ -472,6 +472,18 @@ final class CullingWorkflowUITests: XCTestCase {
     // screenshot tests target too.
     private func selectThumbnail(filename: String) {
         let thumb = Self.app.images.matching(identifier: "Thumbnail_\(filename)").firstMatch
+
+        // The strip is a LazyHStack — thumbnails outside the visible range
+        // aren't in the a11y tree yet. If our target isn't rendered, arrow-
+        // key through the strip to force lazy instantiation before the
+        // existence assertion.
+        if !thumb.waitForExistence(timeout: 2) {
+            Self.app.images["PhotoPreview"].click()
+            for _ in 0..<50 {
+                if thumb.exists { break }
+                Self.app.typeKey(.rightArrow, modifierFlags: [])
+            }
+        }
         XCTAssertTrue(thumb.waitForExistence(timeout: 10),
                       "\(filename) thumbnail should exist")
 
