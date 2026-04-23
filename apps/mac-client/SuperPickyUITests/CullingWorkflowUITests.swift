@@ -113,6 +113,81 @@ final class CullingWorkflowUITests: XCTestCase {
                       "EXIF toggle button should exist")
     }
 
+    func test05_SortMenuOffersFiveOrders() {
+        let app = Self.app!
+        // SortMenu is a borderless Menu button. `.firstMatch` handles the
+        // nested Button→Button wrap on CI.
+        let sortMenu = app.buttons.matching(identifier: "SortMenu").firstMatch
+        XCTAssertTrue(sortMenu.waitForExistence(timeout: 5), "SortMenu should exist")
+        sortMenu.click()
+        Thread.sleep(forTimeInterval: 0.4)
+
+        for label in ["Filename", "Date", "Rating", "Sharpness", "Aesthetics"] {
+            XCTAssertTrue(app.menuItems[label].exists ||
+                          app.descendants(matching: .any)[label].exists,
+                          "Sort menu should offer '\(label)'")
+        }
+        // Dismiss without changing selection so later tests see default order.
+        app.typeKey(.escape, modifierFlags: [])
+        Thread.sleep(forTimeInterval: 0.3)
+    }
+
+    func test06_TopBurstFilterToggle() {
+        let app = Self.app!
+        let counter = app.staticTexts["PhotoCounter"]
+        XCTAssertTrue(counter.waitForExistence(timeout: 3))
+        let initial = counter.value as? String ?? ""
+
+        let filter = app.buttons["TopBurstFilter"]
+        XCTAssertTrue(filter.waitForExistence(timeout: 3), "TopBurstFilter should exist")
+        filter.click()
+        Thread.sleep(forTimeInterval: 0.4)
+        let filtered = counter.value as? String ?? ""
+        // Click again to reset — whether or not the count changed, the toggle
+        // must not crash and must be reversible.
+        filter.click()
+        Thread.sleep(forTimeInterval: 0.4)
+        let reset = counter.value as? String ?? ""
+        XCTAssertEqual(reset, initial,
+                       "Toggling TopBurstFilter on/off should return to initial count (initial=\(initial), toggled=\(filtered), reset=\(reset))")
+    }
+
+    func test07_PickedFilterToggle() {
+        let app = Self.app!
+        let counter = app.staticTexts["PhotoCounter"]
+        XCTAssertTrue(counter.waitForExistence(timeout: 3))
+        let initial = counter.value as? String ?? ""
+
+        let filter = app.buttons["PickedFilter"]
+        XCTAssertTrue(filter.waitForExistence(timeout: 3), "PickedFilter should exist")
+        filter.click()
+        Thread.sleep(forTimeInterval: 0.4)
+        filter.click()
+        Thread.sleep(forTimeInterval: 0.4)
+        let reset = counter.value as? String ?? ""
+        XCTAssertEqual(reset, initial,
+                       "Toggling PickedFilter on/off should return to initial count")
+    }
+
+    func test08_BrightnessKeysShowIndicator() {
+        let app = Self.app!
+        let preview = app.images["PhotoPreview"]
+        XCTAssertTrue(preview.waitForExistence(timeout: 10))
+        preview.click()
+        Thread.sleep(forTimeInterval: 0.3)
+
+        // Raise brightness a few steps; the indicator is hidden when value == 0.
+        for _ in 0..<3 { app.typeText("=") }
+        Thread.sleep(forTimeInterval: 0.3)
+        let indicator = app.staticTexts["BrightnessIndicator"]
+        XCTAssertTrue(indicator.waitForExistence(timeout: 2),
+                      "Brightness indicator should appear after pressing =")
+
+        // Return to zero so later tests aren't affected.
+        for _ in 0..<3 { app.typeText("-") }
+        Thread.sleep(forTimeInterval: 0.3)
+    }
+
     // MARK: - 10-19: Keyboard Shortcuts
 
     func test10_FullscreenToggle() {
@@ -205,6 +280,115 @@ final class CullingWorkflowUITests: XCTestCase {
         XCTAssertTrue(preview.exists, "Preview should remain after fullscreen zoom")
     }
 
+    func test15_InfoToggleKey() {
+        let app = Self.app!
+        let preview = app.images["PhotoPreview"]
+        XCTAssertTrue(preview.waitForExistence(timeout: 10))
+        preview.click()
+        Thread.sleep(forTimeInterval: 0.3)
+
+        // ExifPanel is open by default; "i" toggles it closed.
+        let panel = app.scrollViews["ExifPanel"]
+        let initiallyOpen = panel.exists
+        app.typeText("i")
+        Thread.sleep(forTimeInterval: 0.5)
+        XCTAssertNotEqual(initiallyOpen, panel.exists,
+                          "'i' key should toggle InfoBar/ExifPanel visibility")
+
+        // Restore original state so later tests see it.
+        app.typeText("i")
+        Thread.sleep(forTimeInterval: 0.5)
+    }
+
+    func test16_RatingKeysSetStars() {
+        let app = Self.app!
+        let preview = app.images["PhotoPreview"]
+        XCTAssertTrue(preview.waitForExistence(timeout: 10))
+        preview.click()
+        Thread.sleep(forTimeInterval: 0.3)
+
+        let rating = app.staticTexts["InfoBarRating"]
+        XCTAssertTrue(rating.waitForExistence(timeout: 3),
+                      "InfoBarRating element should exist in InfoBar")
+
+        // Pressing 4 sets rating to 4. Auto-advance is off by default in
+        // test fixtures, so the value should stick.
+        app.typeText("4")
+        Thread.sleep(forTimeInterval: 0.5)
+        XCTAssertEqual(rating.value as? String, "4",
+                       "After pressing '4', InfoBarRating.value should be 4 (was \(String(describing: rating.value)))")
+
+        app.typeText("0")
+        Thread.sleep(forTimeInterval: 0.5)
+    }
+
+    func test17_PKeyTogglesPick() {
+        let app = Self.app!
+        let preview = app.images["PhotoPreview"]
+        XCTAssertTrue(preview.waitForExistence(timeout: 10))
+        preview.click()
+        Thread.sleep(forTimeInterval: 0.3)
+
+        // Find the currently-selected thumbnail; the pick flag should
+        // appear inside its accessibility subtree after pressing P.
+        let thumbs = app.images.matching(NSPredicate(format: "identifier BEGINSWITH 'Thumbnail_'"))
+        XCTAssertGreaterThan(thumbs.count, 0, "At least one Thumbnail_* image should exist")
+
+        app.typeText("p")
+        Thread.sleep(forTimeInterval: 0.6)
+
+        // At least one PickFlag_* element should now exist somewhere in the
+        // grid (some photo just got picked).
+        let anyPickFlag = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier BEGINSWITH 'PickFlag_'")).firstMatch
+        XCTAssertTrue(anyPickFlag.waitForExistence(timeout: 3),
+                      "A PickFlag_* element should appear after pressing P")
+
+        // Toggle off to reset state for later tests.
+        app.typeText("p")
+        Thread.sleep(forTimeInterval: 0.5)
+    }
+
+    func test18_XKeyRejects() {
+        let app = Self.app!
+        let counter = app.staticTexts["PhotoCounter"]
+        XCTAssertTrue(counter.waitForExistence(timeout: 5))
+        let before = counter.value as? String ?? ""
+
+        let preview = app.images["PhotoPreview"]
+        preview.click()
+        Thread.sleep(forTimeInterval: 0.3)
+
+        // Rejecting hides the photo (starRating = 0, isReject flag). The
+        // visible total stays the same because reject doesn't filter by default;
+        // we assert the app doesn't crash and counter is still readable.
+        app.typeText("x")
+        Thread.sleep(forTimeInterval: 0.5)
+        XCTAssertTrue(counter.exists, "Counter should remain after reject")
+        let after = counter.value as? String ?? ""
+        XCTAssertFalse(after.isEmpty, "Counter value should still be readable: '\(before)' -> '\(after)'")
+    }
+
+    func test19_DeleteAndUndo() {
+        let app = Self.app!
+        let preview = app.images["PhotoPreview"]
+        XCTAssertTrue(preview.waitForExistence(timeout: 10))
+        preview.click()
+        Thread.sleep(forTimeInterval: 0.3)
+
+        app.typeKey(.delete, modifierFlags: [])
+        Thread.sleep(forTimeInterval: 0.5)
+
+        // The app surfaces a confirmation alert — dismiss with Cancel so the
+        // test suite's shared fixture files remain on disk for later tests.
+        let cancel = app.buttons["Cancel"]
+        if cancel.waitForExistence(timeout: 2) {
+            cancel.click()
+            Thread.sleep(forTimeInterval: 0.3)
+        }
+        XCTAssertTrue(preview.exists, "Preview should remain after delete-cancel")
+    }
+
     // MARK: - 20-29: Star Filter
 
     func test20_StarFilterBarVisible() {
@@ -246,6 +430,32 @@ final class CullingWorkflowUITests: XCTestCase {
         let resetText = counter.value as? String ?? ""
         XCTAssertEqual(resetText, initialText,
                        "After reset, counter should match initial")
+    }
+
+    // MARK: - 30-39: Export
+
+    func test30_CmdEExportPicks() {
+        let app = Self.app!
+        let preview = app.images["PhotoPreview"]
+        XCTAssertTrue(preview.waitForExistence(timeout: 10))
+        preview.click()
+        Thread.sleep(forTimeInterval: 0.3)
+
+        // Cmd+E triggers export picks. If no picks exist, the handler shows
+        // the "No Photos" alert; if picks exist, an NSSavePanel appears.
+        // Either way, dismiss whatever sheet/alert appears so subsequent
+        // tests aren't stuck on the modal.
+        app.typeKey("e", modifierFlags: .command)
+        Thread.sleep(forTimeInterval: 0.6)
+
+        // Dismiss an alert if present (OK button).
+        if app.buttons["OK"].waitForExistence(timeout: 2) {
+            app.buttons["OK"].click()
+        } else if app.buttons["Cancel"].exists {
+            app.buttons["Cancel"].click()
+        }
+        Thread.sleep(forTimeInterval: 0.3)
+        XCTAssertTrue(preview.exists, "Preview should remain after Cmd+E")
     }
 
     // MARK: - 40-49: Species Edit Panel
