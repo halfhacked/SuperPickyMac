@@ -20,7 +20,10 @@ enum ImageLoader {
         return NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
     }
 
-    private static func loadCGImage(path: String, maxPixelSize: Int?) async -> CGImage? {
+    /// Sendable-friendly decode. Useful for `async let` / `TaskGroup`
+    /// concurrency where NSImage's non-Sendable result would error.
+    /// Call sites wrap in NSImage on their own actor.
+    static func loadCGImage(path: String, maxPixelSize: Int? = nil) async -> CGImage? {
         let url = URL(fileURLWithPath: path)
         return await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
