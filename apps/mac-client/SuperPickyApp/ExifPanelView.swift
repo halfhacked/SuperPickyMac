@@ -14,7 +14,6 @@ struct ExifPanelView: View {
     var searchSpecies: (_ query: String) -> [SpeciesMatch] = { _ in [] }
 
     @State private var exifData: EXIFData?
-    @State private var loaded = false
     @State private var searchQuery: String = ""
     @State private var searchResults: [SpeciesMatch] = []
 
@@ -40,16 +39,14 @@ struct ExifPanelView: View {
         .shadow(color: .black.opacity(0.2), radius: 8, x: -2, y: 2)
         .padding(8)
         .accessibilityIdentifier("ExifPanel")
-        // Keywords come from the XMP sidecar, which the species edit panel
-        // rewrites on every edit — key on assignedSpeciesJSON so the task
-        // re-fires and re-reads keywords when species change (photo.id alone
-        // stays stable across edits).
+        // Re-fire on assignedSpeciesJSON changes too: keywords come from the
+        // XMP sidecar, which the species edit panel rewrites on every edit.
+        // Swap atomically — clearing exifData between photos flashes the
+        // species sections up and back down on every switch.
         .task(id: [photo.id.uuidString, photo.assignedSpeciesJSON ?? ""]) {
-            loaded = false
             exifData = await Task.detached {
                 EXIFReader.read(from: photo.filePath)
             }.value
-            loaded = true
         }
         .onChange(of: photo.id) {
             searchQuery = ""
@@ -61,7 +58,7 @@ struct ExifPanelView: View {
 
     @ViewBuilder
     private var exifSections: some View {
-        if loaded, let data = exifData, !data.isEmpty {
+        if let data = exifData, !data.isEmpty {
             // Camera section
             if data.cameraMake != nil || data.cameraModel != nil || data.lensModel != nil {
                 sectionHeader(config.localized("Camera"), showDivider: false)
@@ -182,7 +179,7 @@ struct ExifPanelView: View {
     private var assignedSection: some View {
         // First species header shows a divider when any EXIF content is
         // rendered above; otherwise it's the very first row in the panel.
-        let needsDivider = loaded && (exifData?.isEmpty == false)
+        let needsDivider = exifData?.isEmpty == false
         sectionHeader(config.localized("Assigned"), showDivider: needsDivider)
         if assigned.isEmpty {
             Text(config.localized("No species assigned"))
