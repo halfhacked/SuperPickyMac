@@ -234,11 +234,7 @@ struct ContentView: View {
             }
             Button(config.localized("Cancel"), role: .cancel) { pendingDeleteID = nil }
         } message: {
-            if let id = pendingDeleteID, let photo = photos.first(where: { $0.id == id }) {
-                Text(config.localized("Move to Trash?"))
-            } else {
-                Text(config.localized("Move to Trash?"))
-            }
+            Text(config.localized("Move to Trash?"))
         }
         .toolbar {
             ToolbarItem(placement: .automatic) {

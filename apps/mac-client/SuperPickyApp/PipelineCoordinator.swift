@@ -193,7 +193,6 @@ final class PipelineCoordinator: @unchecked Sendable {
         let writeBehindLanes = 4
         var writeBehindChains: [Task<Void, Never>] =
             (0..<writeBehindLanes).map { _ in Task {} }
-        @Sendable
         func writeBehind(key: String, _ work: @escaping @Sendable () async -> Void) {
             let lane = Int(UInt(bitPattern: key.hashValue) % UInt(writeBehindLanes))
             let prev = writeBehindChains[lane]
@@ -202,7 +201,6 @@ final class PipelineCoordinator: @unchecked Sendable {
                 await work()
             }
         }
-        @Sendable
         func allWriteBehindLanes() async {
             await withTaskGroup(of: Void.self) { group in
                 for chain in writeBehindChains {
@@ -215,7 +213,6 @@ final class PipelineCoordinator: @unchecked Sendable {
         // a time) so the incremental burst state, DB writes, and UI callback
         // stay coherent regardless of which order the concurrent ML tasks
         // actually complete.
-        @Sendable
         func finalize(url: URL, workTask: Task<MLWorkResult, Error>) async {
             if Task.isCancelled {
                 workTask.cancel()
@@ -248,7 +245,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                 do { try db.save(&p) } catch {
                     logger.error("Failed to save photo: \(error)")
                 }
-                try? XMPWriter.write(photo: p)
+                _ = try? XMPWriter.write(photo: p)
             }
             processedCount += 1
             let elapsedMs = Double(DispatchTime.now().uptimeNanoseconds - startedAt.uptimeNanoseconds) / 1_000_000
@@ -318,7 +315,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                                 // Only rewrite the sidecar when species
                                 // actually changed — burst-flag-only
                                 // updates don't surface in XMP.
-                                if rewriteXMP { try? XMPWriter.write(photo: p) }
+                                if rewriteXMP { _ = try? XMPWriter.write(photo: p) }
                             }
                             updated.append(burstPhotos[i])
                         }
@@ -461,7 +458,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                     var updated = photo
                     updated.isPick = shouldBePicked
                     try db.save(&updated)
-                    try? XMPWriter.write(photo: updated)
+                    _ = try? XMPWriter.write(photo: updated)
                 }
             }
         } catch {

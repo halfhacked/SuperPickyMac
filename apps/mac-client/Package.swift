@@ -1,6 +1,8 @@
 // swift-tools-version: 5.10
 import PackageDescription
 
+let warningsAsErrors: [SwiftSetting] = [.unsafeFlags(["-warnings-as-errors"])]
+
 let package = Package(
     name: "SuperPicky",
     defaultLocalization: "en",
@@ -39,7 +41,8 @@ let package = Package(
                 // Offline eBird country/region species lists (~1.8 MB)
                 // used by SpeciesFilter for GPS-based OSEA candidate filtering.
                 .copy("Resources/ebird"),
-            ]
+            ],
+            swiftSettings: warningsAsErrors
         ),
         .executableTarget(
             name: "SuperPicky",
@@ -48,7 +51,8 @@ let package = Package(
                 "SuperPickyInference",
             ],
             path: "SuperPickyApp",
-            exclude: ["en.lproj", "zh-Hans.lproj"]
+            exclude: ["en.lproj", "zh-Hans.lproj"],
+            swiftSettings: warningsAsErrors
         ),
         .testTarget(
             name: "SuperPickyTests",
@@ -56,7 +60,8 @@ let package = Package(
                 "SuperPicky",
                 "SuperPickyInference",
             ],
-            path: "SuperPickyTests"
+            path: "SuperPickyTests",
+            swiftSettings: warningsAsErrors
         ),
     ]
 )
