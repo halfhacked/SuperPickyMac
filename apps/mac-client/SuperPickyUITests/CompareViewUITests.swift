@@ -24,7 +24,7 @@ final class CompareViewUITests: XCTestCase {
 
         if FileManager.default.fileExists(atPath: sourceDir) {
             let photos = try! FileManager.default.contentsOfDirectory(atPath: sourceDir)
-                .filter { $0.hasSuffix(".jpg") || $0.hasSuffix(".ARW") }
+                .filter { $0.hasSuffix(".jpg") }
             for photo in photos {
                 try! FileManager.default.copyItem(
                     atPath: (sourceDir as NSString).appendingPathComponent(photo),
