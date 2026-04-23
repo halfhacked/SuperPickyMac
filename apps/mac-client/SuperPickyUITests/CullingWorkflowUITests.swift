@@ -479,9 +479,14 @@ final class CullingWorkflowUITests: XCTestCase {
         // existence assertion.
         if !thumb.waitForExistence(timeout: 2) {
             Self.app.images["PhotoPreview"].click()
-            for _ in 0..<50 {
+            // Arrow through both directions: the target may be before or
+            // after the current selection depending on prior-test state.
+            for direction in [XCUIKeyboardKey.rightArrow, .leftArrow] {
+                for _ in 0..<50 {
+                    if thumb.exists { break }
+                    Self.app.typeKey(direction, modifierFlags: [])
+                }
                 if thumb.exists { break }
-                Self.app.typeKey(.rightArrow, modifierFlags: [])
             }
         }
         XCTAssertTrue(thumb.waitForExistence(timeout: 10),
