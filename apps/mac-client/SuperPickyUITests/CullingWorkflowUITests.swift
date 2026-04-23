@@ -553,25 +553,14 @@ final class CullingWorkflowUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 0.3)
     }
 
-    /// Click a button even when XCUITest reports it as not hittable. The
-    /// 12-pt SF-symbol Add/Remove buttons in the candidates list sometimes
-    /// fail the accessibility hit-test on CI (ForEach row overlap + small
-    /// hit area). Hover first forces the AX tree to settle on the target's
-    /// precise frame; if still not hittable, fall back to a coordinate
-    /// click at the reported centre.
+    /// Click a button reliably on CI. The 12-pt SF-symbol Add/Remove
+    /// buttons in the candidates list race between `isHittable` returning
+    /// true and the click being dispatched — the click then fails with
+    /// "Not hittable". Always using a coordinate click at the reported
+    /// centre bypasses the a11y hit test entirely.
     private func tapButton(_ element: XCUIElement) {
         guard element.exists else { return }
-        if element.isHittable {
-            element.click()
-            return
-        }
-        element.hover()
-        Thread.sleep(forTimeInterval: 0.15)
-        if element.isHittable {
-            element.click()
-        } else {
-            element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
-        }
+        element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
     }
 
     /// Grant keyboard focus to the species search TextField. CI's smaller
@@ -737,6 +726,9 @@ final class CullingWorkflowUITests: XCTestCase {
 
     func test49_PhotoChangeClearsSearch() {
         let app = Self.app!
+        // Reset any lingering filter so the thumbnail strip shows every photo.
+        app.typeKey("0", modifierFlags: .command)
+        Thread.sleep(forTimeInterval: 0.3)
         openPanelOnEagle()
 
         let field = focusSearchField()
@@ -748,9 +740,24 @@ final class CullingWorkflowUITests: XCTestCase {
             return
         }
 
-        // Select a different photo; search term should clear.
+        // Select a different photo. Try in preference order so this test
+        // survives any prior reject/delete state drift from shared-app tests.
         ensurePanelClosed()
-        selectThumbnail(filename: "DSC00002.jpg")
+        let candidates = ["DSC00002.jpg", "DSC00003.jpg", "DSC00004.jpg", "DSC00005.jpg"]
+        var switched = false
+        for name in candidates {
+            let thumb = app.images.matching(identifier: "Thumbnail_\(name)").firstMatch
+            if thumb.exists {
+                selectThumbnail(filename: name)
+                switched = true
+                break
+            }
+        }
+        guard switched else {
+            XCTFail("No alternative thumbnail (\(candidates.joined(separator: ", "))) found to switch to")
+            return
+        }
+
         exifToggleButton.click()
         XCTAssertTrue(app.scrollViews["ExifPanel"].waitForExistence(timeout: 3))
         scrollPanelToBottom()

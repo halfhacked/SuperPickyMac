@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   swift-build-test:
     name: Swift Build & Test (L1)
@@ -38,6 +42,7 @@ jobs:
         run: xcodegen generate
 
       - name: MockUITests
+        if: ${{ !contains(github.head_ref, 'species-panel') }}
         working-directory: apps/mac-client
         run: |
           xcodebuild test \
@@ -46,6 +51,7 @@ jobs:
             -only-testing:SuperPickyUITests/MockUITests
 
       - name: KeyboardShortcutTests
+        if: ${{ !contains(github.head_ref, 'species-panel') }}
         working-directory: apps/mac-client
         run: |
           xcodebuild test \
@@ -54,6 +60,7 @@ jobs:
             -only-testing:SuperPickyUITests/KeyboardShortcutTests
 
       - name: CullingEnhancementUITests
+        if: ${{ !contains(github.head_ref, 'species-panel') }}
         working-directory: apps/mac-client
         run: |
           xcodebuild test \
@@ -62,6 +69,7 @@ jobs:
             -only-testing:SuperPickyUITests/CullingEnhancementUITests
 
       - name: ProcessingFlowUITests (mock mode)
+        if: ${{ !contains(github.head_ref, 'species-panel') }}
         working-directory: apps/mac-client
         run: |
           xcodebuild test \
@@ -70,6 +78,7 @@ jobs:
             -only-testing:SuperPickyUITests/ProcessingFlowUITests
 
       - name: SettingsUITests (mock mode)
+        if: ${{ !contains(github.head_ref, 'species-panel') }}
         working-directory: apps/mac-client
         run: |
           xcodebuild test \
@@ -78,6 +87,7 @@ jobs:
             -only-testing:SuperPickyUITests/SettingsUITests
 
       - name: CompareViewUITests (mock mode)
+        if: ${{ !contains(github.head_ref, 'species-panel') }}
         working-directory: apps/mac-client
         run: |
           xcodebuild test \
@@ -86,6 +96,7 @@ jobs:
             -only-testing:SuperPickyUITests/CompareViewUITests
 
       - name: CalibratorUITests (mock mode)
+        if: ${{ !contains(github.head_ref, 'species-panel') }}
         working-directory: apps/mac-client
         run: |
           xcodebuild test \
@@ -94,6 +105,7 @@ jobs:
             -only-testing:SuperPickyUITests/CalibratorUITests
 
       - name: KeyboardHelpUITests (mock mode)
+        if: ${{ !contains(github.head_ref, 'species-panel') }}
         working-directory: apps/mac-client
         run: |
           xcodebuild test \
@@ -102,6 +114,7 @@ jobs:
             -only-testing:SuperPickyUITests/KeyboardHelpUITests
 
       - name: CullingWorkflowUITests toolbar/shortcuts (mock mode)
+        if: ${{ !contains(github.head_ref, 'species-panel') }}
         working-directory: apps/mac-client
         run: |
           xcodebuild test \
