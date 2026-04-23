@@ -119,6 +119,12 @@ final class SettingsUITests: XCTestCase {
         XCTAssertTrue(window.waitForExistence(timeout: 3),
                       "Settings window should open with ⌘,")
 
+        // Diagnostic dump: print the whole a11y tree once so CI logs show
+        // the element types/identifiers we need to target on this macOS
+        // runner. Remove after SettingsUITests is stable.
+        print("=== Settings a11y tree (diagnostic) ===\n\(window.debugDescription)\n=== end tree ===")
+        print("=== Entire app a11y tree ===\n\(app.debugDescription)\n=== end app tree ===")
+
         for label in ["General", "Culling", "Bird ID", "Advanced"] {
             XCTAssertTrue(app.descendants(matching: .any)[label].exists,
                           "Tab '\(label)' should be present in Settings")
