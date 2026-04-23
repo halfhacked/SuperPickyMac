@@ -121,8 +121,8 @@ jobs:
             -only-testing:SuperPickyUITests/CullingWorkflowUITests/test13_ArrowKeyNavigation \
             -only-testing:SuperPickyUITests/CullingWorkflowUITests/test14_FullscreenZoom \
             -only-testing:SuperPickyUITests/CullingWorkflowUITests/test15_InfoToggleKey \
-            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test16_RatingKeysSetStars \
-            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test17_PKeyTogglesPick \
+            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test16_RatingKeysDoNotCrash \
+            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test17_PKeyDoesNotCrash \
             -only-testing:SuperPickyUITests/CullingWorkflowUITests/test18_XKeyRejects \
             -only-testing:SuperPickyUITests/CullingWorkflowUITests/test19_DeleteAndUndo \
             -only-testing:SuperPickyUITests/CullingWorkflowUITests/test20_StarFilterBarVisible \
