@@ -368,7 +368,7 @@ import ImageIO
             .deletingLastPathComponent() // project root
             .appendingPathComponent("test-photos")
 
-        let testPhoto = testPhotosDir.appendingPathComponent("DSC00001.jpg")
+        let testPhoto = testPhotosDir.appendingPathComponent("DSC09177.jpg")
         guard FileManager.default.fileExists(atPath: testPhoto.path) else {
             return // Skip if test-photos not available
         }

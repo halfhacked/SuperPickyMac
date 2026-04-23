@@ -47,5 +47,10 @@ apps/mac-client/SuperPicky.xcodeproj/
 # User-picked photo output
 Picked/
 
+# test-photos runtime artifacts (sidecars + per-folder DB written by the app)
+test-photos/*.xmp
+test-photos/.report.db*
+test-photos/.DS_Store
+
 # LLVM coverage / profiling output
 *.profraw
