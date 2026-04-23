@@ -26,25 +26,39 @@ struct MockInferenceClientForUI: InferenceClient {
         let ebird: String
     }
 
-    // Real species results from preen dry-run on test-photos.
+    // Mock species fixtures keyed by filename stem.
+    // Files not in the map return "bird, no species" (tests the unidentified-bird path).
     private static let speciesByFile: [String: Fixture] = [
-        "DSC00001": Fixture(scientific: "Haliaeetus leucocephalus", common: "Bald Eagle",         confidence: 0.98, cn: "白头海雕", pinyin: "baitouhaidiao", ebird: "baleag"),
-        "DSC00003": Fixture(scientific: "Haliaeetus leucocephalus", common: "Bald Eagle",         confidence: 0.98, cn: "白头海雕", pinyin: "baitouhaidiao", ebird: "baleag"),
-        "DSC00005": Fixture(scientific: "Haliaeetus leucocephalus", common: "Bald Eagle",         confidence: 0.97, cn: "白头海雕", pinyin: "baitouhaidiao", ebird: "baleag"),
-        "DSC00006": Fixture(scientific: "Haliaeetus leucocephalus", common: "Bald Eagle",         confidence: 0.98, cn: "白头海雕", pinyin: "baitouhaidiao", ebird: "baleag"),
-        "DSC00007": Fixture(scientific: "Haliaeetus leucocephalus", common: "Bald Eagle",         confidence: 0.97, cn: "白头海雕", pinyin: "baitouhaidiao", ebird: "baleag"),
-        "DSC00008": Fixture(scientific: "Haliaeetus leucocephalus", common: "Bald Eagle",         confidence: 0.97, cn: "白头海雕", pinyin: "baitouhaidiao", ebird: "baleag"),
-        "DSC00017": Fixture(scientific: "Haliaeetus leucocephalus", common: "Bald Eagle",         confidence: 0.99, cn: "白头海雕", pinyin: "baitouhaidiao", ebird: "baleag"),
-        "DSC00022": Fixture(scientific: "Haliaeetus leucocephalus", common: "Bald Eagle",         confidence: 0.96, cn: "白头海雕", pinyin: "baitouhaidiao", ebird: "baleag"),
-        // DSC00029: bird detected, not identified
-        // DSC00035: no birds
-        "DSC00037": Fixture(scientific: "Gavia immer",              common: "Common Loon",        confidence: 0.81, cn: "普通潜鸟", pinyin: "putongqianniao", ebird: "comloo"),
-        "DSC00045": Fixture(scientific: "Bucephala islandica",      common: "Barrow's Goldeneye", confidence: 0.98, cn: "巴氏鹊鸭", pinyin: "bashiqueya",     ebird: "bargol"),
-        "DSC00046": Fixture(scientific: "Bucephala islandica",      common: "Barrow's Goldeneye", confidence: 0.98, cn: "巴氏鹊鸭", pinyin: "bashiqueya",     ebird: "bargol"),
-        "DSC00050": Fixture(scientific: "Gavia immer",              common: "Common Loon",        confidence: 0.95, cn: "普通潜鸟", pinyin: "putongqianniao", ebird: "comloo"),
-        "DSC00090": Fixture(scientific: "Gavia immer",              common: "Common Loon",        confidence: 0.95, cn: "普通潜鸟", pinyin: "putongqianniao", ebird: "comloo"),
-        "DSC00168": Fixture(scientific: "Cepphus columba",          common: "Pigeon Guillemot",   confidence: 1.0,  cn: "海鸽",     pinyin: "haige",          ebird: "piggui"),
-        "DSC00169": Fixture(scientific: "Cepphus columba",          common: "Pigeon Guillemot",   confidence: 1.0,  cn: "海鸽",     pinyin: "haige",          ebird: "piggui"),
+        // Anna's Hummingbird — burst A1 (09176-80), burst A2 (09199-202), singles (09407, 09660)
+        "DSC09176": Fixture(scientific: "Calypte anna",             common: "Anna's Hummingbird", confidence: 0.97, cn: "安娜蜂鸟", pinyin: "annafengniao",   ebird: "annhum"),
+        "DSC09177": Fixture(scientific: "Calypte anna",             common: "Anna's Hummingbird", confidence: 0.98, cn: "安娜蜂鸟", pinyin: "annafengniao",   ebird: "annhum"),
+        "DSC09178": Fixture(scientific: "Calypte anna",             common: "Anna's Hummingbird", confidence: 0.98, cn: "安娜蜂鸟", pinyin: "annafengniao",   ebird: "annhum"),
+        "DSC09179": Fixture(scientific: "Calypte anna",             common: "Anna's Hummingbird", confidence: 0.97, cn: "安娜蜂鸟", pinyin: "annafengniao",   ebird: "annhum"),
+        "DSC09180": Fixture(scientific: "Calypte anna",             common: "Anna's Hummingbird", confidence: 0.98, cn: "安娜蜂鸟", pinyin: "annafengniao",   ebird: "annhum"),
+        "DSC09199": Fixture(scientific: "Calypte anna",             common: "Anna's Hummingbird", confidence: 0.96, cn: "安娜蜂鸟", pinyin: "annafengniao",   ebird: "annhum"),
+        "DSC09200": Fixture(scientific: "Calypte anna",             common: "Anna's Hummingbird", confidence: 0.97, cn: "安娜蜂鸟", pinyin: "annafengniao",   ebird: "annhum"),
+        "DSC09201": Fixture(scientific: "Calypte anna",             common: "Anna's Hummingbird", confidence: 0.97, cn: "安娜蜂鸟", pinyin: "annafengniao",   ebird: "annhum"),
+        "DSC09202": Fixture(scientific: "Calypte anna",             common: "Anna's Hummingbird", confidence: 0.98, cn: "安娜蜂鸟", pinyin: "annafengniao",   ebird: "annhum"),
+        "DSC09407": Fixture(scientific: "Calypte anna",             common: "Anna's Hummingbird", confidence: 0.95, cn: "安娜蜂鸟", pinyin: "annafengniao",   ebird: "annhum"),
+        "DSC09660": Fixture(scientific: "Calypte anna",             common: "Anna's Hummingbird", confidence: 0.96, cn: "安娜蜂鸟", pinyin: "annafengniao",   ebird: "annhum"),
+        // Bald Eagle — burst B1 (09968-72), burst B2 (09993-96), singles (09985, 09991)
+        "DSC09968": Fixture(scientific: "Haliaeetus leucocephalus", common: "Bald Eagle",         confidence: 0.98, cn: "白头海雕", pinyin: "baitouhaidiao", ebird: "baleag"),
+        "DSC09969": Fixture(scientific: "Haliaeetus leucocephalus", common: "Bald Eagle",         confidence: 0.98, cn: "白头海雕", pinyin: "baitouhaidiao", ebird: "baleag"),
+        "DSC09970": Fixture(scientific: "Haliaeetus leucocephalus", common: "Bald Eagle",         confidence: 0.97, cn: "白头海雕", pinyin: "baitouhaidiao", ebird: "baleag"),
+        "DSC09971": Fixture(scientific: "Haliaeetus leucocephalus", common: "Bald Eagle",         confidence: 0.98, cn: "白头海雕", pinyin: "baitouhaidiao", ebird: "baleag"),
+        "DSC09972": Fixture(scientific: "Haliaeetus leucocephalus", common: "Bald Eagle",         confidence: 0.99, cn: "白头海雕", pinyin: "baitouhaidiao", ebird: "baleag"),
+        "DSC09985": Fixture(scientific: "Haliaeetus leucocephalus", common: "Bald Eagle",         confidence: 0.96, cn: "白头海雕", pinyin: "baitouhaidiao", ebird: "baleag"),
+        "DSC09991": Fixture(scientific: "Haliaeetus leucocephalus", common: "Bald Eagle",         confidence: 0.97, cn: "白头海雕", pinyin: "baitouhaidiao", ebird: "baleag"),
+        "DSC09993": Fixture(scientific: "Haliaeetus leucocephalus", common: "Bald Eagle",         confidence: 0.98, cn: "白头海雕", pinyin: "baitouhaidiao", ebird: "baleag"),
+        "DSC09994": Fixture(scientific: "Haliaeetus leucocephalus", common: "Bald Eagle",         confidence: 0.97, cn: "白头海雕", pinyin: "baitouhaidiao", ebird: "baleag"),
+        "DSC09995": Fixture(scientific: "Haliaeetus leucocephalus", common: "Bald Eagle",         confidence: 0.98, cn: "白头海雕", pinyin: "baitouhaidiao", ebird: "baleag"),
+        "DSC09996": Fixture(scientific: "Haliaeetus leucocephalus", common: "Bald Eagle",         confidence: 0.99, cn: "白头海雕", pinyin: "baitouhaidiao", ebird: "baleag"),
+        // Remaining DSC09950-DSC09967 intentionally absent → bird detected but not identified
+    ]
+
+    // No bird detected at all (matches NULL birdConfidence in the source DB).
+    private static let noBirdFiles: Set<String> = [
+        "DSC09955", "DSC09960", "DSC09961", "DSC09962", "DSC09964", "DSC09967",
     ]
 
     // thresholdUsed "country" so the candidate rows render the "Region"
@@ -62,7 +76,7 @@ struct MockInferenceClientForUI: InferenceClient {
         let filename = (filePath as NSString).lastPathComponent
         let stem = (filename as NSString).deletingPathExtension
 
-        if stem == "DSC00035" {
+        if Self.noBirdFiles.contains(stem) {
             return IdentifyResponse(species: [], birds: nil, totalDetected: 0)
         }
 

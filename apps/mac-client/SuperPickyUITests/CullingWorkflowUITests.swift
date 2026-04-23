@@ -32,7 +32,7 @@ final class CullingWorkflowUITests: XCTestCase {
 
         if FileManager.default.fileExists(atPath: sourceDir) {
             let photos = try! FileManager.default.contentsOfDirectory(atPath: sourceDir)
-                .filter { $0.hasSuffix(".jpg") }
+                .filter { $0.hasSuffix(".jpg") || $0.hasSuffix(".ARW") }
             for photo in photos {
                 try! FileManager.default.copyItem(
                     atPath: (sourceDir as NSString).appendingPathComponent(photo),
@@ -489,7 +489,7 @@ final class CullingWorkflowUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 0.5)
     }
 
-    private func selectEaglePhoto() { selectThumbnail(filename: "DSC00001.jpg") }
+    private func selectEaglePhoto() { selectThumbnail(filename: "DSC09968.ARW") }
 
     // SearchField sits at the bottom of a scrollable panel and can be pruned
     // from the accessibility tree when scrolled out of view. The root
@@ -714,8 +714,8 @@ final class CullingWorkflowUITests: XCTestCase {
     func test48_EmptyAssignedStateShown() {
         let app = Self.app!
         ensurePanelClosed()
-        // DSC00029 is a bird-but-unidentified photo in the mock fixture.
-        selectThumbnail(filename: "DSC00029.jpg")
+        // DSC09950 is a bird-but-unidentified photo in the mock fixture.
+        selectThumbnail(filename: "DSC09950.ARW")
         exifToggleButton.click()
         XCTAssertTrue(app.scrollViews["ExifPanel"].waitForExistence(timeout: 3))
         scrollPanelToBottom()
@@ -743,7 +743,7 @@ final class CullingWorkflowUITests: XCTestCase {
         // Select a different photo. Try in preference order so this test
         // survives any prior reject/delete state drift from shared-app tests.
         ensurePanelClosed()
-        let candidates = ["DSC00002.jpg", "DSC00003.jpg", "DSC00004.jpg", "DSC00005.jpg"]
+        let candidates = ["DSC09969.jpg", "DSC09970.jpg", "DSC09971.jpg", "DSC09972.jpg"]
         var switched = false
         for name in candidates {
             let thumb = app.images.matching(identifier: "Thumbnail_\(name)").firstMatch
@@ -831,7 +831,7 @@ final class CullingWorkflowUITests: XCTestCase {
 
     func test53_SpeciesEditWritesToXMPSidecar() {
         let app = Self.app!
-        let sidecarPath = (Self.testDir! as NSString).appendingPathComponent("DSC00001.xmp")
+        let sidecarPath = (Self.testDir! as NSString).appendingPathComponent("DSC09968.xmp")
         openPanelOnEagle()
 
         tapButton(app.buttons["SpeciesEditPanel_Add_goleag"])
@@ -862,7 +862,7 @@ final class CullingWorkflowUITests: XCTestCase {
         ensurePanelClosed()
         selectEaglePhoto()
 
-        let sidecarPath = (Self.testDir! as NSString).appendingPathComponent("DSC00001.xmp")
+        let sidecarPath = (Self.testDir! as NSString).appendingPathComponent("DSC09968.xmp")
         XCTAssertTrue(waitForSidecar(at: sidecarPath, containing: "Bald Eagle", timeout: 5))
 
         let baldKeyword = app.staticTexts["ExifKeyword_Bald Eagle"]
