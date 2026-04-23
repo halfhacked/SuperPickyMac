@@ -71,7 +71,7 @@ struct ThumbnailCell: View {
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 2))
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .padding(2)
-                    .transition(.scale.combined(with: .opacity))
+                    .transition(.opacity)
             }
 
             // Burst best bottom-right
@@ -92,7 +92,7 @@ struct ThumbnailCell: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
                 .padding(2)
         }
-        .animation(.spring(duration: 0.3, bounce: 0.4), value: photo.isPick)
+        .animation(.easeInOut(duration: 0.2), value: photo.isPick)
         .clipShape(RoundedRectangle(cornerRadius: 4))
         .overlay(
             RoundedRectangle(cornerRadius: 4)
