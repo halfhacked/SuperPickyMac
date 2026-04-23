@@ -69,6 +69,67 @@ jobs:
             -destination 'platform=macOS' \
             -only-testing:SuperPickyUITests/ProcessingFlowUITests
 
+      - name: SettingsUITests (mock mode)
+        working-directory: apps/mac-client
+        run: |
+          xcodebuild test \
+            -scheme SuperPicky \
+            -destination 'platform=macOS' \
+            -only-testing:SuperPickyUITests/SettingsUITests
+
+      - name: CompareViewUITests (mock mode)
+        working-directory: apps/mac-client
+        run: |
+          xcodebuild test \
+            -scheme SuperPicky \
+            -destination 'platform=macOS' \
+            -only-testing:SuperPickyUITests/CompareViewUITests
+
+      - name: CalibratorUITests (mock mode)
+        working-directory: apps/mac-client
+        run: |
+          xcodebuild test \
+            -scheme SuperPicky \
+            -destination 'platform=macOS' \
+            -only-testing:SuperPickyUITests/CalibratorUITests
+
+      - name: KeyboardHelpUITests (mock mode)
+        working-directory: apps/mac-client
+        run: |
+          xcodebuild test \
+            -scheme SuperPicky \
+            -destination 'platform=macOS' \
+            -only-testing:SuperPickyUITests/KeyboardHelpUITests
+
+      - name: CullingWorkflowUITests toolbar/shortcuts (mock mode)
+        working-directory: apps/mac-client
+        run: |
+          xcodebuild test \
+            -scheme SuperPicky \
+            -destination 'platform=macOS' \
+            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test01_SidebarRatingLabels \
+            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test02_PreviewAndInfoBar \
+            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test03_ExportMenuExists \
+            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test04_ExifToggle \
+            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test05_SortMenuOffersFiveOrders \
+            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test06_TopBurstFilterToggle \
+            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test07_PickedFilterToggle \
+            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test08_BrightnessKeysShowIndicator \
+            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test10_FullscreenToggle \
+            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test11_FullscreenArrowNavigation \
+            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test12_ZoomDoesNotCrash \
+            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test13_ArrowKeyNavigation \
+            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test14_FullscreenZoom \
+            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test15_InfoToggleKey \
+            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test16_RatingKeysDoNotCrash \
+            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test17_PKeyDoesNotCrash \
+            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test18_XKeyRejects \
+            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test19_DeleteAndUndo \
+            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test20_StarFilterBarVisible \
+            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test21_PhotoCounterVisible \
+            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test22_StarFilterAndReset \
+            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test30_CmdEExportPicks
+
       - name: SpeciesEditPanelUITests (mock mode)
         working-directory: apps/mac-client
         run: |

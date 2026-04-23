@@ -177,6 +177,7 @@ struct ContentView: View {
                         Text("EV \(brightnessAdj > 0 ? "+" : "")\(String(format: "%.2f", brightnessAdj))")
                             .font(.caption)
                             .foregroundStyle(.orange)
+                            .accessibilityIdentifier("BrightnessIndicator")
                     }
 
                     Text("\(filteredPhotos.count) of \(photos.count)")

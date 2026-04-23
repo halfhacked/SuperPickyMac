@@ -72,6 +72,7 @@ struct ThumbnailCell: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .padding(2)
                     .transition(.opacity)
+                    .accessibilityIdentifier("PickFlag_\(photo.filename)")
             }
 
             // Burst best bottom-right
