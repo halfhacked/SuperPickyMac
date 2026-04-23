@@ -53,6 +53,9 @@ final class CullingWorkflowUITests: XCTestCase {
             if app.progressIndicators.count == 0 { break }
             Thread.sleep(forTimeInterval: 0.5)
         }
+        // PhotoPreview enters the a11y tree only after the auto-selected
+        // photo's full-res decode completes — CI lags on the ~3 MB fixture JPGs.
+        _ = app.images["PhotoPreview"].waitForExistence(timeout: 15)
         Thread.sleep(forTimeInterval: 1)
     }
 
