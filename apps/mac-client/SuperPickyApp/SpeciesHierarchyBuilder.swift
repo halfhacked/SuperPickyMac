@@ -84,9 +84,17 @@ struct SpeciesHierarchyBuilder {
                 return BurstGroupEntry(
                     id: groupID,
                     count: groupPhotos.count,
+                    pickCount: groupPhotos.lazy.filter(\.isPick).count,
                     bestFilename: best?.filename ?? groupPhotos.first?.filename
                 )
             }.sorted { $0.count > $1.count }
+
+            var singlePicks = 0
+            var speciesPicks = 0
+            for photo in bucket.photos where photo.isPick {
+                speciesPicks += 1
+                if photo.burstGroupID == nil { singlePicks += 1 }
+            }
 
             let label: String = {
                 if bucket.isUnidentified { return String(localized: "Unidentified") }
@@ -99,8 +107,10 @@ struct SpeciesHierarchyBuilder {
                 name: label,
                 cnName: bucket.cnName,
                 count: bucket.photos.count,
+                picks: speciesPicks,
                 burstGroups: burstGroups,
                 singlePhotos: singleCount,
+                singlePicks: singlePicks,
                 isUnidentified: bucket.isUnidentified
             )
         }
@@ -133,6 +143,7 @@ struct SpeciesHierarchyBuilder {
     private static func addPrimary(to entries: inout [SpeciesEntry], of photo: Photo) {
         let primary = photo.assignedSpecies.first
         let key = bucketKey(for: photo)
+        let pickDelta = photo.isPick ? 1 : 0
         if let idx = indexOfBucket(in: entries, key: key) {
             let existing = entries[idx]
             entries[idx] = SpeciesEntry(
@@ -141,8 +152,10 @@ struct SpeciesHierarchyBuilder {
                 name: existing.name,
                 cnName: existing.cnName ?? primary?.cnName,
                 count: existing.count + 1,
+                picks: existing.picks + pickDelta,
                 burstGroups: existing.burstGroups,
                 singlePhotos: existing.singlePhotos + 1,
+                singlePicks: existing.singlePicks + pickDelta,
                 isUnidentified: existing.isUnidentified
             )
         } else {
@@ -156,8 +169,10 @@ struct SpeciesHierarchyBuilder {
                 name: name,
                 cnName: primary?.cnName,
                 count: 1,
+                picks: pickDelta,
                 burstGroups: [],
                 singlePhotos: 1,
+                singlePicks: pickDelta,
                 isUnidentified: !hasSpecies
             ))
         }
@@ -171,16 +186,71 @@ struct SpeciesHierarchyBuilder {
             entries.remove(at: idx)
             return
         }
+        let pickDelta = photo.isPick ? 1 : 0
         entries[idx] = SpeciesEntry(
             speciesID: existing.speciesID,
             scientificName: existing.scientificName,
             name: existing.name,
             cnName: existing.cnName,
             count: max(0, existing.count - 1),
+            picks: max(0, existing.picks - pickDelta),
             burstGroups: existing.burstGroups,
             singlePhotos: max(0, existing.singlePhotos - 1),
+            singlePicks: max(0, existing.singlePicks - pickDelta),
             isUnidentified: existing.isUnidentified
         )
+    }
+
+    /// Apply a pick-toggle delta to every bucket (species + any burst/singles
+    /// counter) the photo participates in. Multi-species photos contribute to
+    /// every tagged bucket, matching `build`'s fan-out.
+    static func applyPickToggle(
+        entries: [SpeciesEntry],
+        photo: Photo,
+        newIsPick: Bool
+    ) -> [SpeciesEntry] {
+        let delta = newIsPick ? 1 : -1
+        var updated = entries
+
+        let keys: Set<String>
+        if photo.assignedSpecies.isEmpty {
+            keys = [unidentifiedKey]
+        } else {
+            keys = Set(photo.assignedSpecies.map(\.speciesID))
+        }
+
+        for key in keys {
+            guard let idx = indexOfBucket(in: updated, key: key) else { continue }
+            let existing = updated[idx]
+            let newBursts: [BurstGroupEntry]
+            if let groupID = photo.burstGroupID {
+                newBursts = existing.burstGroups.map { burst in
+                    guard burst.id == groupID else { return burst }
+                    return BurstGroupEntry(
+                        id: burst.id,
+                        count: burst.count,
+                        pickCount: max(0, burst.pickCount + delta),
+                        bestFilename: burst.bestFilename
+                    )
+                }
+            } else {
+                newBursts = existing.burstGroups
+            }
+            let singleDelta = photo.burstGroupID == nil ? delta : 0
+            updated[idx] = SpeciesEntry(
+                speciesID: existing.speciesID,
+                scientificName: existing.scientificName,
+                name: existing.name,
+                cnName: existing.cnName,
+                count: existing.count,
+                picks: max(0, existing.picks + delta),
+                burstGroups: newBursts,
+                singlePhotos: existing.singlePhotos,
+                singlePicks: max(0, existing.singlePicks + singleDelta),
+                isUnidentified: existing.isUnidentified
+            )
+        }
+        return updated
     }
 
     /// Unidentified always first, then by the chosen sort order. Name sort
