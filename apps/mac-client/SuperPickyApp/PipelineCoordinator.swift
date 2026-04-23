@@ -562,14 +562,19 @@ final class PipelineCoordinator: @unchecked Sendable {
             Float(bird.bbox.maxX), Float(bird.bbox.maxY),
         ])
 
-        if let top = identifyResult.species.first {
-            // Writing `assignedSpecies` mirrors the primary SpeciesMatch
-            // into the scalar species* columns, so we avoid setting them
-            // twice.
-            photo.assignedSpecies = [top]
-        } else {
-            photo.assignedSpecies = []
+        // Keep every identified species from every YOLO detection (preen
+        // parity — `preen/detector.py` appends each detection's top-1 and
+        // the caller writes them all as keywords). Dedupe by `speciesID`
+        // keeping the highest confidence; sort descending so the scalar
+        // species* columns mirror the *most confident* detection, not
+        // merely the first one YOLO returned.
+        var uniqueByID: [String: SpeciesMatch] = [:]
+        for match in identifyResult.species {
+            if let existing = uniqueByID[match.speciesID],
+               existing.confidence >= match.confidence { continue }
+            uniqueByID[match.speciesID] = match
         }
+        photo.assignedSpecies = uniqueByID.values.sorted { $0.confidence > $1.confidence }
         if let top5 = identifyResult.top5 {
             photo.speciesTop5JSON = Self.encodeJSON(top5)
         }
