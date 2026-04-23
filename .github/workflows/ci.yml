@@ -109,7 +109,7 @@ jobs:
             -destination 'platform=macOS' \
             -only-testing:SuperPickyUITests/CullingWorkflowUITests/test01_SidebarRatingLabels \
             -only-testing:SuperPickyUITests/CullingWorkflowUITests/test02_PreviewAndInfoBar \
-            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test03_ExportPicksButtonExists \
+            -only-testing:SuperPickyUITests/CullingWorkflowUITests/test03_ExportMenuExists \
             -only-testing:SuperPickyUITests/CullingWorkflowUITests/test04_ExifToggle \
             -only-testing:SuperPickyUITests/CullingWorkflowUITests/test05_SortMenuOffersFiveOrders \
             -only-testing:SuperPickyUITests/CullingWorkflowUITests/test06_TopBurstFilterToggle \

@@ -98,12 +98,15 @@ final class CullingWorkflowUITests: XCTestCase {
                        "Pencil should not appear for AI-rated photos")
     }
 
-    func test03_ExportPicksButtonExists() {
+    func test03_ExportMenuExists() {
         let app = Self.app!
-        let exportButton = app.buttons["ExportPicksButton"]
-        XCTAssertTrue(exportButton.waitForExistence(timeout: 10),
-                      "Export Picks button should exist in toolbar")
-        XCTAssertTrue(exportButton.isEnabled)
+        // Toolbar was refactored from a single Export Picks Button into a
+        // Menu (Export Picks / Export All Visible); the identifier on the
+        // Menu is "ExportMenu". `.firstMatch` handles CI's nested wrap.
+        let exportMenu = app.buttons.matching(identifier: "ExportMenu").firstMatch
+        XCTAssertTrue(exportMenu.waitForExistence(timeout: 10),
+                      "Export menu should exist in toolbar")
+        XCTAssertTrue(exportMenu.isEnabled)
     }
 
     func test04_ExifToggle() {
@@ -115,12 +118,16 @@ final class CullingWorkflowUITests: XCTestCase {
 
     func test05_SortMenuOffersFiveOrders() {
         let app = Self.app!
-        // SortMenu is a borderless Menu button. `.firstMatch` handles the
-        // nested Button→Button wrap on CI.
-        let sortMenu = app.buttons.matching(identifier: "SortMenu").firstMatch
-        XCTAssertTrue(sortMenu.waitForExistence(timeout: 5), "SortMenu should exist")
-        sortMenu.click()
-        Thread.sleep(forTimeInterval: 0.4)
+        // SwiftUI Menu renders as a popUpButton on macOS, not a plain
+        // Button. The identifier is applied to the Menu's label.
+        let sortMenu = app.descendants(matching: .any).matching(identifier: "SortMenu").firstMatch
+        XCTAssertTrue(sortMenu.waitForExistence(timeout: 5), "SortMenu element should exist")
+        if sortMenu.isHittable {
+            sortMenu.click()
+        } else {
+            sortMenu.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+        }
+        Thread.sleep(forTimeInterval: 0.6)
 
         for label in ["Filename", "Date", "Rating", "Sharpness", "Aesthetics"] {
             XCTAssertTrue(app.menuItems[label].exists ||
@@ -307,7 +314,10 @@ final class CullingWorkflowUITests: XCTestCase {
         preview.click()
         Thread.sleep(forTimeInterval: 0.3)
 
-        let rating = app.staticTexts["InfoBarRating"]
+        // StarRatingView (under InfoBarRating identifier) groups 5 Images
+        // and has accessibilityElement(children: .ignore) + accessibilityValue.
+        // It surfaces as a non-static-text element; search across all types.
+        let rating = app.descendants(matching: .any).matching(identifier: "InfoBarRating").firstMatch
         XCTAssertTrue(rating.waitForExistence(timeout: 3),
                       "InfoBarRating element should exist in InfoBar")
 
@@ -329,22 +339,24 @@ final class CullingWorkflowUITests: XCTestCase {
         preview.click()
         Thread.sleep(forTimeInterval: 0.3)
 
-        // Find the currently-selected thumbnail; the pick flag should
-        // appear inside its accessibility subtree after pressing P.
         let thumbs = app.images.matching(NSPredicate(format: "identifier BEGINSWITH 'Thumbnail_'"))
         XCTAssertGreaterThan(thumbs.count, 0, "At least one Thumbnail_* image should exist")
 
+        // Count picks before (some mock photos may already be picks).
+        let picksBefore = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier BEGINSWITH 'PickFlag_'")).count
+
         app.typeText("p")
-        Thread.sleep(forTimeInterval: 0.6)
+        Thread.sleep(forTimeInterval: 1.0)
 
-        // At least one PickFlag_* element should now exist somewhere in the
-        // grid (some photo just got picked).
-        let anyPickFlag = app.descendants(matching: .any).matching(
-            NSPredicate(format: "identifier BEGINSWITH 'PickFlag_'")).firstMatch
-        XCTAssertTrue(anyPickFlag.waitForExistence(timeout: 3),
-                      "A PickFlag_* element should appear after pressing P")
+        // Count picks after — count should have changed (added or removed).
+        let picksAfter = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier BEGINSWITH 'PickFlag_'")).count
 
-        // Toggle off to reset state for later tests.
+        XCTAssertNotEqual(picksBefore, picksAfter,
+                          "P key should change the number of PickFlag_* elements (before=\(picksBefore), after=\(picksAfter))")
+
+        // Toggle off to restore original count.
         app.typeText("p")
         Thread.sleep(forTimeInterval: 0.5)
     }
@@ -377,16 +389,29 @@ final class CullingWorkflowUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 0.3)
 
         app.typeKey(.delete, modifierFlags: [])
-        Thread.sleep(forTimeInterval: 0.5)
+        Thread.sleep(forTimeInterval: 0.6)
 
-        // The app surfaces a confirmation alert — dismiss with Cancel so the
-        // test suite's shared fixture files remain on disk for later tests.
-        let cancel = app.buttons["Cancel"]
-        if cancel.waitForExistence(timeout: 2) {
-            cancel.click()
-            Thread.sleep(forTimeInterval: 0.3)
-        }
+        // The app surfaces a confirmation alert with OK/Cancel. XCUIApplication
+        // may see several "Cancel" buttons across windows/sheets; restrict
+        // to the front-most dialog via `dialogs.firstMatch`.
+        dismissConfirmDialogIfPresent()
         XCTAssertTrue(preview.exists, "Preview should remain after delete-cancel")
+    }
+
+    private func dismissConfirmDialogIfPresent() {
+        let app = Self.app!
+        let dialog = app.dialogs.firstMatch
+        if dialog.waitForExistence(timeout: 2) {
+            let cancel = dialog.buttons["Cancel"]
+            let ok = dialog.buttons["OK"]
+            if cancel.exists { cancel.click() }
+            else if ok.exists { ok.click() }
+            Thread.sleep(forTimeInterval: 0.3)
+            return
+        }
+        // Fallback: escape dismisses most SwiftUI sheets/alerts.
+        app.typeKey(.escape, modifierFlags: [])
+        Thread.sleep(forTimeInterval: 0.3)
     }
 
     // MARK: - 20-29: Star Filter
@@ -443,18 +468,10 @@ final class CullingWorkflowUITests: XCTestCase {
 
         // Cmd+E triggers export picks. If no picks exist, the handler shows
         // the "No Photos" alert; if picks exist, an NSSavePanel appears.
-        // Either way, dismiss whatever sheet/alert appears so subsequent
-        // tests aren't stuck on the modal.
+        // Either way, dismiss via the front-most dialog/sheet.
         app.typeKey("e", modifierFlags: .command)
-        Thread.sleep(forTimeInterval: 0.6)
-
-        // Dismiss an alert if present (OK button).
-        if app.buttons["OK"].waitForExistence(timeout: 2) {
-            app.buttons["OK"].click()
-        } else if app.buttons["Cancel"].exists {
-            app.buttons["Cancel"].click()
-        }
-        Thread.sleep(forTimeInterval: 0.3)
+        Thread.sleep(forTimeInterval: 0.8)
+        dismissConfirmDialogIfPresent()
         XCTAssertTrue(preview.exists, "Preview should remain after Cmd+E")
     }
 
