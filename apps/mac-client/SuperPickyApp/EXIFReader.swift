@@ -45,19 +45,63 @@ struct EXIFData: Sendable {
 
 /// Reads EXIF metadata from image files using ImageIO.
 enum EXIFReader {
+    /// Caches the ImageIO-parsed base — everything except keywords — by file
+    /// path. The RAW file itself doesn't change post-ingest, so this
+    /// stays valid for the lifetime of the process. Keywords live in the
+    /// sidecar, which the species edit panel rewrites, so they're always
+    /// re-read from disk — cheap (tens of µs for a tiny XML file).
+    private static let baseCache: NSCache<NSString, CachedBase> = {
+        let cache = NSCache<NSString, CachedBase>()
+        cache.countLimit = 2000
+        return cache
+    }()
+
+    private final class CachedBase {
+        let data: EXIFData
+        init(_ data: EXIFData) { self.data = data }
+    }
+
     /// Returns nil if the file does not exist or cannot be read as an image.
     static func read(from filePath: String) -> EXIFData? {
-        guard let properties = ImageProperties.load(filePath: filePath) else {
-            return nil
+        let key = filePath as NSString
+        var base: EXIFData
+        if let cached = baseCache.object(forKey: key) {
+            base = cached.data
+        } else {
+            guard let properties = ImageProperties.load(filePath: filePath) else {
+                return nil
+            }
+            base = parse(properties: properties, imagePath: filePath)
+            // ImageIO drops OffsetTimeOriginal for Sony ARW and some other
+            // RAWs. Walk the TIFF IFD ourselves as a fallback.
+            if base.offsetTimeOriginal == nil {
+                base.offsetTimeOriginal = EXIFOffsetReader.readOffsetTimeOriginal(from: filePath)
+            }
+            baseCache.setObject(CachedBase(base), forKey: key)
         }
-        var data = parse(properties: properties, imagePath: filePath)
-        // ImageIO drops OffsetTimeOriginal for Sony ARW and some other RAWs.
-        // Fall back to walking the TIFF IFD ourselves so capture-time TZ
-        // conversion works for those files.
-        if data.offsetTimeOriginal == nil {
-            data.offsetTimeOriginal = EXIFOffsetReader.readOffsetTimeOriginal(from: filePath)
+        // IPTC keywords (from `base.keywords`) merge with sidecar keywords.
+        // The pipeline writes to the sidecar only — RAWs aren't rewritten —
+        // so the sidecar is the source of truth for anything we generated.
+        var merged = base.keywords
+        var seen = Set(base.keywords)
+        for keyword in readKeywords(imagePath: filePath) where seen.insert(keyword).inserted {
+            merged.append(keyword)
         }
-        return data
+        base.keywords = merged
+        return base
+    }
+
+    /// Reads `dc:subject` keywords from the sibling `<stem>.xmp` sidecar.
+    /// Exposed so callers can refresh keywords after a species edit without
+    /// re-parsing the full RAW EXIF.
+    static func readKeywords(imagePath: String) -> [String] {
+        let url = URL(fileURLWithPath: imagePath).deletingPathExtension()
+            .appendingPathExtension("xmp")
+        guard let data = try? Data(contentsOf: url),
+              let xml = String(data: data, encoding: .utf8) else {
+            return []
+        }
+        return parseXMPKeywords(xml: xml)
     }
 
     /// Parse EXIF from a pre-loaded properties dict. Lets callers share one
@@ -113,19 +157,12 @@ enum EXIFReader {
         data.imageWidth = properties[kCGImagePropertyPixelWidth as String] as? Int
         data.imageHeight = properties[kCGImagePropertyPixelHeight as String] as? Int
 
-        // Keywords: IPTC first, then merge in dc:subject from the sibling
-        // `.xmp` sidecar if one exists. The pipeline writes keywords to the
-        // sidecar only (RAWs aren't rewritten), so the sidecar is the source
-        // of truth for anything we generated (species, flight).
-        var keywords: [String] = []
-        var seen: Set<String> = []
+        // IPTC keywords baked into the image. Sidecar keywords are merged
+        // in by `read(from:)` so callers that only want a keyword refresh
+        // don't pay the full ImageIO parse.
         if let kw = iptc?[kCGImagePropertyIPTCKeywords as String] as? [String] {
-            for k in kw where seen.insert(k).inserted { keywords.append(k) }
+            data.keywords = kw
         }
-        for k in readXMPKeywords(imagePath: imagePath) where seen.insert(k).inserted {
-            keywords.append(k)
-        }
-        data.keywords = keywords
 
         // GPS
         let gps = properties[kCGImagePropertyGPSDictionary as String] as? [String: Any]
@@ -174,18 +211,6 @@ enum EXIFReader {
         }
         let denominator = 1.0 / exposure
         return "1/\(Int(denominator.rounded()))"
-    }
-
-    /// Reads `dc:subject` items from a sibling `<stem>.xmp` sidecar. Returns
-    /// an empty array when the sidecar is absent or unparseable.
-    private static func readXMPKeywords(imagePath: String) -> [String] {
-        let url = URL(fileURLWithPath: imagePath).deletingPathExtension()
-            .appendingPathExtension("xmp")
-        guard let data = try? Data(contentsOf: url),
-              let xml = String(data: data, encoding: .utf8) else {
-            return []
-        }
-        return parseXMPKeywords(xml: xml)
     }
 
     /// Pure regex-based parse of the first `<dc:subject>` block in an XMP

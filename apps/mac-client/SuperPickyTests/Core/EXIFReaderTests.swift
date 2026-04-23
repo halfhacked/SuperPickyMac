@@ -194,6 +194,70 @@ import ImageIO
         #expect(data?.keywords == ["Bald Eagle"])
     }
 
+    @Test func keywordsRefreshWhenSidecarChangesOnCachedFile() {
+        // Base EXIF is cached by filePath; keywords must re-read the sidecar
+        // every time so a species edit (which rewrites the XMP) shows up on
+        // the next read without invalidating the whole cache.
+        let stem = "keyword_refresh_\(UUID().uuidString)"
+        let imagePath = NSTemporaryDirectory() + "EXIFReaderTests_\(stem).jpg"
+        let sidecarPath = NSTemporaryDirectory() + "EXIFReaderTests_\(stem).xmp"
+        defer {
+            try? FileManager.default.removeItem(atPath: imagePath)
+            try? FileManager.default.removeItem(atPath: sidecarPath)
+        }
+        createTestJPEG(at: imagePath)
+
+        func writeSidecar(_ items: [String]) {
+            let entries = items.map { "<rdf:li>\($0)</rdf:li>" }.joined(separator: "\n")
+            let xmp = """
+                <?xml version="1.0"?>
+                <x:xmpmeta xmlns:x="adobe:ns:meta/">
+                  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+                    <rdf:Description xmlns:dc="http://purl.org/dc/elements/1.1/">
+                      <dc:subject><rdf:Bag>\(entries)</rdf:Bag></dc:subject>
+                    </rdf:Description>
+                  </rdf:RDF>
+                </x:xmpmeta>
+                """
+            try? xmp.write(toFile: sidecarPath, atomically: true, encoding: .utf8)
+        }
+
+        writeSidecar(["Bald Eagle"])
+        #expect(EXIFReader.read(from: imagePath)?.keywords == ["Bald Eagle"])
+
+        // Same file (base EXIF cached), new sidecar contents.
+        writeSidecar(["Golden Eagle", "Aquila chrysaetos"])
+        #expect(EXIFReader.read(from: imagePath)?.keywords == ["Golden Eagle", "Aquila chrysaetos"])
+
+        // Sidecar removed → keywords empty on next read.
+        try? FileManager.default.removeItem(atPath: sidecarPath)
+        #expect(EXIFReader.read(from: imagePath)?.keywords == [])
+    }
+
+    @Test func readKeywordsReadsSidecarDirectly() {
+        let stem = "read_keywords_\(UUID().uuidString)"
+        let imagePath = NSTemporaryDirectory() + "EXIFReaderTests_\(stem).jpg"
+        let sidecarPath = NSTemporaryDirectory() + "EXIFReaderTests_\(stem).xmp"
+        defer { try? FileManager.default.removeItem(atPath: sidecarPath) }
+
+        let xmp = """
+            <?xml version="1.0"?>
+            <x:xmpmeta xmlns:x="adobe:ns:meta/">
+              <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+                <rdf:Description xmlns:dc="http://purl.org/dc/elements/1.1/">
+                  <dc:subject><rdf:Bag>
+                    <rdf:li>Osprey</rdf:li>
+                    <rdf:li>Pandion haliaetus</rdf:li>
+                  </rdf:Bag></dc:subject>
+                </rdf:Description>
+              </rdf:RDF>
+            </x:xmpmeta>
+            """
+        try? xmp.write(toFile: sidecarPath, atomically: true, encoding: .utf8)
+
+        #expect(EXIFReader.readKeywords(imagePath: imagePath) == ["Osprey", "Pandion haliaetus"])
+    }
+
     @Test func readExtractsOffsetTimeOriginal() {
         let path = tempPath("offset_time.jpg")
         defer { try? FileManager.default.removeItem(atPath: path) }
