@@ -401,6 +401,7 @@ final class AppState {
                     confidence: first.confidence,
                     cnName: first.cnName,
                     pinyin: first.pinyin,
+                    pinyinInitials: first.pinyinInitials,
                     thresholdUsed: first.thresholdUsed,
                     ebirdCode: first.ebirdCode
                 )

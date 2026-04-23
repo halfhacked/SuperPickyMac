@@ -7,6 +7,7 @@ struct SpeciesMatch: Codable, Identifiable, Sendable, Hashable {
     let confidence: Float
     let cnName: String?
     let pinyin: String?
+    let pinyinInitials: String?
     let thresholdUsed: String?
     /// Stable eBird species code (e.g. "mallar3") when the match came from
     /// the OSEA class vocabulary. `nil` for user-entered custom species the
@@ -23,6 +24,7 @@ struct SpeciesMatch: Codable, Identifiable, Sendable, Hashable {
          confidence: Float,
          cnName: String?,
          pinyin: String?,
+         pinyinInitials: String? = nil,
          thresholdUsed: String?,
          ebirdCode: String? = nil) {
         self.scientificName = scientificName
@@ -30,6 +32,7 @@ struct SpeciesMatch: Codable, Identifiable, Sendable, Hashable {
         self.confidence = confidence
         self.cnName = cnName
         self.pinyin = pinyin
+        self.pinyinInitials = pinyinInitials
         self.thresholdUsed = thresholdUsed
         self.ebirdCode = ebirdCode
     }
@@ -40,6 +43,7 @@ struct SpeciesMatch: Codable, Identifiable, Sendable, Hashable {
         case confidence
         case cnName = "cn_name"
         case pinyin
+        case pinyinInitials = "pinyin_initials"
         case thresholdUsed = "threshold_used"
         case ebirdCode = "ebird_code"
     }

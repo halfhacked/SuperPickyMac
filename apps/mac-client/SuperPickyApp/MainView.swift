@@ -139,6 +139,7 @@ struct MainView: View {
                                 confidence: 0,
                                 cnName: entry.chineseName.isEmpty ? nil : entry.chineseName,
                                 pinyin: entry.pinyin,
+                                pinyinInitials: entry.pinyinInitials,
                                 thresholdUsed: "manual",
                                 ebirdCode: entry.ebirdCode
                             )
