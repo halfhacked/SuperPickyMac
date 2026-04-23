@@ -67,6 +67,7 @@ import ImageIO
         #expect(data.shutterSpeed == nil)
         #expect(data.iso == nil)
         #expect(data.dateTimeOriginal == nil)
+        #expect(data.offsetTimeOriginal == nil)
         #expect(data.exposureBias == nil)
         #expect(data.meteringMode == nil)
         #expect(data.whiteBalance == nil)
@@ -191,6 +192,24 @@ import ImageIO
 
         let data = EXIFReader.read(from: imagePath)
         #expect(data?.keywords == ["Bald Eagle"])
+    }
+
+    @Test func readExtractsOffsetTimeOriginal() {
+        let path = tempPath("offset_time.jpg")
+        defer { try? FileManager.default.removeItem(atPath: path) }
+
+        createTestJPEG(
+            at: path,
+            exif: [
+                kCGImagePropertyExifDateTimeOriginal as String: "2024:03:15 14:30:22",
+                kCGImagePropertyExifOffsetTimeOriginal as String: "+08:00",
+            ]
+        )
+
+        let result = EXIFReader.read(from: path)
+        #expect(result != nil)
+        #expect(result!.dateTimeOriginal == "2024:03:15 14:30:22")
+        #expect(result!.offsetTimeOriginal == "+08:00")
     }
 
     @Test func shutterSpeedFormattingForLongExposure() {

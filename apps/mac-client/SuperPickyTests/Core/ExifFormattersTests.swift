@@ -92,6 +92,55 @@ import Foundation
         #expect(en != zh)
     }
 
+    @Test func dateWithOffsetConvertsToDisplayTimeZone() {
+        // 2024-03-15 14:30 +08:00 = 06:30 UTC. Using UTC as the display zone
+        // avoids DST ambiguity that trips up zones like America/Los_Angeles.
+        let utc = TimeZone(identifier: "UTC")!
+        let formatted = ExifFormatters.date("2024:03:15 14:30:22",
+                                            offset: "+08:00",
+                                            locale: Locale(identifier: "en_US"),
+                                            displayTimeZone: utc)
+        #expect(formatted.contains("6:30"))
+        #expect(formatted.contains("AM"))
+        #expect(formatted.contains("15"))
+    }
+
+    @Test func dateWithOffsetMatchingDisplayZoneKeepsWallClock() {
+        // +08:00 clock displayed in Asia/Shanghai → no shift.
+        let shanghai = TimeZone(identifier: "Asia/Shanghai")!
+        let formatted = ExifFormatters.date("2024:03:15 14:30:22",
+                                            offset: "+08:00",
+                                            locale: Locale(identifier: "en_US"),
+                                            displayTimeZone: shanghai)
+        #expect(formatted.contains("2:30"))
+        #expect(formatted.contains("PM"))
+        #expect(formatted.contains("15"))
+    }
+
+    @Test func dateWithNilOffsetPreservesWallClockRegardlessOfDisplayZone() {
+        // No offset tag → treat raw as wall-clock in displayTimeZone; display
+        // in same zone; visible value unchanged.
+        let pst = TimeZone(identifier: "America/Los_Angeles")!
+        let formatted = ExifFormatters.date("2024:03:15 14:30:22",
+                                            offset: nil,
+                                            locale: Locale(identifier: "en_US"),
+                                            displayTimeZone: pst)
+        #expect(formatted.contains("2:30"))
+        #expect(formatted.contains("PM"))
+        #expect(formatted.contains("15"))
+    }
+
+    @Test func dateWithMalformedOffsetFallsBackToWallClock() {
+        let pst = TimeZone(identifier: "America/Los_Angeles")!
+        let formatted = ExifFormatters.date("2024:03:15 14:30:22",
+                                            offset: "not-an-offset",
+                                            locale: Locale(identifier: "en_US"),
+                                            displayTimeZone: pst)
+        #expect(formatted.contains("2:30"))
+        #expect(formatted.contains("PM"))
+        #expect(formatted.contains("15"))
+    }
+
     // MARK: - location
 
     @Test func locationReturnsNilWhenAllFieldsNil() {
