@@ -553,16 +553,42 @@ final class CullingWorkflowUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 0.3)
     }
 
-    /// Click a button even when XCUITest reports it as not hittable. The
-    /// 13×13 SF-symbol Add/Remove buttons in the candidates list fail the
-    /// accessibility hit-test on CI (covered by ForEach row overlap), but
-    /// clicking via their reported coordinate still activates the button.
+    /// Click a button reliably on CI. The 12-pt SF-symbol Add/Remove
+    /// buttons in the candidates list race between `isHittable` returning
+    /// true and the click being dispatched — the click then fails with
+    /// "Not hittable". Always using a coordinate click at the reported
+    /// centre bypasses the a11y hit test entirely.
     private func tapButton(_ element: XCUIElement) {
-        if element.isHittable {
-            element.click()
-        } else {
-            element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
-        }
+        guard element.exists else { return }
+        element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+    }
+
+    /// Grant keyboard focus to the species search TextField. CI's smaller
+    /// window occasionally leaves `field.click()` non-focus-granting, so
+    /// approach with a coordinate click first and fall back to a hover +
+    /// click pair. Callers verify focus by typing a sentinel character and
+    /// reading back `field.value`; if the sentinel didn't land the field
+    /// didn't receive focus.
+    @discardableResult
+    private func focusSearchField() -> XCUIElement {
+        let field = Self.app.textFields["SpeciesEditPanel_SearchField"]
+        _ = field.waitForExistence(timeout: 3)
+        let center = field.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        center.click()
+        Thread.sleep(forTimeInterval: 0.3)
+        field.hover()
+        Thread.sleep(forTimeInterval: 0.15)
+        center.click()
+        Thread.sleep(forTimeInterval: 0.3)
+        return field
+    }
+
+    /// Returns true if the field currently carries the expected value.
+    /// We use this as a focus-granted proxy on macOS where `hasKeyboardFocus`
+    /// isn't available on XCUIElement.
+    private func fieldValueContains(_ field: XCUIElement, _ needle: String) -> Bool {
+        let value = field.value as? String ?? ""
+        return value.contains(needle)
     }
 
     private func clearSearchField() {
@@ -611,38 +637,78 @@ final class CullingWorkflowUITests: XCTestCase {
         ensurePanelClosed()
     }
 
-    func test44_AddCandidateMovesToAssigned() throws {
-        throw XCTSkip("Flaky on CI: tapButton's coordinate fallback misses " +
-                      "the 12-pt Remove_goleag button on the smaller runner " +
-                      "window. Re-enable with the other species tests once " +
-                      "the click path is reliable.")
+    func test44_AddCandidateMovesToAssigned() {
+        let app = Self.app!
+        openPanelOnEagle()
+
+        let add = app.buttons["SpeciesEditPanel_Add_goleag"]
+        XCTAssertTrue(add.waitForExistence(timeout: 3))
+        tapButton(add)
+
+        let remove = app.buttons["SpeciesEditPanel_Remove_goleag"]
+        XCTAssertTrue(remove.waitForExistence(timeout: 2),
+                      "After Add_goleag click, goleag should move to Assigned (Remove_goleag present)")
+        XCTAssertFalse(app.buttons["SpeciesEditPanel_Add_goleag"].exists)
+
+        tapButton(remove)
+        // Verify we actually returned to the initial state so test45 starts clean.
+        XCTAssertTrue(app.buttons["SpeciesEditPanel_Add_goleag"].waitForExistence(timeout: 2),
+                      "After Remove_goleag click, goleag should be back in Candidates (Add_goleag present)")
+        ensurePanelClosed()
     }
 
-    func test45_RemoveSecondarySpecies() throws {
-        throw XCTSkip("Flaky on CI: tapButton's coordinate fallback silently " +
-                      "misses the 12-pt Remove_goleag button on the smaller " +
-                      "runner window. Re-enable once the click path is made " +
-                      "reliable (larger hit target or direct AX click).")
+    func test45_RemoveSecondarySpecies() {
+        let app = Self.app!
+        openPanelOnEagle()
+
+        tapButton(app.buttons["SpeciesEditPanel_Add_goleag"])
+        let remove = app.buttons["SpeciesEditPanel_Remove_goleag"]
+        XCTAssertTrue(remove.waitForExistence(timeout: 2))
+        tapButton(remove)
+
+        XCTAssertTrue(app.buttons["SpeciesEditPanel_Add_goleag"].waitForExistence(timeout: 2))
+        XCTAssertFalse(app.buttons["SpeciesEditPanel_Remove_goleag"].exists)
+        ensurePanelClosed()
     }
 
-    /// `field.click()` reports "not hittable" when the search field sits
-    /// partially under the scroll view's rounded-corner clip at the panel
-    /// bottom. A coordinate-based click bypasses that hittability check.
-    private func clickSearchField() {
-        let field = Self.app.textFields["SpeciesEditPanel_SearchField"]
-        field.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+    func test46_SearchFieldAcceptsInput() {
+        let app = Self.app!
+        openPanelOnEagle()
+
+        let field = focusSearchField()
+        app.typeText("robin")
+        Thread.sleep(forTimeInterval: 0.4)
+        XCTAssertTrue(fieldValueContains(field, "robin"),
+                      "SearchField should contain 'robin' after typing " +
+                      "(value=\(String(describing: field.value)))")
+
+        clearSearchField()
+        ensurePanelClosed()
     }
 
-    func test46_SearchFieldAcceptsInput() throws {
-        throw XCTSkip("Flaky on CI: coordinate click on the SearchField " +
-                      "fails to grant keyboard focus on the CI runner " +
-                      "(typeText errors with 'neither element nor descendant " +
-                      "has keyboard focus'). Re-enable once focus can be " +
-                      "driven reliably.")
-    }
+    func test47_UnmatchedSearchReturnIsIgnored() {
+        let app = Self.app!
+        openPanelOnEagle()
 
-    func test47_UnmatchedSearchReturnIsIgnored() throws {
-        throw XCTSkip("Flaky on CI: same SearchField focus problem as test46.")
+        let field = focusSearchField()
+        let garbage = "MyCustomSpeciesXYZ"
+        app.typeText(garbage)
+        // Verify the text landed before pressing Return; if it didn't, the
+        // Return-doesn't-add invariant isn't testable in this run.
+        guard fieldValueContains(field, garbage) else {
+            XCTFail("SearchField did not receive input; cannot verify Return behaviour")
+            ensurePanelClosed()
+            return
+        }
+        app.typeKey(.return, modifierFlags: [])
+        Thread.sleep(forTimeInterval: 0.5)
+
+        XCTAssertFalse(app.buttons["SpeciesEditPanel_Remove_\(garbage)"].exists,
+                       "Unmatched Return must not add a custom species")
+        XCTAssertTrue(app.buttons["SpeciesEditPanel_Remove_baleag"].exists)
+
+        clearSearchField()
+        ensurePanelClosed()
     }
 
     func test48_EmptyAssignedStateShown() {
@@ -658,20 +724,100 @@ final class CullingWorkflowUITests: XCTestCase {
         ensurePanelClosed()
     }
 
-    func test49_PhotoChangeClearsSearch() throws {
-        throw XCTSkip("Flaky on CI: same SearchField focus problem as test46.")
+    func test49_PhotoChangeClearsSearch() {
+        let app = Self.app!
+        // Reset any lingering filter so the thumbnail strip shows every photo.
+        app.typeKey("0", modifierFlags: .command)
+        Thread.sleep(forTimeInterval: 0.3)
+        openPanelOnEagle()
+
+        let field = focusSearchField()
+        app.typeText("robin")
+        Thread.sleep(forTimeInterval: 0.3)
+        guard fieldValueContains(field, "robin") else {
+            XCTFail("SearchField did not receive input; cannot verify clear-on-photo-change")
+            ensurePanelClosed()
+            return
+        }
+
+        // Select a different photo. Try in preference order so this test
+        // survives any prior reject/delete state drift from shared-app tests.
+        ensurePanelClosed()
+        let candidates = ["DSC00002.jpg", "DSC00003.jpg", "DSC00004.jpg", "DSC00005.jpg"]
+        var switched = false
+        for name in candidates {
+            let thumb = app.images.matching(identifier: "Thumbnail_\(name)").firstMatch
+            if thumb.exists {
+                selectThumbnail(filename: name)
+                switched = true
+                break
+            }
+        }
+        guard switched else {
+            XCTFail("No alternative thumbnail (\(candidates.joined(separator: ", "))) found to switch to")
+            return
+        }
+
+        exifToggleButton.click()
+        XCTAssertTrue(app.scrollViews["ExifPanel"].waitForExistence(timeout: 3))
+        scrollPanelToBottom()
+
+        let newField = app.textFields["SpeciesEditPanel_SearchField"]
+        _ = newField.waitForExistence(timeout: 2)
+        XCTAssertFalse(fieldValueContains(newField, "robin"),
+                       "Search field should clear on photo change " +
+                       "(value=\(String(describing: newField.value)))")
+
+        ensurePanelClosed()
     }
 
-    func test50_RemovePrimaryPromotesNext() throws {
-        throw XCTSkip("Flaky on CI: tapButton's coordinate fallback misses " +
-                      "the 12-pt Remove button. Re-enable with the other " +
-                      "species tests once the click path is reliable.")
+    func test50_RemovePrimaryPromotesNext() {
+        let app = Self.app!
+        openPanelOnEagle()
+
+        tapButton(app.buttons["SpeciesEditPanel_Add_goleag"])
+        XCTAssertTrue(app.buttons["SpeciesEditPanel_Remove_goleag"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["SpeciesEditPanel_MakePrimary_goleag"].exists)
+        XCTAssertFalse(app.buttons["SpeciesEditPanel_MakePrimary_baleag"].exists)
+
+        tapButton(app.buttons["SpeciesEditPanel_Remove_baleag"])
+        // Wait for the primary to demote out of Assigned.
+        XCTAssertTrue(app.buttons["SpeciesEditPanel_Add_baleag"].waitForExistence(timeout: 2),
+                      "Removed primary (baleag) should reappear in Candidates")
+        XCTAssertFalse(app.buttons["SpeciesEditPanel_Remove_baleag"].exists)
+        XCTAssertTrue(app.buttons["SpeciesEditPanel_Remove_goleag"].exists)
+        XCTAssertFalse(app.buttons["SpeciesEditPanel_MakePrimary_goleag"].exists,
+                       "Golden should now be primary (no MakePrimary button)")
+
+        // Restore state for later tests.
+        tapButton(app.buttons["SpeciesEditPanel_Remove_goleag"])
+        _ = app.buttons["SpeciesEditPanel_Add_goleag"].waitForExistence(timeout: 2)
+        tapButton(app.buttons["SpeciesEditPanel_Add_baleag"])
+        _ = app.buttons["SpeciesEditPanel_Remove_baleag"].waitForExistence(timeout: 2)
+        ensurePanelClosed()
     }
 
-    func test51_MakePrimaryReordersAssigned() throws {
-        throw XCTSkip("Flaky on CI: tapButton's coordinate fallback misses " +
-                      "the 12-pt MakePrimary button. Re-enable with the " +
-                      "other species tests once the click path is reliable.")
+    func test51_MakePrimaryReordersAssigned() {
+        let app = Self.app!
+        openPanelOnEagle()
+
+        tapButton(app.buttons["SpeciesEditPanel_Add_goleag"])
+        XCTAssertTrue(app.buttons["SpeciesEditPanel_Remove_goleag"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["SpeciesEditPanel_MakePrimary_goleag"].exists)
+        XCTAssertFalse(app.buttons["SpeciesEditPanel_MakePrimary_baleag"].exists)
+
+        tapButton(app.buttons["SpeciesEditPanel_MakePrimary_goleag"])
+
+        XCTAssertTrue(app.buttons["SpeciesEditPanel_MakePrimary_baleag"].waitForExistence(timeout: 2),
+                      "Bald should now be secondary with a make-primary button")
+        XCTAssertFalse(app.buttons["SpeciesEditPanel_MakePrimary_goleag"].exists)
+        XCTAssertTrue(app.buttons["SpeciesEditPanel_Remove_goleag"].exists)
+        XCTAssertTrue(app.buttons["SpeciesEditPanel_Remove_baleag"].exists)
+
+        // Restore: remove goleag so subsequent tests see the default primary.
+        tapButton(app.buttons["SpeciesEditPanel_Remove_goleag"])
+        _ = app.buttons["SpeciesEditPanel_Add_goleag"].waitForExistence(timeout: 2)
+        ensurePanelClosed()
     }
 
     func test52_CandidateRowsShowLevelAndConfidence() {
@@ -683,20 +829,76 @@ final class CullingWorkflowUITests: XCTestCase {
         ensurePanelClosed()
     }
 
-    func test53_SpeciesEditWritesToXMPSidecar() throws {
-        throw XCTSkip("Flaky on CI: tapButton's coordinate fallback misses " +
-                      "the Add/Remove buttons, so the sidecar write never " +
-                      "lands. Re-enable once the click path is reliable.")
+    func test53_SpeciesEditWritesToXMPSidecar() {
+        let app = Self.app!
+        let sidecarPath = (Self.testDir! as NSString).appendingPathComponent("DSC00001.xmp")
+        openPanelOnEagle()
+
+        tapButton(app.buttons["SpeciesEditPanel_Add_goleag"])
+        XCTAssertTrue(app.buttons["SpeciesEditPanel_Remove_goleag"].waitForExistence(timeout: 2),
+                      "Add click should have moved goleag to Assigned")
+
+        XCTAssertTrue(waitForSidecar(at: sidecarPath, containing: "Golden Eagle", timeout: 3))
+        let afterAdd = (try? String(contentsOfFile: sidecarPath)) ?? ""
+        XCTAssertTrue(afterAdd.contains("Bald Eagle"))
+
+        tapButton(app.buttons["SpeciesEditPanel_Remove_goleag"])
+        XCTAssertTrue(app.buttons["SpeciesEditPanel_Add_goleag"].waitForExistence(timeout: 2),
+                      "Remove click should have moved goleag back to Candidates")
+        XCTAssertTrue(waitForSidecar(at: sidecarPath,
+                                     satisfying: { !$0.contains("Golden Eagle") },
+                                     timeout: 3))
+        let afterRemove = (try? String(contentsOfFile: sidecarPath)) ?? ""
+        XCTAssertTrue(afterRemove.contains("Bald Eagle"))
+        ensurePanelClosed()
     }
 
     // Regression: the EXIF panel's `.task(id:)` was keyed only on photo.id,
     // so species edits (which rewrite the XMP sidecar without changing the
     // id) left the keywords list stale. The panel now hosts both EXIF and
     // species editing, so one toggle is enough.
-    func test54_InfoPanelRefreshesKeywordsOnSpeciesEdit() throws {
-        throw XCTSkip("Flaky on CI: tapButton's coordinate fallback misses " +
-                      "the Remove_goleag button, so the final 'keyword should " +
-                      "drop' poll times out. Re-enable with the other species " +
-                      "tests once the click path is reliable.")
+    func test54_InfoPanelRefreshesKeywordsOnSpeciesEdit() {
+        let app = Self.app!
+        ensurePanelClosed()
+        selectEaglePhoto()
+
+        let sidecarPath = (Self.testDir! as NSString).appendingPathComponent("DSC00001.xmp")
+        XCTAssertTrue(waitForSidecar(at: sidecarPath, containing: "Bald Eagle", timeout: 5))
+
+        let baldKeyword = app.staticTexts["ExifKeyword_Bald Eagle"]
+        if !baldKeyword.exists {
+            exifToggleButton.click()
+        }
+        XCTAssertTrue(baldKeyword.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["ExifKeyword_Golden Eagle"].exists)
+
+        // Panel already open from the check above; just scroll + normalize.
+        if !app.scrollViews["ExifPanel"].exists {
+            exifToggleButton.click()
+        }
+        _ = app.scrollViews["ExifPanel"].waitForExistence(timeout: 3)
+        scrollPanelToBottom()
+        resetEagleSpeciesToBaleagOnly()
+
+        tapButton(app.buttons["SpeciesEditPanel_Add_goleag"])
+        XCTAssertTrue(app.buttons["SpeciesEditPanel_Remove_goleag"].waitForExistence(timeout: 2),
+                      "Add_goleag click should move goleag to Assigned")
+
+        XCTAssertTrue(waitForSidecar(at: sidecarPath, containing: "Golden Eagle", timeout: 3))
+        XCTAssertTrue(app.staticTexts["ExifKeyword_Golden Eagle"].waitForExistence(timeout: 5),
+                      "EXIF keywords should refresh after species edit")
+        XCTAssertTrue(app.staticTexts["ExifKeyword_Bald Eagle"].exists)
+
+        tapButton(app.buttons["SpeciesEditPanel_Remove_goleag"])
+        XCTAssertTrue(app.buttons["SpeciesEditPanel_Add_goleag"].waitForExistence(timeout: 2),
+                      "Remove click should move goleag back to Candidates")
+        XCTAssertTrue(poll(timeout: 4) { !app.staticTexts["ExifKeyword_Golden Eagle"].exists },
+                      "Keyword should drop after removal")
+
+        ensurePanelClosed()
+        if baldKeyword.exists {
+            exifToggleButton.click()
+            Thread.sleep(forTimeInterval: 0.3)
+        }
     }
 }
