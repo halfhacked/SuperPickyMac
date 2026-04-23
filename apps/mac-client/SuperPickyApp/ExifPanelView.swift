@@ -16,6 +16,7 @@ struct ExifPanelView: View {
     @State private var exifData: EXIFData?
     @State private var searchQuery: String = ""
     @State private var searchResults: [SpeciesMatch] = []
+    @FocusState private var searchFieldFocused: Bool
 
     private let labelWidth: CGFloat = 100
 
@@ -44,9 +45,11 @@ struct ExifPanelView: View {
         // Swap atomically — clearing exifData between photos flashes the
         // species sections up and back down on every switch.
         .task(id: [photo.id.uuidString, photo.assignedSpeciesJSON ?? ""]) {
-            exifData = await Task.detached {
+            let newData = await Task.detached {
                 EXIFReader.read(from: photo.filePath)
             }.value
+            guard !Task.isCancelled else { return }
+            exifData = newData
         }
         .onChange(of: photo.id) {
             searchQuery = ""
@@ -226,8 +229,12 @@ struct ExifPanelView: View {
                     .textFieldStyle(.plain)
                     .font(.system(size: 12))
                     .accessibilityIdentifier("SpeciesEditPanel_SearchField")
+                    .focused($searchFieldFocused)
                     .onSubmit {
                         commitSearchQuery()
+                    }
+                    .onExitCommand {
+                        searchFieldFocused = false
                     }
                 if !searchQuery.isEmpty {
                     Button {

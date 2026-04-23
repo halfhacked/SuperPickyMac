@@ -129,12 +129,16 @@ struct CompareView: View {
     private func loadImages() async {
         async let left = loadImage(for: leftPhoto)
         async let right = loadImage(for: rightPhoto)
-        leftImage = await left
-        rightImage = await right
+        let (l, r) = await (left, right)
+        guard !Task.isCancelled else { return }
+        leftImage = l
+        rightImage = r
     }
 
     private func loadRightImage() async {
-        rightImage = await loadImage(for: rightPhoto)
+        let loaded = await loadImage(for: rightPhoto)
+        guard !Task.isCancelled else { return }
+        rightImage = loaded
     }
 
     private func loadImage(for photo: Photo?) async -> NSImage? {
