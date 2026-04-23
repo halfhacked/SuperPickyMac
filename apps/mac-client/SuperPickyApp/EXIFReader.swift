@@ -12,6 +12,7 @@ struct EXIFData: Sendable {
     var shutterSpeed: String?      // formatted: "1/500" or "2.5s"
     var iso: Int?
     var dateTimeOriginal: String?  // raw EXIF string "2024:03:15 14:30:22"
+    var offsetTimeOriginal: String?  // raw EXIF offset "+08:00" / "-05:00", nil when camera didn't write the tag
     var imageWidth: Int?
     var imageHeight: Int?
     var exposureBias: Double?
@@ -34,7 +35,8 @@ struct EXIFData: Sendable {
     var isEmpty: Bool {
         cameraMake == nil && cameraModel == nil && lensModel == nil &&
         focalLength == nil && aperture == nil && shutterSpeed == nil &&
-        iso == nil && dateTimeOriginal == nil && exposureBias == nil &&
+        iso == nil && dateTimeOriginal == nil && offsetTimeOriginal == nil &&
+        exposureBias == nil &&
         meteringMode == nil && whiteBalance == nil && keywords.isEmpty &&
         latitude == nil && longitude == nil && altitude == nil &&
         city == nil && state == nil && country == nil
@@ -48,7 +50,14 @@ enum EXIFReader {
         guard let properties = ImageProperties.load(filePath: filePath) else {
             return nil
         }
-        return parse(properties: properties, imagePath: filePath)
+        var data = parse(properties: properties, imagePath: filePath)
+        // ImageIO drops OffsetTimeOriginal for Sony ARW and some other RAWs.
+        // Fall back to walking the TIFF IFD ourselves so capture-time TZ
+        // conversion works for those files.
+        if data.offsetTimeOriginal == nil {
+            data.offsetTimeOriginal = EXIFOffsetReader.readOffsetTimeOriginal(from: filePath)
+        }
+        return data
     }
 
     /// Parse EXIF from a pre-loaded properties dict. Lets callers share one
@@ -88,6 +97,7 @@ enum EXIFReader {
 
         // Date
         data.dateTimeOriginal = exif?[kCGImagePropertyExifDateTimeOriginal as String] as? String
+        data.offsetTimeOriginal = exif?[kCGImagePropertyExifOffsetTimeOriginal as String] as? String
 
         // Metering mode
         if let mode = exif?[kCGImagePropertyExifMeteringMode as String] {

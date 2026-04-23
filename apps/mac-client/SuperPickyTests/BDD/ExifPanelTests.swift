@@ -23,6 +23,7 @@ import ImageIO
                              focalLength: Double = 800, aperture: Double = 6.3,
                              exposureTime: Double = 0.0005, iso: Int = 1600,
                              dateTime: String = "2025:03:15 07:30:22",
+                             offsetTime: String? = nil,
                              keywords: [String] = ["bird", "kingfisher", "wildlife"],
                              latitude: Double? = nil, longitude: Double? = nil,
                              altitude: Double? = nil,
@@ -39,7 +40,7 @@ import ImageIO
 
         let dest = CGImageDestinationCreateWithURL(url as CFURL, "public.jpeg" as CFString, 1, nil)!
 
-        let exifDict: [String: Any] = [
+        var exifDict: [String: Any] = [
             kCGImagePropertyExifFNumber as String: aperture,
             kCGImagePropertyExifExposureTime as String: exposureTime,
             kCGImagePropertyExifISOSpeedRatings as String: [iso],
@@ -47,6 +48,9 @@ import ImageIO
             kCGImagePropertyExifDateTimeOriginal as String: dateTime,
             kCGImagePropertyExifLensModel as String: lens,
         ]
+        if let offsetTime {
+            exifDict[kCGImagePropertyExifOffsetTimeOriginal as String] = offsetTime
+        }
 
         let tiffDict: [String: Any] = [
             kCGImagePropertyTIFFMake as String: make,
@@ -305,6 +309,52 @@ import ImageIO
         #expect(data.city == nil)
         #expect(data.state == nil)
         #expect(data.country == nil)
+    }
+
+    // MARK: - Scenario: EXIF panel converts capture date to viewer timezone when offset is present
+
+    @Test func exifPanelDisplaysCaptureDateInViewerTimezoneWhenOffsetPresent() throws {
+        let dir = try makeTempDir()
+        let photoURL = dir.appendingPathComponent("offset_test.jpg")
+        // Shot at 14:30 +08:00 (China) = 06:30 UTC. UTC display zone avoids
+        // DST ambiguity in the assertion.
+        createJPEGWithEXIF(at: photoURL,
+                           dateTime: "2024:03:15 14:30:22",
+                           offsetTime: "+08:00")
+
+        let data = try #require(EXIFReader.read(from: photoURL.path))
+        #expect(data.dateTimeOriginal == "2024:03:15 14:30:22")
+        #expect(data.offsetTimeOriginal == "+08:00")
+
+        let utc = TimeZone(identifier: "UTC")!
+        let formatted = ExifFormatters.date(data.dateTimeOriginal!,
+                                            offset: data.offsetTimeOriginal,
+                                            locale: Locale(identifier: "en_US"),
+                                            displayTimeZone: utc)
+        #expect(formatted.contains("6:30"))
+        #expect(formatted.contains("AM"))
+        #expect(formatted.contains("15"))
+    }
+
+    @Test func exifPanelPreservesCaptureDateWhenOffsetAbsent() throws {
+        let dir = try makeTempDir()
+        let photoURL = dir.appendingPathComponent("no_offset.jpg")
+        createJPEGWithEXIF(at: photoURL,
+                           dateTime: "2024:03:15 14:30:22",
+                           offsetTime: nil)
+
+        let data = try #require(EXIFReader.read(from: photoURL.path))
+        #expect(data.offsetTimeOriginal == nil)
+
+        // Display TZ is irrelevant when no offset — wall clock is preserved.
+        let pst = TimeZone(identifier: "America/Los_Angeles")!
+        let formatted = ExifFormatters.date(data.dateTimeOriginal!,
+                                            offset: data.offsetTimeOriginal,
+                                            locale: Locale(identifier: "en_US"),
+                                            displayTimeZone: pst)
+        #expect(formatted.contains("2:30"))
+        #expect(formatted.contains("PM"))
+        #expect(formatted.contains("15"))
     }
 
     // MARK: - Scenario: Read EXIF from real test-photos directory

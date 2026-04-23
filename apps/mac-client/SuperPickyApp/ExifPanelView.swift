@@ -101,7 +101,8 @@ struct ExifPanelView: View {
             if data.imageWidth != nil || data.dateTimeOriginal != nil {
                 sectionHeader(config.localized("Image"))
                 if let date = data.dateTimeOriginal {
-                    exifRow(label: config.localized("Capture Date"), value: formatDate(date))
+                    exifRow(label: config.localized("Capture Date"),
+                            value: formatDate(date, offset: data.offsetTimeOriginal))
                 }
                 if let w = data.imageWidth, let h = data.imageHeight {
                     exifRow(label: config.localized("Dimensions"), value: "\(w) \u{00D7} \(h)")
@@ -433,8 +434,8 @@ struct ExifPanelView: View {
                                 iso: data.iso)
     }
 
-    private func formatDate(_ raw: String) -> String {
-        ExifFormatters.date(raw, locale: config.appLanguage.locale)
+    private func formatDate(_ raw: String, offset: String?) -> String {
+        ExifFormatters.date(raw, offset: offset, locale: config.appLanguage.locale)
     }
 
     private func formatLocation(_ data: EXIFData) -> String? {

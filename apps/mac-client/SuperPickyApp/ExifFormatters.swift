@@ -34,16 +34,37 @@ enum ExifFormatters {
     }
 
     /// EXIF `"yyyy:MM:dd HH:mm:ss"` → localized medium date + short time in
-    /// the supplied `locale`. Returns the raw string unchanged if parsing
-    /// fails (some EXIF files use alternate formats).
-    static func date(_ raw: String, locale: Locale) -> String {
+    /// the supplied `locale`, rendered in `displayTimeZone`.
+    ///
+    /// When `offset` (EXIF `OffsetTimeOriginal`, e.g. `"+08:00"`) is provided,
+    /// the raw wall-clock time is interpreted as that offset and converted to
+    /// `displayTimeZone` — so a China-clock photo viewed on a PST Mac shows
+    /// the equivalent PST instant. When `offset` is nil or unparseable, the
+    /// raw string is interpreted as wall-clock time in `displayTimeZone` and
+    /// displayed unchanged (historical behavior). Returns the raw string
+    /// unchanged if parsing fails entirely.
+    static func date(_ raw: String,
+                     offset: String? = nil,
+                     locale: Locale,
+                     displayTimeZone: TimeZone = .current) -> String {
         let parser = DateFormatter()
-        parser.dateFormat = "yyyy:MM:dd HH:mm:ss"
         parser.locale = Locale(identifier: "en_US_POSIX")
-        guard let date = parser.date(from: raw) else { return raw }
+
+        var parsed: Date?
+        if let offset, !offset.isEmpty {
+            parser.dateFormat = "yyyy:MM:dd HH:mm:ssZZZZZ"
+            parsed = parser.date(from: raw + offset)
+        }
+        if parsed == nil {
+            parser.dateFormat = "yyyy:MM:dd HH:mm:ss"
+            parser.timeZone = displayTimeZone
+            parsed = parser.date(from: raw)
+        }
+        guard let date = parsed else { return raw }
 
         let display = DateFormatter()
         display.locale = locale
+        display.timeZone = displayTimeZone
         display.dateStyle = .medium
         display.timeStyle = .short
         return display.string(from: date)
