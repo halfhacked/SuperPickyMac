@@ -177,9 +177,12 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
         //    Use the same 15%-padding + letterbox semantics as preen so OSEA
         //    sees exactly the crop it was trained on.
         var speciesMatches: [SpeciesMatch] = []
-        // Full top-5 from the BEST detection only — used by the parity
-        // harness. UI still reads `species` (top-1 per detection).
-        var bestTop5: [SpeciesMatch]? = nil
+        // Candidates merged across every YOLO detection so the species-
+        // edit panel surfaces every species the model considered — any
+        // confidently-assigned species is guaranteed to be in this list,
+        // which means "Remove" always moves the row back to Candidates
+        // instead of making it disappear.
+        var mergedByClassID: [Int: SpeciesMatch] = [:]
         let oseaStart = DispatchTime.now()
         var cropMs: Double = 0
 
@@ -229,9 +232,9 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
                 }
             }
 
-            // 6a. Primary species (top-1) still comes from the accepted
-            //     level only. If no level cleared, the photo stays
-            //     unidentified — nothing is appended to `speciesMatches`.
+            // Primary species (top-1) still comes from the accepted
+            // level only. If no level cleared, the photo stays
+            // unidentified — nothing is appended to `speciesMatches`.
             if let accepted = acceptedProbs,
                let top1 = accepted.enumerated().max(by: { $0.element < $1.element }),
                top1.element >= Self.oseaFloorProbability,
@@ -248,12 +251,11 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
                 ))
             }
 
-            // 6b. Candidate union across every level. For each (level, probs)
-            //     pair pull the top-5 above floor, then merge into a single
-            //     by-classID map keeping the highest-confidence entry (with
-            //     that level recorded as `thresholdUsed`). Cap final output
-            //     at 10 so the edit panel UI stays digestible.
-            var byClassID: [Int: SpeciesMatch] = [:]
+            // Candidate union across every level AND every detection. For
+            // each (level, probs) pair pull the top-5 above floor, then
+            // merge into `mergedByClassID` keeping the highest-confidence
+            // entry per species (the entry's level is recorded as
+            // `thresholdUsed`).
             for (kind, probs) in perLevelProbs {
                 let top = probs.enumerated()
                     .sorted { $0.element > $1.element }
@@ -261,32 +263,27 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
                 for (classID, prob) in top {
                     guard prob >= Self.oseaFloorProbability else { break }
                     guard let entry = db.lookup(classID: classID) else { continue }
-                    let newMatch = SpeciesMatch(
-                        scientificName: entry.scientificName,
-                        commonName: entry.englishName,
-                        confidence: prob,
-                        cnName: entry.chineseName,
-                        pinyin: entry.pinyin,
-                        pinyinInitials: entry.pinyinInitials,
-                        thresholdUsed: kind.rawValue,
-                        ebirdCode: entry.ebirdCode
-                    )
-                    if let existing = byClassID[classID] {
-                        if prob > existing.confidence {
-                            byClassID[classID] = newMatch
-                        }
-                    } else {
-                        byClassID[classID] = newMatch
+                    if prob > (mergedByClassID[classID]?.confidence ?? -.infinity) {
+                        mergedByClassID[classID] = SpeciesMatch(
+                            scientificName: entry.scientificName,
+                            commonName: entry.englishName,
+                            confidence: prob,
+                            cnName: entry.chineseName,
+                            pinyin: entry.pinyin,
+                            pinyinInitials: entry.pinyinInitials,
+                            thresholdUsed: kind.rawValue,
+                            ebirdCode: entry.ebirdCode
+                        )
                     }
                 }
             }
-            let thisCropCandidates = byClassID.values
-                .sorted { $0.confidence > $1.confidence }
-                .prefix(10)
-            if bestTop5 == nil && !thisCropCandidates.isEmpty {
-                bestTop5 = Array(thisCropCandidates)
-            }
         }
+        // Cap the merged list at 10 so the edit panel stays digestible.
+        let topCandidates: [SpeciesMatch]? = mergedByClassID.isEmpty
+            ? nil
+            : Array(mergedByClassID.values
+                .sorted { $0.confidence > $1.confidence }
+                .prefix(10))
 
         let birds = detections.map { d in
             BirdDetection(
@@ -303,7 +300,7 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
             species: Array(speciesMatches.prefix(topK)),
             birds: birds,
             totalDetected: detections.count,
-            top5: bestTop5
+            top5: topCandidates
         )
     }
 
