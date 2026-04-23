@@ -86,6 +86,7 @@ struct AsyncPreviewImage: View {
             isFullRes = false
             if zoomState.scale > 1.0 {
                 if let full = await loadFullRes(filePath) {
+                    guard !Task.isCancelled else { return }
                     image = full
                     isFullRes = true
                 }
@@ -94,6 +95,7 @@ struct AsyncPreviewImage: View {
             if let cached = ImageCache.preview.get(filePath) {
                 image = cached
             } else if let loaded = await ImageLoader.load(path: filePath, maxPixelSize: 2000) {
+                guard !Task.isCancelled else { return }
                 ImageCache.preview.set(filePath, image: loaded)
                 image = loaded
             }
