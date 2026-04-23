@@ -19,9 +19,9 @@ Native macOS app for AI-powered bird photo culling.
 
 | Layer | What | Command | Trigger |
 |-------|------|---------|---------|
-| G1 Static | swift build + swiftlint | `scripts/pre-commit.sh` | pre-commit |
-| L1 Unit | Swift Testing | `scripts/pre-commit.sh` | pre-commit |
-| L2 Parity | CoreML parity harness (Swift) | `scripts/run-l2.sh` | pre-push |
+| G1 Static | xcodebuild build + swiftlint | `scripts/pre-commit.sh` | pre-commit |
+| L1 Unit | Swift Testing via xcodebuild | `scripts/pre-commit.sh` | pre-commit |
+| L2 Parity | Python reference vs Swift output | `scripts/parity/run.sh` | manual |
 | G2 Security | gitleaks | `scripts/gate-security.sh` | pre-push |
 | L3 BDD | XCUITest full user flows (TEST_MODE=1) | `scripts/run-l3.sh` | on-demand |
 
@@ -29,10 +29,11 @@ Native macOS app for AI-powered bird photo culling.
 
 ```bash
 # Build
-cd apps/mac-client && swift build
+cd apps/mac-client && xcodebuild build -scheme SuperPicky -destination 'platform=macOS'
 
-# Test
-cd apps/mac-client && swift test
+# Test (L1 unit)
+cd apps/mac-client && xcodebuild test -scheme SuperPicky -destination 'platform=macOS' \
+    -only-testing:SuperPickyTests
 
 # Re-convert CoreML models (requires ~/projects/SuperPicky/models/)
 python3 tools/model-conversion/convert_flight.py
@@ -41,6 +42,8 @@ python3 tools/model-conversion/convert_yolo.py
 python3 tools/model-conversion/convert_osea.py
 python3 tools/model-conversion/convert_topiq.py
 ```
+
+Adding a new `.swift` file requires registering it in `SuperPicky.xcodeproj/project.pbxproj` (PBXBuildFile, PBXFileReference, PBXGroup children, PBXSourcesBuildPhase) — there is no Package.swift or xcodegen to regenerate it from.
 
 ## Key Decisions
 
@@ -55,9 +58,7 @@ python3 tools/model-conversion/convert_topiq.py
 
 ## Retrospective
 
-- **xcodebuild silently uses stale binaries after edits**: When editing Swift files via automation tools, xcodebuild's incremental build sometimes doesn't detect changes. → The Edit tool's atomic writes may not update mtime reliably from Xcode's dependency tracker perspective. → Always `touch` changed files or delete `Build/Intermediates.noindex/SuperPicky.build/` before `xcodebuild build`. SPM (`swift build`) always picks up changes correctly.
-
-- **New Swift files must be added to both Package.swift AND the .xcodeproj**: SPM build and xcodebuild use different file registries. A file that compiles with `swift build` will fail `xcodebuild` (used by XCUITests and CI) if not in the pbxproj. → When creating any new .swift file, immediately add it to the Xcode project's PBXBuildFile, PBXFileReference, PBXGroup children, and PBXSourcesBuildPhase sections. CI catches this — always check CI after adding files.
+- **xcodebuild silently uses stale binaries after edits**: When editing Swift files via automation tools, xcodebuild's incremental build sometimes doesn't detect changes. → The Edit tool's atomic writes may not update mtime reliably from Xcode's dependency tracker perspective. → Always `touch` changed files or delete `Build/Intermediates.noindex/SuperPicky.build/` before `xcodebuild build`.
 
 - **SwiftUI .onKeyPress requires view focus, which is fragile**: After clicking a thumbnail, sidebar, or any other view, keyboard focus moves away from ContentView and .onKeyPress stops working. → Use `NSEvent.addLocalMonitorForEvents(matching: .keyDown)` for global keyboard shortcuts that should work regardless of focus. Check `firstResponder is NSTextView` to skip text fields.
 
@@ -74,5 +75,3 @@ python3 tools/model-conversion/convert_topiq.py
 - **SwiftUI runtime localization has three separate mechanisms for three UI layers**: (1) `.environment(\.locale)` handles `Text("literal")` via `LocalizedStringKey` — works for SwiftUI views but NOT for AppKit-rendered elements like `Settings` scene tab labels or the menu bar. (2) `config.localized("key")` (explicit Bundle lookup reading `appLanguage`) handles tab labels and interpolated strings — works because reading `@Observable` property triggers SwiftUI re-render. (3) `NSApp.mainMenu` title iteration handles the menu bar — must be done programmatically since it's pure AppKit. → When localizing menu items at runtime, cache the original English title on first encounter (`ObjectIdentifier` → original title), then always look up from the English key. Otherwise switching back fails because the key is now the translated string.
 
 - **`@Observable` `onChange` and `didSet` are unreliable through `@Bindable` bindings**: `onChange(of: config.property)` attached to a view using `@Bindable var config = config` fires inconsistently — sometimes only once, sometimes never. `didSet` on `@Observable` properties also only fires once through `@Bindable`. → Use `task(id: config.property)` on a stable parent view instead. It fires on every id change, including initial appear, and isn't affected by child view recreation cycles.
-
-- **SPM `swift build` doesn't embed `.lproj` resources into `Bundle.main` properly**: SPM puts resources in a separate `_ModuleName.bundle` with lowercased directory names (`zh-hans.lproj` instead of `zh-Hans.lproj`). `.environment(\.locale)` and `Bundle.main.path(forResource:)` don't find them. → Use `xcodebuild` (via xcodegen) for builds that need localization. It places `.lproj` directories in the app bundle's `Contents/Resources/` with correct casing.

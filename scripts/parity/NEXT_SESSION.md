@@ -33,8 +33,8 @@ cd ~/projects/SuperPickyMac/.claude/worktrees/inspiring-agnesi/apps/mac-client
 rm -rf ~/Library/Application\ Support/com.superpicky.mac/ModelCache/avonet.db*
 rm ~/projects/SuperPickyMac/real-photos/.report.db  # force reprocess
 
-xcodegen  # regenerate pbxproj if untracked test files appeared
-swift test  # should be 263 green (or higher if we add more)
+xcodebuild test -scheme SuperPicky -destination 'platform=macOS' \
+    -only-testing:SuperPickyTests  # should be 263 green (or higher if we add more)
 
 xcodebuild -scheme SuperPicky -configuration Debug \
     -derivedDataPath /tmp/spm-ddata build
@@ -107,10 +107,8 @@ Each row's `speciesTop5JSON` should decode to a list with a
   (HuggingFace sometimes re-tags files). Raw 107 MB file with
   SHA `6dd77175...` per manifest.
 - **eBird JSONs not found at runtime:** check that xcodebuild
-  shipped `Resources/ebird/` into the framework bundle. The
-  Package.swift path `.copy("Resources/ebird")` and project.yml
-  `buildPhase: resources` are both wired, but worth spot-checking
-  with `ls /tmp/spm-ddata/Build/Products/Debug/SuperPicky.app/Contents/Frameworks/SuperPickyInference.framework/Versions/A/Resources/ebird/ | wc -l` (should be 145).
+  shipped `Resources/ebird/` into the framework bundle. Worth
+  spot-checking with `ls /tmp/spm-ddata/Build/Products/Debug/SuperPicky.app/Contents/Frameworks/SuperPickyInference.framework/Versions/A/Resources/ebird/ | wc -l` (should be 145).
 - **Swift app can't find avonet.db:** `SpeciesFilter.init` is
   non-throwing when avonet.db is missing — it just returns nil
   from `queryAvonet` and falls through to the eBird JSON cascade.

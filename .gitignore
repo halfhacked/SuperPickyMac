@@ -10,11 +10,6 @@ build/
 *.xccheckout
 *.moved-aside
 
-# Swift Package Manager
-.build/
-Packages/
-Package.resolved
-
 # Python
 __pycache__/
 *.pyc
@@ -39,7 +34,6 @@ apps/mac-client/SuperPickyInference/Resources/Models/*.mlpackage/
 # Superpowers
 .superpowers/
 real-photos/
-apps/mac-client/SuperPicky.xcodeproj/
 
 # Claude Code local state
 .claude/
