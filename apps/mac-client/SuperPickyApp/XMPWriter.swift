@@ -87,10 +87,9 @@ struct XMPWriter {
         return url
     }
 
-    /// Flat `dc:subject` keyword list for the XMP sidecar. Emits common name,
-    /// scientific name, Chinese name, pinyin per species (each only if
-    /// non-nil) plus "In Flight" when applicable, deduping across species so
-    /// two photos tagged with colliding common names don't double-emit.
+    /// Flat `dc:subject` keyword list for the XMP sidecar. Pinyin initials ride
+    /// with pinyin — both appear together or neither does, so a species removal
+    /// drops both from the regenerated sidecar with no separate cleanup.
     static func keywordBag(for assigned: [SpeciesMatch], isFlying: Bool) -> [String] {
         var emitted = Set<String>()
         var bag: [String] = []
@@ -102,7 +101,10 @@ struct XMPWriter {
             push(match.commonName)
             push(match.scientificName)
             push(match.cnName)
-            push(match.pinyin)
+            if let pinyin = match.pinyin {
+                push(pinyin)
+                push(match.pinyinInitials)
+            }
         }
         if isFlying { bag.append("In Flight") }
         return bag

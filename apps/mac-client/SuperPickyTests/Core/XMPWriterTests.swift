@@ -265,13 +265,15 @@ import Foundation
     // MARK: - Pure-helper tests: keywordBag / hierarchicalBag
 
     private func match(_ ebird: String, common: String? = nil, scientific: String? = nil,
-                       cn: String? = nil, pinyin: String? = nil) -> SpeciesMatch {
+                       cn: String? = nil, pinyin: String? = nil,
+                       pinyinInitials: String? = nil) -> SpeciesMatch {
         SpeciesMatch(
             scientificName: scientific ?? "Genus \(ebird)",
             commonName: common,
             confidence: 0.5,
             cnName: cn,
             pinyin: pinyin,
+            pinyinInitials: pinyinInitials,
             thresholdUsed: nil,
             ebirdCode: ebird
         )
@@ -281,9 +283,30 @@ import Foundation
         let bag = XMPWriter.keywordBag(for: [
             match("baleag", common: "Bald Eagle",
                   scientific: "Haliaeetus leucocephalus",
-                  cn: "白头海雕", pinyin: "baitouhaidiao"),
+                  cn: "白头海雕", pinyin: "baitouhaidiao", pinyinInitials: "btHd"),
+        ], isFlying: false)
+        #expect(bag == ["Bald Eagle", "Haliaeetus leucocephalus", "白头海雕", "baitouhaidiao", "btHd"])
+    }
+
+    @Test func keywordBagEmitsPinyinWithoutInitialsWhenInitialsMissing() {
+        let bag = XMPWriter.keywordBag(for: [
+            match("baleag", common: "Bald Eagle",
+                  scientific: "Haliaeetus leucocephalus",
+                  cn: "白头海雕", pinyin: "baitouhaidiao", pinyinInitials: nil),
         ], isFlying: false)
         #expect(bag == ["Bald Eagle", "Haliaeetus leucocephalus", "白头海雕", "baitouhaidiao"])
+    }
+
+    @Test func keywordBagOmitsInitialsWhenPinyinMissing() {
+        // Initials without pinyin is semantically inconsistent — the data never
+        // ships that way — but the writer should still suppress orphan initials
+        // so the pinyin/initials pair never splits.
+        let bag = XMPWriter.keywordBag(for: [
+            match("baleag", common: "Bald Eagle",
+                  scientific: "Haliaeetus leucocephalus",
+                  cn: nil, pinyin: nil, pinyinInitials: "btHd"),
+        ], isFlying: false)
+        #expect(bag == ["Bald Eagle", "Haliaeetus leucocephalus"])
     }
 
     @Test func keywordBagSkipsNilFields() {

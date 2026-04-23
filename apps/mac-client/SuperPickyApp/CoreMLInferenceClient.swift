@@ -242,6 +242,7 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
                     confidence: top1.element,
                     cnName: entry.chineseName,
                     pinyin: entry.pinyin,
+                    pinyinInitials: entry.pinyinInitials,
                     thresholdUsed: acceptedLevel.rawValue,
                     ebirdCode: entry.ebirdCode
                 ))
@@ -266,6 +267,7 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
                         confidence: prob,
                         cnName: entry.chineseName,
                         pinyin: entry.pinyin,
+                        pinyinInitials: entry.pinyinInitials,
                         thresholdUsed: kind.rawValue,
                         ebirdCode: entry.ebirdCode
                     )
