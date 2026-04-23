@@ -94,6 +94,7 @@ struct CompareView: View {
                         Image(systemName: "flag.fill")
                             .foregroundStyle(.orange)
                             .font(.caption)
+                            .transition(.opacity)
                     }
                     Spacer()
                     Text(photo.filename)
@@ -103,6 +104,7 @@ struct CompareView: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
                 .background(.black)
+                .animation(.easeInOut(duration: 0.2), value: photo.isPick)
             }
         }
     }
