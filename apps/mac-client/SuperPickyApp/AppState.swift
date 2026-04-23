@@ -26,16 +26,41 @@ struct SpeciesEntry: Identifiable {
     let name: String
     let cnName: String?
     let count: Int
+    let picks: Int
     let burstGroups: [BurstGroupEntry]
     let singlePhotos: Int
+    let singlePicks: Int
     let isUnidentified: Bool
     var id: String { speciesID ?? "__unidentified__" }
+
+    init(speciesID: String?, scientificName: String?, name: String, cnName: String?,
+         count: Int, picks: Int = 0, burstGroups: [BurstGroupEntry],
+         singlePhotos: Int, singlePicks: Int = 0, isUnidentified: Bool) {
+        self.speciesID = speciesID
+        self.scientificName = scientificName
+        self.name = name
+        self.cnName = cnName
+        self.count = count
+        self.picks = picks
+        self.burstGroups = burstGroups
+        self.singlePhotos = singlePhotos
+        self.singlePicks = singlePicks
+        self.isUnidentified = isUnidentified
+    }
 }
 
 struct BurstGroupEntry: Identifiable {
     let id: UUID
     let count: Int
+    let pickCount: Int
     let bestFilename: String?
+
+    init(id: UUID, count: Int, pickCount: Int = 0, bestFilename: String?) {
+        self.id = id
+        self.count = count
+        self.pickCount = pickCount
+        self.bestFilename = bestFilename
+    }
 }
 
 @Observable
@@ -343,9 +368,18 @@ final class AppState {
     }
 
     func togglePick(id: UUID) {
+        var newIsPick: Bool?
         mutatePhoto(id: id) { photo in
             photo.isPick.toggle()
+            newIsPick = photo.isPick
         }
+        guard let newIsPick,
+              let idx = allPhotoIndex[id] else { return }
+        speciesEntries = SpeciesHierarchyBuilder.applyPickToggle(
+            entries: speciesEntries,
+            photo: allPhotos[idx],
+            newIsPick: newIsPick
+        )
     }
 
     func deletePhoto(id: UUID) throws {
@@ -440,6 +474,7 @@ final class AppState {
         do {
             let database = try db()
             guard var photo = try database.fetchPhoto(id: action.photoID) else { return }
+            let pickChanged = photo.isPick != action.previousIsPick
             photo.starRating = action.previousRating
             photo.isPick = action.previousIsPick
             photo.isManualRating = action.previousIsManualRating
@@ -448,6 +483,13 @@ final class AppState {
 
             if let idx = allPhotoIndex[action.photoID] {
                 allPhotos[idx] = photo
+            }
+            if pickChanged {
+                speciesEntries = SpeciesHierarchyBuilder.applyPickToggle(
+                    entries: speciesEntries,
+                    photo: photo,
+                    newIsPick: photo.isPick
+                )
             }
 
             if action.wasHidden {

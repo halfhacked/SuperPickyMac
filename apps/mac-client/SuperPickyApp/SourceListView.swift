@@ -126,7 +126,7 @@ struct SourceListView: View {
                                 HStack {
                                     Text(species.isUnidentified ? config.localized("Unidentified") : config.localizedName(en: species.name, cn: species.cnName))
                                     Spacer()
-                                    Text("\(species.count)")
+                                    Text("\(species.picks)/\(species.count)")
                                         .foregroundStyle(.secondary)
                                 }
                             } icon: {
@@ -142,7 +142,7 @@ struct SourceListView: View {
                                         HStack {
                                             Text(config.localized("Burst"))
                                             Spacer()
-                                            Text("\(burst.count)")
+                                            Text("\(burst.pickCount)/\(burst.count)")
                                                 .foregroundStyle(.secondary)
                                         }
                                     } icon: {
@@ -156,7 +156,7 @@ struct SourceListView: View {
                                         HStack {
                                             Text(config.localized("Singles"))
                                             Spacer()
-                                            Text("\(species.singlePhotos)")
+                                            Text("\(species.singlePicks)/\(species.singlePhotos)")
                                                 .foregroundStyle(.secondary)
                                         }
                                     } icon: {
@@ -170,7 +170,7 @@ struct SourceListView: View {
                                     HStack {
                                         Text(species.isUnidentified ? config.localized("Unidentified") : config.localizedName(en: species.name, cn: species.cnName))
                                         Spacer()
-                                        Text("\(species.count)")
+                                        Text("\(species.picks)/\(species.count)")
                                             .foregroundStyle(.secondary)
                                     }
                                 } icon: {

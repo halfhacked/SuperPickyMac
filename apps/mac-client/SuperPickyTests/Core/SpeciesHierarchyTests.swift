@@ -21,7 +21,8 @@ import Foundation
         speciesConfidence: Float? = nil,
         burstGroupID: UUID? = nil,
         isBurstBest: Bool = false,
-        starRating: Int = 0
+        starRating: Int = 0,
+        isPick: Bool = false
     ) -> Photo {
         var photo = Photo(
             filename: filename,
@@ -34,6 +35,7 @@ import Foundation
         photo.burstGroupID = burstGroupID
         photo.isBurstBest = isBurstBest
         photo.starRating = starRating
+        photo.isPick = isPick
         return photo
     }
 
@@ -432,5 +434,123 @@ import Foundation
         let sparrowBuckets = appState.speciesEntries.filter { $0.name == "Sparrow" }
         #expect(sparrowBuckets.count == 2)
         #expect(Set(sparrowBuckets.compactMap(\.speciesID)) == Set(["sparow_a", "sparow_b"]))
+    }
+
+    // MARK: - Pick counts
+
+    @Test func buildTalliesPicksPerBurstSinglesAndSpecies() throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let burstID = UUID()
+        let photos = [
+            // 3-photo Eagle burst, 1 picked
+            makePhoto(folder: folder, speciesCommonName: "Eagle", speciesScientificName: "Aquila",
+                      speciesConfidence: 0.9, burstGroupID: burstID, isPick: true),
+            makePhoto(folder: folder, speciesCommonName: "Eagle", speciesScientificName: "Aquila",
+                      speciesConfidence: 0.9, burstGroupID: burstID),
+            makePhoto(folder: folder, speciesCommonName: "Eagle", speciesScientificName: "Aquila",
+                      speciesConfidence: 0.9, burstGroupID: burstID),
+            // 2 Eagle singles, 1 picked
+            makePhoto(folder: folder, speciesCommonName: "Eagle", speciesScientificName: "Aquila",
+                      speciesConfidence: 0.9, isPick: true),
+            makePhoto(folder: folder, speciesCommonName: "Eagle", speciesScientificName: "Aquila",
+                      speciesConfidence: 0.9),
+        ]
+        let entries = SpeciesHierarchyBuilder.build(from: photos)
+        let eagle = entries.first { $0.name == "Eagle" }
+        #expect(eagle?.count == 5)
+        #expect(eagle?.picks == 2)
+        #expect(eagle?.singlePhotos == 2)
+        #expect(eagle?.singlePicks == 1)
+        #expect(eagle?.burstGroups.first?.count == 3)
+        #expect(eagle?.burstGroups.first?.pickCount == 1)
+    }
+
+    @Test func applyPickToggleIncrementsBurstAndSpecies() {
+        let burstID = UUID()
+        let folder = URL(fileURLWithPath: "/tmp")
+        let photos = [
+            makePhoto(folder: folder, speciesCommonName: "Eagle", speciesScientificName: "Aquila",
+                      speciesConfidence: 0.9, burstGroupID: burstID),
+            makePhoto(folder: folder, speciesCommonName: "Eagle", speciesScientificName: "Aquila",
+                      speciesConfidence: 0.9, burstGroupID: burstID),
+        ]
+        let entries = SpeciesHierarchyBuilder.build(from: photos)
+
+        let updated = SpeciesHierarchyBuilder.applyPickToggle(
+            entries: entries, photo: photos[0], newIsPick: true
+        )
+        let eagle = updated.first { $0.name == "Eagle" }
+        #expect(eagle?.picks == 1)
+        #expect(eagle?.burstGroups.first?.pickCount == 1)
+        #expect(eagle?.singlePicks == 0)
+    }
+
+    @Test func applyPickToggleOnSingleUpdatesSinglePicksNotBurst() {
+        let burstID = UUID()
+        let folder = URL(fileURLWithPath: "/tmp")
+        let photos = [
+            makePhoto(folder: folder, speciesCommonName: "Eagle", speciesScientificName: "Aquila",
+                      speciesConfidence: 0.9),
+            makePhoto(folder: folder, speciesCommonName: "Eagle", speciesScientificName: "Aquila",
+                      speciesConfidence: 0.9, burstGroupID: burstID),
+            makePhoto(folder: folder, speciesCommonName: "Eagle", speciesScientificName: "Aquila",
+                      speciesConfidence: 0.9, burstGroupID: burstID),
+        ]
+        let entries = SpeciesHierarchyBuilder.build(from: photos)
+
+        let single = photos[0]  // the one without burstGroupID
+        let updated = SpeciesHierarchyBuilder.applyPickToggle(
+            entries: entries, photo: single, newIsPick: true
+        )
+        let eagle = updated.first { $0.name == "Eagle" }
+        #expect(eagle?.picks == 1)
+        #expect(eagle?.singlePicks == 1)
+        #expect(eagle?.burstGroups.first?.pickCount == 0)
+    }
+
+    @Test func applyPickToggleDecrementsAndGuardsAgainstUnderflow() {
+        let folder = URL(fileURLWithPath: "/tmp")
+        let photos = [
+            makePhoto(folder: folder, speciesCommonName: "Eagle", speciesScientificName: "Aquila",
+                      speciesConfidence: 0.9, isPick: true),
+        ]
+        let entries = SpeciesHierarchyBuilder.build(from: photos)
+
+        let afterUnpick = SpeciesHierarchyBuilder.applyPickToggle(
+            entries: entries, photo: photos[0], newIsPick: false
+        )
+        #expect(afterUnpick.first?.picks == 0)
+        #expect(afterUnpick.first?.singlePicks == 0)
+        // Spurious extra un-pick must not go negative.
+        let afterDouble = SpeciesHierarchyBuilder.applyPickToggle(
+            entries: afterUnpick, photo: photos[0], newIsPick: false
+        )
+        #expect(afterDouble.first?.picks == 0)
+    }
+
+    @Test func applyPickToggleFansOutToEveryTaggedBucket() {
+        let folder = URL(fileURLWithPath: "/tmp")
+        var multi = makePhoto(folder: folder, filename: "IMG_M.CR3")
+        multi.assignedSpecies = [
+            SpeciesMatch(scientificName: "Aquila", commonName: "Eagle",
+                         confidence: 0.9, cnName: nil, pinyin: nil,
+                         thresholdUsed: "gps", ebirdCode: "eagle"),
+            SpeciesMatch(scientificName: "Buteo", commonName: "Hawk",
+                         confidence: 0.4, cnName: nil, pinyin: nil,
+                         thresholdUsed: "gps", ebirdCode: "hawk"),
+        ]
+        let entries = SpeciesHierarchyBuilder.build(from: [multi])
+
+        let updated = SpeciesHierarchyBuilder.applyPickToggle(
+            entries: entries, photo: multi, newIsPick: true
+        )
+        let eagle = updated.first { $0.name == "Eagle" }
+        let hawk = updated.first { $0.name == "Hawk" }
+        #expect(eagle?.picks == 1)
+        #expect(hawk?.picks == 1)
+        #expect(eagle?.singlePicks == 1)
+        #expect(hawk?.singlePicks == 1)
     }
 }
