@@ -449,7 +449,16 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
     private func arrowStripUntil(_ condition: () -> Bool,
                                  pressesPerDirection: Int,
                                  batchSize: Int = 1) {
-        Self.app.images[A11y.photoPreview].click()
+        // Clear keyboard focus from any text field so arrow keys land on
+        // the app-level NSEvent monitor. Prefer clicking PhotoPreview;
+        // fall back to Escape if it's not yet in the tree (slow-CI race
+        // where the auto-selected photo hasn't finished decoding).
+        let preview = Self.app.images[A11y.photoPreview]
+        if preview.exists {
+            preview.click()
+        } else {
+            Self.app.typeKey(.escape, modifierFlags: [])
+        }
         for direction in [XCUIKeyboardKey.rightArrow, .leftArrow] {
             var pressed = 0
             while pressed < pressesPerDirection {
