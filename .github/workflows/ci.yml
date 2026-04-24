@@ -34,17 +34,70 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: All UI tests (mock mode)
+      # Each UI test class runs in its own xcodebuild invocation — a
+      # fresh process + fresh app launch every class, which is the only
+      # reliable way to avoid window-state bleed (UserDefaults-restored
+      # size, toolbar offsets) between shared-app classes.
+      - name: MockUITests
         working-directory: apps/mac-client
         run: |
           xcodebuild test \
             -scheme SuperPicky \
             -destination 'platform=macOS' \
-            -only-testing:SuperPickyUITests/MockUITests \
-            -only-testing:SuperPickyUITests/ProcessingFlowUITests \
-            -only-testing:SuperPickyUITests/SettingsUITests \
-            -only-testing:SuperPickyUITests/CompareViewUITests \
-            -only-testing:SuperPickyUITests/CalibratorUITests \
-            -only-testing:SuperPickyUITests/KeyboardHelpUITests \
-            -only-testing:SuperPickyUITests/CullingWorkflowUITests \
+            -only-testing:SuperPickyUITests/MockUITests
+
+      - name: ProcessingFlowUITests
+        working-directory: apps/mac-client
+        run: |
+          xcodebuild test \
+            -scheme SuperPicky \
+            -destination 'platform=macOS' \
+            -only-testing:SuperPickyUITests/ProcessingFlowUITests
+
+      - name: SettingsUITests
+        working-directory: apps/mac-client
+        run: |
+          xcodebuild test \
+            -scheme SuperPicky \
+            -destination 'platform=macOS' \
+            -only-testing:SuperPickyUITests/SettingsUITests
+
+      - name: CompareViewUITests
+        working-directory: apps/mac-client
+        run: |
+          xcodebuild test \
+            -scheme SuperPicky \
+            -destination 'platform=macOS' \
+            -only-testing:SuperPickyUITests/CompareViewUITests
+
+      - name: CalibratorUITests
+        working-directory: apps/mac-client
+        run: |
+          xcodebuild test \
+            -scheme SuperPicky \
+            -destination 'platform=macOS' \
+            -only-testing:SuperPickyUITests/CalibratorUITests
+
+      - name: KeyboardHelpUITests
+        working-directory: apps/mac-client
+        run: |
+          xcodebuild test \
+            -scheme SuperPicky \
+            -destination 'platform=macOS' \
+            -only-testing:SuperPickyUITests/KeyboardHelpUITests
+
+      - name: CullingWorkflowUITests
+        working-directory: apps/mac-client
+        run: |
+          xcodebuild test \
+            -scheme SuperPicky \
+            -destination 'platform=macOS' \
+            -only-testing:SuperPickyUITests/CullingWorkflowUITests
+
+      - name: SpeciesEditPanelUITests
+        working-directory: apps/mac-client
+        run: |
+          xcodebuild test \
+            -scheme SuperPicky \
+            -destination 'platform=macOS' \
             -only-testing:SuperPickyUITests/SpeciesEditPanelUITests
