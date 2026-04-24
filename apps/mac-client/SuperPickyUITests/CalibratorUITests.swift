@@ -5,8 +5,29 @@ final class CalibratorUITests: SuperPickyUITestCase {
 
     override class var testDirPrefix: String { "superpicky_calibrator" }
 
+    private static var diagSuiteDumped = false
+
     override func setUpWithError() throws {
         continueAfterFailure = true
+        if !Self.diagSuiteDumped {
+            Self.diagSuiteDumped = true
+            logDiagnostics("suite-init",
+                           interestButtons: ["ThresholdCalibratorButton"])
+        }
+    }
+
+    /// Temporary: the chrome shard's CalibratorUITests test02/03/04 fail
+    /// deterministically on `push` events to main with
+    /// `ThresholdCalibratorButton` at `{{1028, 25}, {39, 52}}` "not
+    /// hittable", while `pull_request` runs pass. Dump geometry +
+    /// screenshot at the start of every test so the next failing push
+    /// tells us what covers that coordinate. Remove once diagnosed.
+    override func tearDownWithError() throws {
+        if let run = testRun, run.failureCount > 0 {
+            logDiagnostics("fail-\(name)",
+                           interestButtons: ["ThresholdCalibratorButton"])
+        }
+        try super.tearDownWithError()
     }
 
     private func calibratorButton() -> XCUIElement {

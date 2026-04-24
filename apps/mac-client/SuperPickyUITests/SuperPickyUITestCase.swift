@@ -68,4 +68,42 @@ class SuperPickyUITestCase: XCTestCase {
     static var fixturesRoot: URL {
         URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     }
+
+    // MARK: - Diagnostics
+
+    /// Dump the state the CI chrome shard keeps failing in — main window
+    /// frame, button-of-interest geometry + hittability, screen size, and
+    /// an attached screenshot. Prints go to stdout (shows in CI logs);
+    /// screenshot attaches to the xcresult bundle via XCTAttachment.
+    /// Temporary — remove once the "not hittable" root cause is known.
+    func logDiagnostics(_ tag: String, interestButtons: [String] = []) {
+        let app = Self.app!
+
+        let screenshot = XCUIScreen.main.screenshot()
+        print("[DIAG \(tag)] screenSize=\(screenshot.image.size)")
+
+        for (i, win) in app.windows.allElementsBoundByIndex.enumerated() {
+            let id = win.identifier
+            let title = win.title
+            let frame = win.frame
+            print("[DIAG \(tag)] window[\(i)] id='\(id)' title='\(title)' frame=\(frame)")
+        }
+
+        for ident in interestButtons {
+            let btn = app.buttons.matching(identifier: ident).firstMatch
+            if btn.exists {
+                print("[DIAG \(tag)] button '\(ident)' frame=\(btn.frame) hittable=\(btn.isHittable)")
+            } else {
+                print("[DIAG \(tag)] button '\(ident)' NOT in a11y tree")
+            }
+        }
+
+        // Full a11y tree — large but that's the point.
+        print("[DIAG \(tag)] a11y:\n\(app.debugDescription)")
+
+        let att = XCTAttachment(screenshot: screenshot)
+        att.name = "diag-\(tag)"
+        att.lifetime = .keepAlways
+        add(att)
+    }
 }
