@@ -56,6 +56,28 @@ struct SuperPickyApp: App {
                 .environment(config)
                 .preferredColorScheme(config.appTheme.colorScheme)
         }
+
+        Window("World Clock", id: "timezone-picker") {
+            TimezonePickerView()
+                .frame(minWidth: 520, minHeight: 720)
+        }
+        .defaultSize(width: 520, height: 720)
+        .windowResizability(.contentSize)
+        .commands {
+            CommandGroup(after: .windowList) {
+                OpenWorldClockCommand()
+            }
+        }
+    }
+}
+
+private struct OpenWorldClockCommand: View {
+    @Environment(\.openWindow) private var openWindow
+    var body: some View {
+        Button("World Clock") {
+            openWindow(id: "timezone-picker")
+        }
+        .keyboardShortcut("0", modifiers: [.command, .shift])
     }
 }
 

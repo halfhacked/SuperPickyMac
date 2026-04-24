@@ -10,6 +10,8 @@
 		006CBFEF3CA361B2F60615AB /* species_list_US-WY.json in Resources */ = {isa = PBXBuildFile; fileRef = B079855D4EA6D7FE445B24D9 /* species_list_US-WY.json */; };
 		0106105613F1068C39E464B4 /* species_list_CN-50.json in Resources */ = {isa = PBXBuildFile; fileRef = FF7BC47F186D13ED11279144 /* species_list_CN-50.json */; };
 		013134A36705408051D6EB93 /* GeneralTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = E283097C3245E4C2533065B6 /* GeneralTab.swift */; };
+		AA00001100000000000000A1 /* TimezoneData.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00001100000000000000B1 /* TimezoneData.swift */; };
+		AA00001100000000000000A2 /* TimezonePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00001100000000000000B2 /* TimezonePickerView.swift */; };
 		0248B7B5C0E566EFFBB63CCB /* ExifPanelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C249ECD5A8E7D02960210EA5 /* ExifPanelTests.swift */; };
 		0282798E9E2C5C127B3F1D8D /* species_list_CN-35.json in Resources */ = {isa = PBXBuildFile; fileRef = 7FC5EB11196529B2705F55B4 /* species_list_CN-35.json */; };
 		04AFCB4EB5F25BCE9F245A56 /* SuperPickyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8F78B4A7BDCFE1CE3947F19 /* SuperPickyApp.swift */; };
@@ -391,6 +393,8 @@
 		1E28FB6BF8EA365481A5787F /* species_list_US-IL.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-IL.json"; sourceTree = "<group>"; };
 		1E5FB961979296D57E260183 /* species_list_CN-61.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-61.json"; sourceTree = "<group>"; };
 		2035E1F0D51979F7D9BD4857 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		BB00001100000000000000B1 /* TimezoneData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimezoneData.swift; sourceTree = "<group>"; };
+		BB00001100000000000000B2 /* TimezonePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimezonePickerView.swift; sourceTree = "<group>"; };
 		21E2F3D30F69CB0D67BCB10E /* species_list_AR.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_AR.json; sourceTree = "<group>"; };
 		229472C67589424B4A5072F0 /* CullingConfigTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CullingConfigTests.swift; sourceTree = "<group>"; };
 		24FEF008D651B45C2E5D9732 /* FocusPointDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusPointDetector.swift; sourceTree = "<group>"; };
@@ -784,6 +788,8 @@
 				C8F78B4A7BDCFE1CE3947F19 /* SuperPickyApp.swift */,
 				97ECE0591D7C74C6BBC6C5BD /* ThresholdCalibratorView.swift */,
 				EFB7F185F169F5E033B697F1 /* ThumbnailStripView.swift */,
+				BB00001100000000000000B1 /* TimezoneData.swift */,
+				BB00001100000000000000B2 /* TimezonePickerView.swift */,
 				6841A0114CD6BBE3D1E4008E /* XMPWriter.swift */,
 				9287FBC69300612F56401CD6 /* ZoomableImageView.swift */,
 				BF41AD1430AE0514A5578240 /* Localizable.strings */,
@@ -1546,6 +1552,8 @@
 				04AFCB4EB5F25BCE9F245A56 /* SuperPickyApp.swift in Sources */,
 				22579742F83CBF5A726147F1 /* ThresholdCalibratorView.swift in Sources */,
 				628781342964039FC54E5D63 /* ThumbnailStripView.swift in Sources */,
+				AA00001100000000000000A1 /* TimezoneData.swift in Sources */,
+				AA00001100000000000000A2 /* TimezonePickerView.swift in Sources */,
 				B6B76A0E59A2F4F0E8C9F653 /* XMPWriter.swift in Sources */,
 				41CE16FF85A6D10B7356C792 /* ZoomableImageView.swift in Sources */,
 			);
