@@ -20,26 +20,19 @@ jobs:
       - name: Install exiftool
         run: brew install exiftool
 
-      - name: Swift Build
+      - name: Build & Test (L1 Unit)
         working-directory: apps/mac-client
-        run: swift build
-
-      - name: Swift Test (L1 Unit)
-        working-directory: apps/mac-client
-        run: swift test
+        run: |
+          xcodebuild test \
+            -scheme SuperPicky \
+            -destination 'platform=macOS' \
+            -only-testing:SuperPickyTests
 
   xcuitest:
     name: XCUITest (Mock)
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install xcodegen
-        run: brew install xcodegen
-
-      - name: Generate Xcode project
-        working-directory: apps/mac-client
-        run: xcodegen generate
 
       - name: MockUITests
         working-directory: apps/mac-client

@@ -345,7 +345,7 @@ final class AppState {
             }
             mutate(&photo)
             try database.save(&photo)      // DB write FIRST
-            try? XMPWriter.write(photo: photo)
+            _ = try? XMPWriter.write(photo: photo)
             // Only update in-memory state after successful DB write:
             if let idx = allPhotoIndex[id] {
                 allPhotos[idx] = photo
@@ -479,7 +479,7 @@ final class AppState {
             photo.isPick = action.previousIsPick
             photo.isManualRating = action.previousIsManualRating
             try database.save(&photo)
-            try? XMPWriter.write(photo: photo)
+            _ = try? XMPWriter.write(photo: photo)
 
             if let idx = allPhotoIndex[action.photoID] {
                 allPhotos[idx] = photo

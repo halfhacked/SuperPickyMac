@@ -28,7 +28,7 @@ struct BurstDetector: Sendable {
     /// Which similarity algorithm to use for verification.
     let similarityMethod: BurstSimilarityMethod
 
-    private nonisolated(unsafe) static let exifDateFormatter: DateFormatter = {
+    private static let exifDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
         formatter.locale = Locale(identifier: "en_US_POSIX")  // required for format strings
@@ -59,7 +59,7 @@ struct BurstDetector: Sendable {
         guard timestamped.count >= minBurstCount else { return [] }
 
         // 2. Group by time proximity
-        var timeGroups = groupByTime(timestamped)
+        let timeGroups = groupByTime(timestamped)
 
         // 3. Verify with image similarity (Vision feature prints)
         var verifiedGroups: [BurstGroup] = []

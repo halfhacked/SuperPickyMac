@@ -70,8 +70,8 @@ final class ProcessingFlowUITests: XCTestCase {
     /// 04: All photos remain in folder (no auto-organize)
     func test04_PhotosNotMoved() throws {
         let photos = try! FileManager.default.contentsOfDirectory(atPath: Self.testDir)
-            .filter { $0.hasSuffix(".jpg") || $0.hasSuffix(".ARW") }
-        XCTAssertEqual(photos.count, 34, "All 34 photos should remain in folder")
+            .filter { $0.hasSuffix(".jpg") }
+        XCTAssertEqual(photos.count, 34, "All 34 JPGs should remain in folder")
     }
 
     /// 05: Thumbnails are visible in the strip
@@ -190,7 +190,7 @@ final class ProcessingFlowUITests: XCTestCase {
 
         if FileManager.default.fileExists(atPath: sourceDir) {
             let photos = try! FileManager.default.contentsOfDirectory(atPath: sourceDir)
-                .filter { $0.hasSuffix(".jpg") || $0.hasSuffix(".ARW") }
+                .filter { $0.hasSuffix(".jpg") }
             for photo in photos {
                 let src = (sourceDir as NSString).appendingPathComponent(photo)
                 let dst = (testDir as NSString).appendingPathComponent(photo)

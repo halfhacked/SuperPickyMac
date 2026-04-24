@@ -8,17 +8,29 @@ enum ImageLoader {
     /// Load an image at a given max pixel size, or full resolution if nil.
     /// Uses the embedded preview when it's large enough (fast path for RAW),
     /// otherwise decodes the full image and downsamples.
+    ///
+    /// NSImage isn't Sendable, so decode returns a CGImage from the
+    /// background queue (Sendable) and the MainActor-isolated caller wraps
+    /// it — which also keeps AppKit construction off the worker thread.
+    @MainActor
     static func load(path: String, maxPixelSize: Int? = nil) async -> NSImage? {
-        let url = URL(fileURLWithPath: path)
+        guard let cgImage = await loadCGImage(path: path, maxPixelSize: maxPixelSize) else {
+            return nil
+        }
+        return NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+    }
 
+    /// Sendable-friendly decode. Useful for `async let` / `TaskGroup`
+    /// concurrency where NSImage's non-Sendable result would error.
+    /// Call sites wrap in NSImage on their own actor.
+    static func loadCGImage(path: String, maxPixelSize: Int? = nil) async -> CGImage? {
+        let url = URL(fileURLWithPath: path)
         return await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
                     continuation.resume(returning: nil)
                     return
                 }
-
-                let cgImage: CGImage?
                 if let maxPixelSize {
                     // RAWs embed a ~1600 px preview that satisfies `maxPixelSize`;
                     // use it (IfAbsent). Smaller sources (e.g. 1600 px JPEGs
@@ -27,26 +39,21 @@ enum ImageLoader {
                     // thumbnail and the preview ends up blurry.
                     let sourceSide = sourceMaxDimension(source: source)
                     let useEmbedded = sourceSide > maxPixelSize
-                    cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                    let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, [
                         kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
                         (useEmbedded
                          ? kCGImageSourceCreateThumbnailFromImageIfAbsent
                          : kCGImageSourceCreateThumbnailFromImageAlways): true,
                         kCGImageSourceCreateThumbnailWithTransform: true,
                     ] as CFDictionary)
+                    continuation.resume(returning: cgImage)
                 } else {
                     // Full-res: actual image decode
-                    cgImage = CGImageSourceCreateImageAtIndex(source, 0, [
+                    let cgImage = CGImageSourceCreateImageAtIndex(source, 0, [
                         kCGImageSourceCreateThumbnailWithTransform: true,
                     ] as CFDictionary)
+                    continuation.resume(returning: cgImage)
                 }
-
-                guard let cgImage else {
-                    continuation.resume(returning: nil)
-                    return
-                }
-                let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
-                continuation.resume(returning: nsImage)
             }
         }
     }

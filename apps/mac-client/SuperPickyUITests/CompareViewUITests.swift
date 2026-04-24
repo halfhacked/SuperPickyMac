@@ -24,7 +24,7 @@ final class CompareViewUITests: XCTestCase {
 
         if FileManager.default.fileExists(atPath: sourceDir) {
             let photos = try! FileManager.default.contentsOfDirectory(atPath: sourceDir)
-                .filter { $0.hasSuffix(".jpg") || $0.hasSuffix(".ARW") }
+                .filter { $0.hasSuffix(".jpg") }
             for photo in photos {
                 try! FileManager.default.copyItem(
                     atPath: (sourceDir as NSString).appendingPathComponent(photo),
@@ -44,6 +44,9 @@ final class CompareViewUITests: XCTestCase {
             if app.progressIndicators.count == 0 { break }
             Thread.sleep(forTimeInterval: 0.5)
         }
+        // PhotoPreview enters the a11y tree only after the auto-selected
+        // photo's full-res decode completes — CI lags on the ~3 MB fixture JPGs.
+        _ = app.images["PhotoPreview"].waitForExistence(timeout: 15)
         Thread.sleep(forTimeInterval: 1)
     }
 

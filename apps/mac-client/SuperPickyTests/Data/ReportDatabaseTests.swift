@@ -129,7 +129,7 @@ import GRDB
 
     @Test func deletePhoto_removesFromDatabase() throws {
         let dir = try makeTempDir()
-        var db = try ReportDatabase(folderPath: dir)
+        let db = try ReportDatabase(folderPath: dir)
         var photo = Photo(filename: "test.jpg", filePath: "/tmp/test.jpg", folderPath: dir.path)
         try db.save(&photo)
         try db.delete(id: photo.id)
@@ -173,7 +173,7 @@ import GRDB
 
     @Test func deleteNonManualPhotos_preservesManualRatings() throws {
         let dir = try makeTempDir()
-        var db = try ReportDatabase(folderPath: dir)
+        let db = try ReportDatabase(folderPath: dir)
 
         var autoPhoto = Photo(filename: "auto.jpg", filePath: "/tmp/auto.jpg", folderPath: dir.path)
         autoPhoto.isManualRating = false

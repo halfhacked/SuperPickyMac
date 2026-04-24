@@ -127,23 +127,31 @@ struct CompareView: View {
     }
 
     private func loadImages() async {
-        async let left = loadImage(for: leftPhoto)
-        async let right = loadImage(for: rightPhoto)
+        // Decode in parallel via async let. Return CGImage (Sendable) from
+        // the child tasks and wrap in NSImage on MainActor — NSImage isn't
+        // Sendable, so `async let` with an NSImage return fails Swift 6
+        // strict-concurrency checking.
+        async let left = loadCGImage(for: leftPhoto)
+        async let right = loadCGImage(for: rightPhoto)
         let (l, r) = await (left, right)
         guard !Task.isCancelled else { return }
-        leftImage = l
-        rightImage = r
+        leftImage = l.map(Self.makeNSImage)
+        rightImage = r.map(Self.makeNSImage)
     }
 
     private func loadRightImage() async {
-        let loaded = await loadImage(for: rightPhoto)
+        let cg = await loadCGImage(for: rightPhoto)
         guard !Task.isCancelled else { return }
-        rightImage = loaded
+        rightImage = cg.map(Self.makeNSImage)
     }
 
-    private func loadImage(for photo: Photo?) async -> NSImage? {
+    private func loadCGImage(for photo: Photo?) async -> CGImage? {
         guard let photo else { return nil }
-        return await ImageLoader.load(path: photo.filePath, maxPixelSize: 2000)
+        return await ImageLoader.loadCGImage(path: photo.filePath, maxPixelSize: 2000)
+    }
+
+    private static func makeNSImage(_ cg: CGImage) -> NSImage {
+        NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
     }
 
     private func handleKey(_ key: KeyboardMonitor.KeyEvent) -> Bool {

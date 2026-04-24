@@ -47,7 +47,7 @@ import CoreGraphics
         // Photo 4: 400 * 0.5 + 1 * 0.5 = 200.5
         // Best = Photo 4
 
-        let group = BurstGroup(id: UUID(), photos: photos, bestPhotoID: nil)
+        _ = BurstGroup(id: UUID(), photos: photos, bestPhotoID: nil)
         let bestID = photos.max(by: {
             ($0.sharpnessScore ?? 0) * 0.5 + ($0.aestheticsScore ?? 0) * 0.5 <
             ($1.sharpnessScore ?? 0) * 0.5 + ($1.aestheticsScore ?? 0) * 0.5
@@ -169,8 +169,8 @@ import CoreGraphics
             Issue.record("Failed to create test images")
             return
         }
-        guard let hash1 = BurstDetector.pHash(from: black),
-              let hash2 = BurstDetector.pHash(from: white) else {
+        guard BurstDetector.pHash(from: black) != nil,
+              BurstDetector.pHash(from: white) != nil else {
             Issue.record("pHash returned nil")
             return
         }
