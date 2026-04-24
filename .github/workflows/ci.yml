@@ -66,53 +66,35 @@ jobs:
     runs-on: macos-15
     needs: build-ui
     strategy:
-      # Each shard runs `xcodebuild test-without-building` against a
-      # pre-built .xctestrun, skipping the ~90 s build per shard.
-      # Shards with multiple UI classes run one xcodebuild invocation
-      # per class — 1-class-per-xctest-process isolation is still
-      # required to avoid consolidation flakes (see
-      # docs/ci-perf-retry-notes.md). Shards with many methods in one
-      # class (species-a/species-b) pass all targets to one invocation
-      # so they share class-level setUp.
+      # Four shards grouped by the UI area they exercise. Each shard
+      # runs one `xcodebuild test-without-building` per class so the
+      # xctest process stays isolated (prevents the consolidation flakes
+      # documented in docs/ci-perf-retry-notes.md). The shared artifact
+      # from `build-ui` skips the ~90 s per-shard build cost.
       fail-fast: false
       matrix:
         include:
-          - name: mock-settings
+          - name: chrome
+            # Empty state, settings, calibrator popover, keyboard help
+            # overlay — the supporting-UI surfaces around the main tab.
             run: |
               xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/MockUITests
               xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/SettingsUITests
-          - name: calibrator
-            run: |
               xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/CalibratorUITests
-          - name: kbdhelp
-            run: |
               xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/KeyboardHelpUITests
-          - name: proc-compare
+          - name: processing
+            # Folder ingestion + compare-view side flow.
             run: |
               xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/ProcessingFlowUITests
               xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/CompareViewUITests
           - name: culling
+            # Main culling workflow — sidebar, toolbar, keyboard shortcuts.
             run: |
               xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/CullingWorkflowUITests
-          - name: species-a
+          - name: species
+            # Species edit panel feature as one logical unit.
             run: |
-              xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' \
-                -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test41_ToggleOpensPanelWithAssignedSpecies \
-                -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test43_CandidatesListShowsNonAssignedTop5 \
-                -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test44_AddCandidateMovesToAssigned \
-                -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test45_RemoveSecondarySpecies \
-                -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test46_SearchFieldAcceptsInput \
-                -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test47_UnmatchedSearchReturnIsIgnored \
-                -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test48_EmptyAssignedStateShown
-          - name: species-b
-            run: |
-              xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' \
-                -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test49_PhotoChangeClearsSearch \
-                -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test50_RemovePrimaryPromotesNext \
-                -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test51_MakePrimaryReordersAssigned \
-                -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test52_CandidateRowsShowLevelAndConfidence \
-                -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test53_SpeciesEditWritesToXMPSidecar \
-                -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test54_InfoPanelRefreshesKeywordsOnSpeciesEdit
+              xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/SpeciesEditPanelUITests
     steps:
       - uses: actions/checkout@v4
 
