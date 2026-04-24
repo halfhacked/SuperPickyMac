@@ -69,8 +69,8 @@ struct ThumbnailCell: View {
                     .foregroundStyle(.orange)
                     .padding(3)
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 2))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .padding(2)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .transition(.opacity)
                     .accessibilityIdentifier("PickFlag_\(photo.filename)")
             }
@@ -82,22 +82,20 @@ struct ThumbnailCell: View {
                     .foregroundStyle(.yellow)
                     .padding(3)
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 2))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                     .padding(2)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
             }
 
             // Stars bottom-left
             StarRatingView(rating: photo.starRating)
                 .padding(2)
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 2))
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
                 .padding(2)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
         }
         .animation(.easeInOut(duration: 0.2), value: photo.isPick)
         .clipShape(RoundedRectangle(cornerRadius: 4))
         .overlay(
-            // `strokeBorder` (not `stroke`) so the full line renders inside
-            // the frame — otherwise the outer half is clipped (issue #48).
             RoundedRectangle(cornerRadius: 4)
                 .strokeBorder(isSelected ? Color.accentColor : (photo.isPick ? Color.orange.opacity(0.6) : .clear), lineWidth: 2)
         )
