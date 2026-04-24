@@ -46,17 +46,7 @@ final class CullingWorkflowUITests: XCTestCase {
         app.launchEnvironment["TEST_FOLDER"] = testDir
         app.launch()
 
-        // Wait for processing to complete
-        _ = app.images.firstMatch.waitForExistence(timeout: 15)
-        let deadline = Date().addingTimeInterval(15)
-        while Date() < deadline {
-            if app.progressIndicators.count == 0 { break }
-            Thread.sleep(forTimeInterval: 0.5)
-        }
-        // PhotoPreview enters the a11y tree only after the auto-selected
-        // photo's full-res decode completes — CI lags on the ~3 MB fixture JPGs.
-        _ = app.images["PhotoPreview"].waitForExistence(timeout: 15)
-        Thread.sleep(forTimeInterval: 1)
+        app.waitUntilProcessed()
     }
 
     override class func tearDown() {
@@ -474,39 +464,41 @@ final class CullingWorkflowUITests: XCTestCase {
         let thumb = Self.app.images.matching(identifier: "Thumbnail_\(filename)").firstMatch
 
         // The strip is a LazyHStack — thumbnails outside the visible range
-        // aren't in the a11y tree yet. If our target isn't rendered, arrow-
-        // key through the strip to force lazy instantiation before the
-        // existence assertion.
+        // aren't in the a11y tree yet. If our target isn't rendered, arrow
+        // through the strip (both directions — it may be before or after
+        // the current selection) to force lazy instantiation.
         if !thumb.waitForExistence(timeout: 2) {
-            Self.app.images["PhotoPreview"].click()
-            // Arrow through both directions: the target may be before or
-            // after the current selection depending on prior-test state.
-            for direction in [XCUIKeyboardKey.rightArrow, .leftArrow] {
-                for _ in 0..<50 {
-                    if thumb.exists { break }
-                    Self.app.typeKey(direction, modifierFlags: [])
-                }
-                if thumb.exists { break }
-            }
+            arrowStripUntil({ thumb.exists }, pressesPerDirection: 50)
         }
         XCTAssertTrue(thumb.waitForExistence(timeout: 10),
                       "\(filename) thumbnail should exist")
 
-        // Prior tests may have scrolled the horizontal strip so the target
-        // is off-screen. Arrow keys navigate selection *and* auto-scroll;
-        // batch into chunks of 5 to amortise the expensive isHittable query.
+        // Rendered but not hittable = off-screen. Arrow in chunks of 5 to
+        // amortise the expensive isHittable query.
         if !thumb.isHittable {
-            Self.app.images["PhotoPreview"].click()
-            for direction in [XCUIKeyboardKey.leftArrow, .rightArrow] {
-                for _ in 0..<6 {
-                    if thumb.isHittable { break }
-                    for _ in 0..<5 { Self.app.typeKey(direction, modifierFlags: []) }
-                }
-                if thumb.isHittable { break }
-            }
+            arrowStripUntil({ thumb.isHittable }, pressesPerDirection: 30, batchSize: 5)
         }
         thumb.click()
         Thread.sleep(forTimeInterval: 0.5)
+    }
+
+    /// Arrow-key the thumbnail strip in both directions (right, then left)
+    /// until `condition` is true or the press budget is exhausted.
+    /// `batchSize > 1` skips the condition check between presses — use
+    /// when the check is expensive (`isHittable`) but not when it's cheap
+    /// (`exists`).
+    private func arrowStripUntil(_ condition: () -> Bool,
+                                 pressesPerDirection: Int,
+                                 batchSize: Int = 1) {
+        Self.app.images["PhotoPreview"].click()
+        for direction in [XCUIKeyboardKey.rightArrow, .leftArrow] {
+            var pressed = 0
+            while pressed < pressesPerDirection {
+                if condition() { return }
+                for _ in 0..<batchSize { Self.app.typeKey(direction, modifierFlags: []) }
+                pressed += batchSize
+            }
+        }
     }
 
     private func selectEaglePhoto() { selectThumbnail(filename: "DSC09969.jpg") }

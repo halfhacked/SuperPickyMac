@@ -15,6 +15,7 @@
 		04AFCB4EB5F25BCE9F245A56 /* SuperPickyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8F78B4A7BDCFE1CE3947F19 /* SuperPickyApp.swift */; };
 		04EF6C1DD4443AF13BA6722D /* Photo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EAEF125F85AE85042A82314 /* Photo.swift */; };
 		057D3C67392C6EB97E013F6C /* CalibratorUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCFFE5AB2583A78C57369323 /* CalibratorUITests.swift */; };
+		B74EF03A45705183640CC48E /* XCUIApplication+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA80DF8633D5B0C788A91A4E /* XCUIApplication+Helpers.swift */; };
 		05B7E327D3FE21AF6EDF9741 /* species_list_AR.json in Resources */ = {isa = PBXBuildFile; fileRef = 21E2F3D30F69CB0D67BCB10E /* species_list_AR.json */; };
 		06B5974B68BDC4BE7D30DD44 /* SpeciesHierarchyBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DDC8E8C649AF2E099E54AB6 /* SpeciesHierarchyBuilder.swift */; };
 		07840BD69DB598D3FE555874 /* species_list_US-NY.json in Resources */ = {isa = PBXBuildFile; fileRef = 9879470ED5E5EE64F5D97BE2 /* species_list_US-NY.json */; };
@@ -573,6 +574,7 @@
 		CCACCF0FFF8E5E99AC0BF500 /* species_list_US-VT.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-VT.json"; sourceTree = "<group>"; };
 		CCBA5789A3ED2B17AA4EB44D /* SpeciesAssignmentEditorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeciesAssignmentEditorTests.swift; sourceTree = "<group>"; };
 		CCFFE5AB2583A78C57369323 /* CalibratorUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibratorUITests.swift; sourceTree = "<group>"; };
+		FA80DF8633D5B0C788A91A4E /* XCUIApplication+Helpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "XCUIApplication+Helpers.swift"; sourceTree = "<group>"; };
 		CD58D52864274CD6EF36539F /* FullscreenViewer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullscreenViewer.swift; sourceTree = "<group>"; };
 		CE8140A5E163360D2640F003 /* species_list_SV.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_SV.json; sourceTree = "<group>"; };
 		CFD05DF5AFC994E0A5CF74B3 /* YOLOBirdDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YOLOBirdDetector.swift; sourceTree = "<group>"; };
@@ -903,6 +905,7 @@
 			isa = PBXGroup;
 			children = (
 				CCFFE5AB2583A78C57369323 /* CalibratorUITests.swift */,
+				FA80DF8633D5B0C788A91A4E /* XCUIApplication+Helpers.swift */,
 				2B41F890C0F4B6826B048C97 /* CompareViewUITests.swift */,
 				F4FC5A73B3D82C650DB5DA2F /* CullingWorkflowUITests.swift */,
 				186285048D4F76B62A044BC2 /* KeyboardHelpUITests.swift */,
@@ -1389,6 +1392,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				057D3C67392C6EB97E013F6C /* CalibratorUITests.swift in Sources */,
+				B74EF03A45705183640CC48E /* XCUIApplication+Helpers.swift in Sources */,
 				CA72C6008712387A88EF0778 /* CompareViewUITests.swift in Sources */,
 				6A5822DDA6A5F74C8B512048 /* CullingWorkflowUITests.swift in Sources */,
 				1BE0E64115D2A4A91A03C59C /* KeyboardHelpUITests.swift in Sources */,

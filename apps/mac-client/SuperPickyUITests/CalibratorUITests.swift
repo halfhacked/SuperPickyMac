@@ -37,18 +37,7 @@ final class CalibratorUITests: XCTestCase {
         app.launchEnvironment["TEST_FOLDER"] = testDir
         app.launch()
 
-        _ = app.images.firstMatch.waitForExistence(timeout: 15)
-        let deadline = Date().addingTimeInterval(15)
-        while Date() < deadline {
-            if app.progressIndicators.count == 0 { break }
-            Thread.sleep(forTimeInterval: 0.5)
-        }
-        // Wait for the auto-selected photo to finish its full-res decode —
-        // dismissPopover relies on clicking PhotoPreview, which is only in
-        // the a11y tree once the image has rendered. CI's full-res decode
-        // lags on the ~3 MB fixture JPGs.
-        _ = app.images["PhotoPreview"].waitForExistence(timeout: 15)
-        Thread.sleep(forTimeInterval: 1)
+        app.waitUntilProcessed()
     }
 
     override class func tearDown() {
