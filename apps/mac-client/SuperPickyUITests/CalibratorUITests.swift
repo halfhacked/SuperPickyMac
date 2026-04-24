@@ -1,61 +1,9 @@
 import XCTest
 
 /// XCUITests for the Threshold Calibrator popover (toolbar slider-icon button).
-final class CalibratorUITests: XCTestCase {
+final class CalibratorUITests: SuperPickyUITestCase {
 
-    static var app: XCUIApplication!
-    static var testDir: String!
-
-    override class func setUp() {
-        super.setUp()
-
-        testDir = NSTemporaryDirectory() + "superpicky_calibrator_\(UUID().uuidString.prefix(8))"
-        try? FileManager.default.removeItem(atPath: testDir)
-        try! FileManager.default.createDirectory(atPath: testDir, withIntermediateDirectories: true)
-
-        let thisFile = URL(fileURLWithPath: #filePath)
-        let projectRoot = thisFile
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let sourceDir = projectRoot.appendingPathComponent("test-photos").path
-
-        if FileManager.default.fileExists(atPath: sourceDir) {
-            let photos = try! FileManager.default.contentsOfDirectory(atPath: sourceDir)
-                .filter { $0.hasSuffix(".jpg") }
-            for photo in photos {
-                try! FileManager.default.copyItem(
-                    atPath: (sourceDir as NSString).appendingPathComponent(photo),
-                    toPath: (testDir as NSString).appendingPathComponent(photo)
-                )
-            }
-        }
-
-        app = XCUIApplication()
-        app.launchEnvironment["TEST_MODE"] = "1"
-        app.launchEnvironment["TEST_FOLDER"] = testDir
-        app.launch()
-
-        _ = app.images.firstMatch.waitForExistence(timeout: 15)
-        let deadline = Date().addingTimeInterval(15)
-        while Date() < deadline {
-            if app.progressIndicators.count == 0 { break }
-            Thread.sleep(forTimeInterval: 0.5)
-        }
-        // Wait for the auto-selected photo to finish its full-res decode —
-        // dismissPopover relies on clicking PhotoPreview, which is only in
-        // the a11y tree once the image has rendered. CI's full-res decode
-        // lags on the ~3 MB fixture JPGs.
-        _ = app.images["PhotoPreview"].waitForExistence(timeout: 15)
-        Thread.sleep(forTimeInterval: 1)
-    }
-
-    override class func tearDown() {
-        app.terminate()
-        try? FileManager.default.removeItem(atPath: testDir)
-        super.tearDown()
-    }
+    override class var testDirPrefix: String { "superpicky_calibrator" }
 
     override func setUpWithError() throws {
         continueAfterFailure = true
@@ -68,7 +16,7 @@ final class CalibratorUITests: XCTestCase {
     private func dismissPopover() {
         // Click far into the main preview area to dismiss without hitting
         // any other control. Brief sleep to let macOS animate the popover out.
-        Self.app.images["PhotoPreview"].click()
+        Self.app.images[A11y.photoPreview].click()
         Thread.sleep(forTimeInterval: 0.5)
     }
 
