@@ -28,45 +28,75 @@ jobs:
             -destination 'platform=macOS' \
             -only-testing:SuperPickyTests
 
+  build-ui:
+    name: Build for UI Testing
+    runs-on: macos-15
+    outputs:
+      xctestrun: ${{ steps.xctestrun.outputs.name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: build-for-testing
+        working-directory: apps/mac-client
+        run: |
+          xcodebuild build-for-testing \
+            -scheme SuperPicky \
+            -destination 'platform=macOS' \
+            -derivedDataPath build
+
+      - name: Locate xctestrun
+        id: xctestrun
+        working-directory: apps/mac-client
+        run: |
+          f=$(find build/Build/Products -maxdepth 1 -name '*.xctestrun' | head -n 1)
+          echo "name=$(basename "$f")" >> "$GITHUB_OUTPUT"
+
+      - name: Package products
+        working-directory: apps/mac-client
+        run: tar -cf build.tar build/Build/Products
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ui-build
+          path: apps/mac-client/build.tar
+          retention-days: 1
+
   xcuitest:
     name: XCUITest / ${{ matrix.name }}
     runs-on: macos-15
+    needs: build-ui
     strategy:
-      # Each shard runs one `xcodebuild test` per UI test class (the
-      # 1-class-per-invocation pattern the repo has relied on for
-      # reliability) but in parallel across runners. See
-      # docs/ci-perf-retry-notes.md for why fully consolidating multiple
-      # classes into one invocation has flaked in the past.
+      # Each shard runs `xcodebuild test-without-building` against a
+      # pre-built .xctestrun, skipping the ~90 s build per shard.
+      # Shards with multiple UI classes run one xcodebuild invocation
+      # per class — 1-class-per-xctest-process isolation is still
+      # required to avoid consolidation flakes (see
+      # docs/ci-perf-retry-notes.md). Shards with many methods in one
+      # class (species-a/species-b) pass all targets to one invocation
+      # so they share class-level setUp.
       fail-fast: false
       matrix:
         include:
           - name: mock-settings
             run: |
-              xcodebuild test -scheme SuperPicky -destination 'platform=macOS' \
-                -only-testing:SuperPickyUITests/MockUITests
-              xcodebuild test -scheme SuperPicky -destination 'platform=macOS' \
-                -only-testing:SuperPickyUITests/SettingsUITests
+              xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/MockUITests
+              xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/SettingsUITests
           - name: calibrator
             run: |
-              xcodebuild test -scheme SuperPicky -destination 'platform=macOS' \
-                -only-testing:SuperPickyUITests/CalibratorUITests
+              xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/CalibratorUITests
           - name: kbdhelp
             run: |
-              xcodebuild test -scheme SuperPicky -destination 'platform=macOS' \
-                -only-testing:SuperPickyUITests/KeyboardHelpUITests
+              xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/KeyboardHelpUITests
           - name: proc-compare
             run: |
-              xcodebuild test -scheme SuperPicky -destination 'platform=macOS' \
-                -only-testing:SuperPickyUITests/ProcessingFlowUITests
-              xcodebuild test -scheme SuperPicky -destination 'platform=macOS' \
-                -only-testing:SuperPickyUITests/CompareViewUITests
+              xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/ProcessingFlowUITests
+              xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/CompareViewUITests
           - name: culling
             run: |
-              xcodebuild test -scheme SuperPicky -destination 'platform=macOS' \
-                -only-testing:SuperPickyUITests/CullingWorkflowUITests
+              xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/CullingWorkflowUITests
           - name: species-a
             run: |
-              xcodebuild test -scheme SuperPicky -destination 'platform=macOS' \
+              xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' \
                 -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test41_ToggleOpensPanelWithAssignedSpecies \
                 -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test43_CandidatesListShowsNonAssignedTop5 \
                 -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test44_AddCandidateMovesToAssigned \
@@ -76,7 +106,7 @@ jobs:
                 -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test48_EmptyAssignedStateShown
           - name: species-b
             run: |
-              xcodebuild test -scheme SuperPicky -destination 'platform=macOS' \
+              xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' \
                 -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test49_PhotoChangeClearsSearch \
                 -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test50_RemovePrimaryPromotesNext \
                 -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test51_MakePrimaryReordersAssigned \
@@ -86,6 +116,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: ${{ matrix.name }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: ui-build
+          path: apps/mac-client
+
+      - name: Unpack build
         working-directory: apps/mac-client
+        run: tar -xf build.tar
+
+      - name: Run ${{ matrix.name }}
+        working-directory: apps/mac-client
+        env:
+          XCTESTRUN: build/Build/Products/${{ needs.build-ui.outputs.xctestrun }}
         run: ${{ matrix.run }}
