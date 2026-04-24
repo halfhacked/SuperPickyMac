@@ -8,63 +8,29 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
 
     override class var testDirPrefix: String { "superpicky_species_edit" }
 
+    // Species tests only need 3 photos — the eagle (09969, primary subject),
+    // one bird-but-unidentified (09951, for test48's empty-assigned case),
+    // and one second eagle (09970, for test49's photo-switch flow). Using a
+    // trimmed fixture avoids the ~20s setUp cost of processing 34 photos and
+    // eliminates the `arrowStripUntil` detour when selecting thumbnails.
+    override class var fixtureFolder: String { "test-photos-species" }
+
     override func setUpWithError() throws {
         continueAfterFailure = true
     }
 
     // MARK: - Helpers
 
-    // Thumbnail identifiers repeat in the accessibility tree (favorite badge
-    // etc.); `.firstMatch` picks the top-level image view the existing
-    // screenshot tests target too.
+    // Fixture only contains 3 photos (09951, 09969, 09970) — they all fit
+    // in the thumbnail strip's initial lazy render window, so we can click
+    // by identifier directly without the arrow-strip detour the larger
+    // shared fixture needs.
     private func selectThumbnail(filename: String) {
         let thumb = Self.app.images.matching(identifier: A11y.thumbnail(filename)).firstMatch
-
-        // The strip is a LazyHStack — thumbnails outside the visible range
-        // aren't in the a11y tree yet. If our target isn't rendered, arrow
-        // through the strip (both directions — it may be before or after
-        // the current selection) to force lazy instantiation.
-        if !thumb.waitForExistence(timeout: 2) {
-            arrowStripUntil({ thumb.exists }, pressesPerDirection: 50)
-        }
-        XCTAssertTrue(thumb.waitForExistence(timeout: 10),
-                      "\(filename) thumbnail should exist")
-
-        // Rendered but not hittable = off-screen. Arrow in chunks of 5 to
-        // amortise the expensive isHittable query.
-        if !thumb.isHittable {
-            arrowStripUntil({ thumb.isHittable }, pressesPerDirection: 30, batchSize: 5)
-        }
+        XCTAssertTrue(thumb.waitForExistence(timeout: 5),
+                      "\(filename) thumbnail should exist in the 3-photo species fixture")
         thumb.click()
-        Thread.sleep(forTimeInterval: 0.5)
-    }
-
-    /// Arrow-key the thumbnail strip in both directions (right, then left)
-    /// until `condition` is true or the press budget is exhausted.
-    /// `batchSize > 1` skips the condition check between presses — use
-    /// when the check is expensive (`isHittable`) but not when it's cheap
-    /// (`exists`).
-    private func arrowStripUntil(_ condition: () -> Bool,
-                                 pressesPerDirection: Int,
-                                 batchSize: Int = 1) {
-        // Clear keyboard focus from any text field so arrow keys land on
-        // the app-level NSEvent monitor. Prefer clicking PhotoPreview;
-        // fall back to Escape if it's not yet in the tree (slow-CI race
-        // where the auto-selected photo hasn't finished decoding).
-        let preview = Self.app.images[A11y.photoPreview]
-        if preview.exists {
-            preview.click()
-        } else {
-            Self.app.typeKey(.escape, modifierFlags: [])
-        }
-        for direction in [XCUIKeyboardKey.rightArrow, .leftArrow] {
-            var pressed = 0
-            while pressed < pressesPerDirection {
-                if condition() { return }
-                for _ in 0..<batchSize { Self.app.typeKey(direction, modifierFlags: []) }
-                pressed += batchSize
-            }
-        }
+        Thread.sleep(forTimeInterval: 0.3)
     }
 
     private func selectEaglePhoto() { selectThumbnail(filename: "DSC09969.jpg") }
@@ -320,23 +286,10 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
             return
         }
 
-        // Select a different photo. Try in preference order so this test
-        // survives any prior reject/delete state drift from shared-app tests.
+        // Switch to DSC09970 (second eagle in the species fixture) — a real
+        // photo change that should clear the search.
         ensurePanelClosed()
-        let candidates = ["DSC09969.jpg", "DSC09970.jpg", "DSC09971.jpg", "DSC09972.jpg"]
-        var switched = false
-        for name in candidates {
-            let thumb = app.images.matching(identifier: A11y.thumbnail(name)).firstMatch
-            if thumb.exists {
-                selectThumbnail(filename: name)
-                switched = true
-                break
-            }
-        }
-        guard switched else {
-            XCTFail("No alternative thumbnail (\(candidates.joined(separator: ", "))) found to switch to")
-            return
-        }
+        selectThumbnail(filename: "DSC09970.jpg")
 
         exifToggleButton.click()
         XCTAssertTrue(app.scrollViews[A11y.exifPanel].waitForExistence(timeout: 3))

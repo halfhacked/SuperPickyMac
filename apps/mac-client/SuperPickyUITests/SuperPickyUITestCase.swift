@@ -13,10 +13,16 @@ class SuperPickyUITestCase: XCTestCase {
     /// Prefix for the per-suite temp directory. Override in subclasses.
     class var testDirPrefix: String { "superpicky" }
 
+    /// Fixture directory (relative to `SuperPickyUITests/`) to copy into
+    /// `testDir` before launch. Override to use a smaller purpose-built
+    /// fixture — e.g. species tests only need ~3 photos, so they don't
+    /// have to pay the ~20s full-fixture processing cost.
+    class var fixtureFolder: String { "test-photos" }
+
     override class func setUp() {
         super.setUp()
         testDir = makeTestDir(prefix: testDirPrefix)
-        copyFixtures(to: testDir)
+        copyFixtures(from: fixtureFolder, to: testDir)
         app = launchApp(testFolder: testDir)
         app.waitUntilProcessed()
     }
@@ -36,11 +42,11 @@ class SuperPickyUITestCase: XCTestCase {
         return dir
     }
 
-    private static func copyFixtures(to testDir: String) {
-        let sourceDir = projectRoot.appendingPathComponent("test-photos").path
+    private static func copyFixtures(from fixtureFolder: String, to testDir: String) {
+        let sourceDir = fixturesRoot.appendingPathComponent(fixtureFolder).path
         guard FileManager.default.fileExists(atPath: sourceDir) else { return }
         let photos = try! FileManager.default.contentsOfDirectory(atPath: sourceDir)
-            .filter { $0.hasSuffix(".jpg") }
+            .filter { $0.hasSuffix(".jpg") || $0.hasSuffix(".xmp") }
         for photo in photos {
             try! FileManager.default.copyItem(
                 atPath: (sourceDir as NSString).appendingPathComponent(photo),
@@ -57,14 +63,9 @@ class SuperPickyUITestCase: XCTestCase {
         return app
     }
 
-    /// #filePath resolves to this source file's on-disk location, which
-    /// sits at apps/mac-client/SuperPickyUITests/ — four levels below the
-    /// project root.
-    private static var projectRoot: URL {
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
+    /// #filePath resolves to this source file, which sits at
+    /// apps/mac-client/SuperPickyUITests/. Fixtures live alongside it.
+    static var fixturesRoot: URL {
+        URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     }
 }
