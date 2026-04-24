@@ -122,5 +122,4 @@ enum ImageLoader {
             ? CGSize(width: h, height: w)
             : CGSize(width: w, height: h)
     }
-
 }
