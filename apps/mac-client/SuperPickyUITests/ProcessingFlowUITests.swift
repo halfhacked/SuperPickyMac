@@ -180,13 +180,8 @@ final class ProcessingFlowUITests: XCTestCase {
         try? FileManager.default.removeItem(atPath: testDir)
         try! FileManager.default.createDirectory(atPath: testDir, withIntermediateDirectories: true)
 
-        let thisFile = URL(fileURLWithPath: #filePath)
-        let projectRoot = thisFile
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let sourceDir = projectRoot.appendingPathComponent("test-photos").path
+        let sourceDir = SuperPickyUITestCase.fixturesRoot
+            .appendingPathComponent("test-photos").path
 
         if FileManager.default.fileExists(atPath: sourceDir) {
             let photos = try! FileManager.default.contentsOfDirectory(atPath: sourceDir)

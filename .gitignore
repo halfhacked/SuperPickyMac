@@ -41,10 +41,11 @@ real-photos/
 # User-picked photo output
 Picked/
 
-# test-photos runtime artifacts (sidecars + per-folder DB written by the app)
-test-photos/*.xmp
-test-photos/.report.db*
-test-photos/.DS_Store
+# test-photos runtime artifacts (per-folder DB written by the app). Fixture
+# JPGs + the DSC09969.xmp sidecar are tracked; unwanted sidecars only appear
+# if you point the real app at the fixture directory by accident.
+apps/mac-client/SuperPickyUITests/test-photos*/.report.db*
+apps/mac-client/SuperPickyUITests/test-photos*/.DS_Store
 
 # LLVM coverage / profiling output
 *.profraw

@@ -363,9 +363,7 @@ import ImageIO
         let testPhotosDir = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent() // BDD/
             .deletingLastPathComponent() // SuperPickyTests/
-            .deletingLastPathComponent() // apps/mac-client/
-            .deletingLastPathComponent() // apps/
-            .deletingLastPathComponent() // project root
+            .appendingPathComponent("SuperPickyUITests")
             .appendingPathComponent("test-photos")
 
         let testPhoto = testPhotosDir.appendingPathComponent("DSC09177.jpg")
