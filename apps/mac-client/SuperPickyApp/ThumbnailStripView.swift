@@ -96,11 +96,8 @@ struct ThumbnailCell: View {
         .animation(.easeInOut(duration: 0.2), value: photo.isPick)
         .clipShape(RoundedRectangle(cornerRadius: 4))
         .overlay(
-            // Use `strokeBorder` so the 2pt line renders entirely inside the
-            // cell's frame. `stroke` centers on the path boundary, which sent
-            // half the line width outside the cell where the ScrollView's
-            // `.padding(.vertical, 2)` + outer clip erased the top/bottom
-            // edges (issue #48).
+            // `strokeBorder` (not `stroke`) so the full line renders inside
+            // the frame — otherwise the outer half is clipped (issue #48).
             RoundedRectangle(cornerRadius: 4)
                 .strokeBorder(isSelected ? Color.accentColor : (photo.isPick ? Color.orange.opacity(0.6) : .clear), lineWidth: 2)
         )
