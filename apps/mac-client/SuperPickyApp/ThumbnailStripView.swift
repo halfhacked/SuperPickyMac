@@ -28,7 +28,7 @@ struct ThumbnailStripView: View {
                     }
                 }
                 .padding(.horizontal, 4)
-                .padding(.vertical, 2)
+                .padding(.vertical, 4)
             }
             .background(ScrollWheelRedirector())
             .background(.bar)
@@ -69,8 +69,8 @@ struct ThumbnailCell: View {
                     .foregroundStyle(.orange)
                     .padding(3)
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 2))
-                    .padding(2)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(2)
                     .transition(.opacity)
                     .accessibilityIdentifier("PickFlag_\(photo.filename)")
             }
@@ -82,16 +82,16 @@ struct ThumbnailCell: View {
                     .foregroundStyle(.yellow)
                     .padding(3)
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 2))
-                    .padding(2)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                    .padding(2)
             }
 
             // Stars bottom-left
             StarRatingView(rating: photo.starRating)
                 .padding(2)
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 2))
-                .padding(2)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                .padding(2)
         }
         .animation(.easeInOut(duration: 0.2), value: photo.isPick)
         .clipShape(RoundedRectangle(cornerRadius: 4))
