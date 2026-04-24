@@ -5,14 +5,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApplication.shared.activate(ignoringOtherApps: true)
 
         if ProcessInfo.processInfo.environment["TEST_MODE"] == "1" {
-            // Pin the main window to a known frame so XCUITests get a
-            // consistent layout across classes running in one xcodebuild
-            // invocation. SwiftUI's NSWindow-frame prefs can otherwise
-            // carry a narrowed / off-screen window from a prior class
-            // into the next, clipping toolbar buttons and sidebar rows.
-            // See docs/ci-perf-retry-notes.md.
+            // Pin the main window WIDE enough that the toolbar never
+            // collapses into an overflow menu. A narrow window (<~1500
+            // px) drops rightmost toolbar items (ExifToggle /
+            // ThresholdCalibratorButton) into a hidden overflow — they
+            // remain in the a11y tree but are "not hittable", which
+            // shows up as cryptic CI failures. See
+            // docs/ci-perf-retry-notes.md. Set in an async block so
+            // SwiftUI's WindowGroup has time to create the window.
             DispatchQueue.main.async {
-                let frame = NSRect(x: 100, y: 100, width: 1400, height: 900)
+                let frame = NSRect(x: 0, y: 0, width: 1800, height: 1000)
                 for window in NSApp.windows where window.contentViewController != nil {
                     window.setFrame(frame, display: true)
                 }
