@@ -82,6 +82,7 @@
 		386532C80D611F1BD9A18303 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = BF41AD1430AE0514A5578240 /* Localizable.strings */; };
 		3889D1E2499F4D32B9C4F63A /* MockUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FC42B7AF80A2E12BBE315A0 /* MockUITests.swift */; };
 		38BDD7274FBEA3E39AF190C2 /* ZoomStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A5220B2A07CE5136A004F40 /* ZoomStateTests.swift */; };
+		26A797F1A8C9366F76BB6D63 /* ImageLoaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51DF18F24F27FA845B8DA10D /* ImageLoaderTests.swift */; };
 		39C19098B14ADDF3056D7885 /* species_list_US-MN.json in Resources */ = {isa = PBXBuildFile; fileRef = B0092D1A9E4E726F7DFFCCE9 /* species_list_US-MN.json */; };
 		39D8B1E325F33687B5E3C846 /* species_list_US-VA.json in Resources */ = {isa = PBXBuildFile; fileRef = 07580E7FA71DB8E50F06BE95 /* species_list_US-VA.json */; };
 		3B30B50F73D434EB0A32456A /* ReportDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = E726094A2C453F4B243141FD /* ReportDatabase.swift */; };
@@ -519,6 +520,7 @@
 		989AA24DA5C45881773FB833 /* species_list_FR.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_FR.json; sourceTree = "<group>"; };
 		98EC2DA90BF8B3CEECA6B71D /* species_list_BO.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_BO.json; sourceTree = "<group>"; };
 		9A5220B2A07CE5136A004F40 /* ZoomStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoomStateTests.swift; sourceTree = "<group>"; };
+		51DF18F24F27FA845B8DA10D /* ImageLoaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageLoaderTests.swift; sourceTree = "<group>"; };
 		9AAE5D25B3F1753DA681958E /* species_list_CN.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_CN.json; sourceTree = "<group>"; };
 		9B096E5BDF2FE98BB7B6F24D /* species_list_CN-14.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-14.json"; sourceTree = "<group>"; };
 		9DA8D0BDAF85657AB9C123BE /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
@@ -699,6 +701,7 @@
 				AF0BCC676F3ADE3C07F1A5FE /* EyeCropSharpnessTests.swift */,
 				B52B9E4BC133A0426D127FD9 /* FocusPointDetectorTests.swift */,
 				ADB21E6D8CB2BE644B0B26B6 /* GPSCellTests.swift */,
+				51DF18F24F27FA845B8DA10D /* ImageLoaderTests.swift */,
 				D88FC087F1746047FC2B2D32 /* LaplacianSharpnessTests.swift */,
 				622BC8DFB8850CF206885FBD /* LocalizationTests.swift */,
 				961E549D049211A4D632059F /* PhotoInheritSpeciesTests.swift */,
@@ -1457,6 +1460,7 @@
 				0A4945C29333A9D35B261081 /* FocusPointDetectorTests.swift in Sources */,
 				B410B08651B89F0366179458 /* GPSCellTests.swift in Sources */,
 				4486C33BC0AD686718CB8BF3 /* GPSExtractorTests.swift in Sources */,
+				26A797F1A8C9366F76BB6D63 /* ImageLoaderTests.swift in Sources */,
 				D1197EA9F228E4B15D05CD9C /* InferenceConstantsTests.swift in Sources */,
 				0B3D06F1CC0C4DF53D3FEB8C /* KeypointModelTests.swift in Sources */,
 				5823240721509FA169C396EA /* LaplacianSharpnessTests.swift in Sources */,
