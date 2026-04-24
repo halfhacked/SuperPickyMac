@@ -56,6 +56,12 @@ struct ThumbnailCell: View {
         return photoBurstGroupID != selected
     }
 
+    private var borderColor: Color {
+        if isSelected { return .accentColor }
+        if photo.isPick { return .orange.opacity(0.6) }
+        return .clear
+    }
+
     var body: some View {
         ZStack {
             AsyncThumbnailImage(filePath: photo.filePath)
@@ -96,8 +102,10 @@ struct ThumbnailCell: View {
         .animation(.easeInOut(duration: 0.2), value: photo.isPick)
         .clipShape(RoundedRectangle(cornerRadius: 4))
         .overlay(
+            // strokeBorder draws inside the frame; plain stroke would center
+            // on the edge and clip the outer half.
             RoundedRectangle(cornerRadius: 4)
-                .strokeBorder(isSelected ? Color.accentColor : (photo.isPick ? Color.orange.opacity(0.6) : .clear), lineWidth: 2)
+                .strokeBorder(borderColor, lineWidth: 2)
         )
         .opacity(isDimmed ? 0.4 : 1.0)
         .animation(.easeInOut(duration: 0.15), value: isDimmed)
