@@ -29,21 +29,71 @@ jobs:
             -only-testing:SuperPickyTests
 
   xcuitest:
-    name: XCUITest (Mock)
+    name: XCUITest (${{ matrix.shard }})
     runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Biggest class; split in half so neither shard exceeds ~4 min.
+          - shard: culling01-30
+            only_testing: >-
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test01_SidebarRatingLabels
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test02_PreviewAndInfoBar
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test03_ExportMenuExists
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test04_ExifToggle
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test05_SortMenuOffersFiveOrders
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test06_TopBurstFilterToggle
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test07_PickedFilterToggle
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test08_BrightnessKeysShowIndicator
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test10_FullscreenToggle
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test11_FullscreenArrowNavigation
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test12_ZoomDoesNotCrash
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test13_ArrowKeyNavigation
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test14_FullscreenZoom
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test15_InfoToggleKey
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test16_RatingKeysDoNotCrash
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test17_PKeyDoesNotCrash
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test18_XKeyRejects
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test19_DeleteAndUndo
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test20_StarFilterBarVisible
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test21_PhotoCounterVisible
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test22_StarFilterAndReset
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test30_CmdEExportPicks
+          - shard: culling41-54
+            only_testing: >-
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test41_ToggleOpensPanelWithAssignedSpecies
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test43_CandidatesListShowsNonAssignedTop5
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test44_AddCandidateMovesToAssigned
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test45_RemoveSecondarySpecies
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test46_SearchFieldAcceptsInput
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test47_UnmatchedSearchReturnIsIgnored
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test48_EmptyAssignedStateShown
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test49_PhotoChangeClearsSearch
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test50_RemovePrimaryPromotesNext
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test51_MakePrimaryReordersAssigned
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test52_CandidateRowsShowLevelAndConfidence
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test53_SpeciesEditWritesToXMPSidecar
+              -only-testing:SuperPickyUITests/CullingWorkflowUITests/test54_InfoPanelRefreshesKeywordsOnSpeciesEdit
+          - shard: proc-compare
+            only_testing: >-
+              -only-testing:SuperPickyUITests/ProcessingFlowUITests
+              -only-testing:SuperPickyUITests/CompareViewUITests
+          - shard: calibrator-kbdhelp
+            only_testing: >-
+              -only-testing:SuperPickyUITests/CalibratorUITests
+              -only-testing:SuperPickyUITests/KeyboardHelpUITests
+          - shard: settings-mock
+            only_testing: >-
+              -only-testing:SuperPickyUITests/SettingsUITests
+              -only-testing:SuperPickyUITests/MockUITests
     steps:
       - uses: actions/checkout@v4
 
-      - name: All UI tests (mock mode)
+      - name: Run shard ${{ matrix.shard }}
         working-directory: apps/mac-client
         run: |
           xcodebuild test \
             -scheme SuperPicky \
             -destination 'platform=macOS' \
-            -only-testing:SuperPickyUITests/MockUITests \
-            -only-testing:SuperPickyUITests/ProcessingFlowUITests \
-            -only-testing:SuperPickyUITests/SettingsUITests \
-            -only-testing:SuperPickyUITests/CompareViewUITests \
-            -only-testing:SuperPickyUITests/CalibratorUITests \
-            -only-testing:SuperPickyUITests/KeyboardHelpUITests \
-            -only-testing:SuperPickyUITests/CullingWorkflowUITests
+            ${{ matrix.only_testing }}
