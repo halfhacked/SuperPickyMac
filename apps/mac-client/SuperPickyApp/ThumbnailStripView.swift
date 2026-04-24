@@ -28,7 +28,7 @@ struct ThumbnailStripView: View {
                     }
                 }
                 .padding(.horizontal, 4)
-                .padding(.vertical, 4)
+                .padding(.vertical, 6)
             }
             .background(ScrollWheelRedirector())
             .background(.bar)
