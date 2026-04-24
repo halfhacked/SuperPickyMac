@@ -33,6 +33,13 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
     // by identifier directly without the arrow-strip detour the larger
     // shared fixture needs.
     private func selectThumbnail(filename: String) {
+        // Every photo selection in this suite funnels through this helper,
+        // so `currentPhotoFilename` is authoritative. Re-clicking the
+        // already-selected thumbnail does nothing visible but still pays
+        // the 0.3 s settle below — test54 in particular hits this because
+        // its initial `ensurePanelClosed` closes the panel but leaves the
+        // thumbnail selection on the eagle from the prior test.
+        if Self.currentPhotoFilename == filename { return }
         let thumb = Self.app.images.matching(identifier: A11y.thumbnail(filename)).firstMatch
         XCTAssertTrue(thumb.waitForExistence(timeout: 5),
                       "\(filename) thumbnail should exist in the 3-photo species fixture")
@@ -76,14 +83,19 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
         _ = poll(timeout: 2) { !self.panelIsOpen() }
     }
 
-    private func openPanelOnEagle() {
+    /// Open the EXIF+species panel on the eagle photo, ready for the test
+    /// body. `normalizeState` controls whether `resetEagleSpeciesToBaleag
+    /// Only()` runs afterward — species-state tests need the baseline; the
+    /// search-field / search-clear tests (test49) don't care about species
+    /// assignment and can skip the reset to save its walk.
+    private func openPanelOnEagle(normalizeState: Bool = true) {
         // Fast path: panel already open on the eagle from the previous
         // test in the shared-app suite. Skip the toggle-off / reselect /
         // toggle-on + re-scroll cycle (roughly 2–3 s on the CI runner).
         // The panel's scroll offset persists, so the species section is
         // already visible — only state-normalization is needed.
         if panelIsOpenOnEagle() {
-            resetEagleSpeciesToBaleagOnly()
+            if normalizeState { resetEagleSpeciesToBaleagOnly() }
             return
         }
         ensurePanelClosed()
@@ -95,7 +107,7 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
         // (CI) the species section is below the fold; scroll it into view
         // so Remove_/Add_/MakePrimary_ buttons and SearchField are hittable.
         scrollPanelToBottom()
-        resetEagleSpeciesToBaleagOnly()
+        if normalizeState { resetEagleSpeciesToBaleagOnly() }
     }
 
     /// Self-heal for tests that share the eagle photo: each test assumes
@@ -322,9 +334,11 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
         app.typeKey(.return, modifierFlags: [])
         // Testing an absence (Return must not add a custom species); there
         // is no positive signal to poll for, so briefly dwell before the
-        // negative assertion. 0.3 s is well above the observed SwiftUI
-        // action dispatch latency on the CI runner.
-        Thread.sleep(forTimeInterval: 0.3)
+        // negative assertion. 0.2 s is above the observed SwiftUI action
+        // dispatch latency on the macos-15 CI runner (sub-100 ms in
+        // practice) — tightened from 0.3 s as part of the species-shard
+        // timing trim.
+        Thread.sleep(forTimeInterval: 0.2)
 
         XCTAssertFalse(app.buttons[A11y.speciesEditRemove(garbage)].exists,
                        "Unmatched Return must not add a custom species")
@@ -350,9 +364,12 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
 
     func test49_PhotoChangeClearsSearch() {
         let app = Self.app!
-        // Reset any lingering filter so the thumbnail strip shows every photo.
-        app.typeKey("0", modifierFlags: .command)
-        openPanelOnEagle()
+        // This test only asserts on the search field; species state is
+        // irrelevant. Skipping the reset is a no-op on the current test
+        // order (test48 doesn't touch eagle species) but defends the
+        // timing if a future test inserted before this one scrambles
+        // the eagle's Assigned list.
+        openPanelOnEagle(normalizeState: false)
 
         let field = focusSearchField()
         guard typeAndWaitFor(field, "robin") else {
