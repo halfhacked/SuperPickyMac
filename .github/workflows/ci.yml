@@ -28,76 +28,87 @@ jobs:
             -destination 'platform=macOS' \
             -only-testing:SuperPickyTests
 
-  xcuitest:
-    name: XCUITest (Mock)
+  build-ui:
+    name: Build for UI Testing
     runs-on: macos-15
+    outputs:
+      xctestrun: ${{ steps.xctestrun.outputs.name }}
     steps:
       - uses: actions/checkout@v4
 
-      # Each UI test class runs in its own xcodebuild invocation — a
-      # fresh process + fresh app launch every class, which is the only
-      # reliable way to avoid window-state bleed (UserDefaults-restored
-      # size, toolbar offsets) between shared-app classes.
-      - name: MockUITests
+      - name: build-for-testing
         working-directory: apps/mac-client
         run: |
-          xcodebuild test \
+          xcodebuild build-for-testing \
             -scheme SuperPicky \
             -destination 'platform=macOS' \
-            -only-testing:SuperPickyUITests/MockUITests
+            -derivedDataPath build
 
-      - name: ProcessingFlowUITests
+      - name: Locate xctestrun
+        id: xctestrun
         working-directory: apps/mac-client
         run: |
-          xcodebuild test \
-            -scheme SuperPicky \
-            -destination 'platform=macOS' \
-            -only-testing:SuperPickyUITests/ProcessingFlowUITests
+          f=$(find build/Build/Products -maxdepth 1 -name '*.xctestrun' | head -n 1)
+          echo "name=$(basename "$f")" >> "$GITHUB_OUTPUT"
 
-      - name: SettingsUITests
+      - name: Package products
         working-directory: apps/mac-client
-        run: |
-          xcodebuild test \
-            -scheme SuperPicky \
-            -destination 'platform=macOS' \
-            -only-testing:SuperPickyUITests/SettingsUITests
+        run: tar -cf build.tar build/Build/Products
 
-      - name: CompareViewUITests
-        working-directory: apps/mac-client
-        run: |
-          xcodebuild test \
-            -scheme SuperPicky \
-            -destination 'platform=macOS' \
-            -only-testing:SuperPickyUITests/CompareViewUITests
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ui-build
+          path: apps/mac-client/build.tar
+          retention-days: 1
 
-      - name: CalibratorUITests
-        working-directory: apps/mac-client
-        run: |
-          xcodebuild test \
-            -scheme SuperPicky \
-            -destination 'platform=macOS' \
-            -only-testing:SuperPickyUITests/CalibratorUITests
+  xcuitest:
+    name: XCUITest / ${{ matrix.name }}
+    runs-on: macos-15
+    needs: build-ui
+    strategy:
+      # Four shards grouped by the UI area they exercise. Each shard
+      # runs one `xcodebuild test-without-building` per class so the
+      # xctest process stays isolated (prevents the consolidation flakes
+      # documented in docs/ci-perf-retry-notes.md). The shared artifact
+      # from `build-ui` skips the ~90 s per-shard build cost.
+      fail-fast: false
+      matrix:
+        include:
+          - name: chrome
+            # Empty state, settings, calibrator popover, keyboard help
+            # overlay — the supporting-UI surfaces around the main tab.
+            run: |
+              xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/MockUITests
+              xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/SettingsUITests
+              xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/CalibratorUITests
+              xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/KeyboardHelpUITests
+          - name: processing
+            # Folder ingestion + compare-view side flow.
+            run: |
+              xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/ProcessingFlowUITests
+              xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/CompareViewUITests
+          - name: culling
+            # Main culling workflow — sidebar, toolbar, keyboard shortcuts.
+            run: |
+              xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/CullingWorkflowUITests
+          - name: species
+            # Species edit panel feature as one logical unit.
+            run: |
+              xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/SpeciesEditPanelUITests
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: KeyboardHelpUITests
-        working-directory: apps/mac-client
-        run: |
-          xcodebuild test \
-            -scheme SuperPicky \
-            -destination 'platform=macOS' \
-            -only-testing:SuperPickyUITests/KeyboardHelpUITests
+      - uses: actions/download-artifact@v4
+        with:
+          name: ui-build
+          path: apps/mac-client
 
-      - name: CullingWorkflowUITests
+      - name: Unpack build
         working-directory: apps/mac-client
-        run: |
-          xcodebuild test \
-            -scheme SuperPicky \
-            -destination 'platform=macOS' \
-            -only-testing:SuperPickyUITests/CullingWorkflowUITests
+        run: tar -xf build.tar
 
-      - name: SpeciesEditPanelUITests
+      - name: Run ${{ matrix.name }}
         working-directory: apps/mac-client
-        run: |
-          xcodebuild test \
-            -scheme SuperPicky \
-            -destination 'platform=macOS' \
-            -only-testing:SuperPickyUITests/SpeciesEditPanelUITests
+        env:
+          XCTESTRUN: build/Build/Products/${{ needs.build-ui.outputs.xctestrun }}
+        run: ${{ matrix.run }}
