@@ -46,4 +46,5 @@ jobs:
             -only-testing:SuperPickyUITests/CompareViewUITests \
             -only-testing:SuperPickyUITests/CalibratorUITests \
             -only-testing:SuperPickyUITests/KeyboardHelpUITests \
-            -only-testing:SuperPickyUITests/CullingWorkflowUITests
+            -only-testing:SuperPickyUITests/CullingWorkflowUITests \
+            -only-testing:SuperPickyUITests/SpeciesEditPanelUITests

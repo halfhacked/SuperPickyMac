@@ -15,6 +15,7 @@
 		04AFCB4EB5F25BCE9F245A56 /* SuperPickyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8F78B4A7BDCFE1CE3947F19 /* SuperPickyApp.swift */; };
 		04EF6C1DD4443AF13BA6722D /* Photo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EAEF125F85AE85042A82314 /* Photo.swift */; };
 		057D3C67392C6EB97E013F6C /* CalibratorUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCFFE5AB2583A78C57369323 /* CalibratorUITests.swift */; };
+		609D731343275487F934DDD5 /* SpeciesEditPanelUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E57D54FCAE5270CDA9F9F446 /* SpeciesEditPanelUITests.swift */; };
 		B4D00DF562335BFFE834EE12 /* A11y.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8557E46BEAAD6BF756D061BF /* A11y.swift */; };
 		10BADC26A432284212C22429 /* SuperPickyUITestCase.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5295EA677E3CF058DDD9A45 /* SuperPickyUITestCase.swift */; };
 		B74EF03A45705183640CC48E /* XCUIApplication+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA80DF8633D5B0C788A91A4E /* XCUIApplication+Helpers.swift */; };
@@ -576,6 +577,7 @@
 		CCACCF0FFF8E5E99AC0BF500 /* species_list_US-VT.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-VT.json"; sourceTree = "<group>"; };
 		CCBA5789A3ED2B17AA4EB44D /* SpeciesAssignmentEditorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeciesAssignmentEditorTests.swift; sourceTree = "<group>"; };
 		CCFFE5AB2583A78C57369323 /* CalibratorUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibratorUITests.swift; sourceTree = "<group>"; };
+		E57D54FCAE5270CDA9F9F446 /* SpeciesEditPanelUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeciesEditPanelUITests.swift; sourceTree = "<group>"; };
 		8557E46BEAAD6BF756D061BF /* A11y.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = A11y.swift; sourceTree = "<group>"; };
 		E5295EA677E3CF058DDD9A45 /* SuperPickyUITestCase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuperPickyUITestCase.swift; sourceTree = "<group>"; };
 		FA80DF8633D5B0C788A91A4E /* XCUIApplication+Helpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "XCUIApplication+Helpers.swift"; sourceTree = "<group>"; };
@@ -909,6 +911,7 @@
 			isa = PBXGroup;
 			children = (
 				CCFFE5AB2583A78C57369323 /* CalibratorUITests.swift */,
+				E57D54FCAE5270CDA9F9F446 /* SpeciesEditPanelUITests.swift */,
 				8557E46BEAAD6BF756D061BF /* A11y.swift */,
 				E5295EA677E3CF058DDD9A45 /* SuperPickyUITestCase.swift */,
 				FA80DF8633D5B0C788A91A4E /* XCUIApplication+Helpers.swift */,
@@ -1398,6 +1401,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				057D3C67392C6EB97E013F6C /* CalibratorUITests.swift in Sources */,
+				609D731343275487F934DDD5 /* SpeciesEditPanelUITests.swift in Sources */,
 				B4D00DF562335BFFE834EE12 /* A11y.swift in Sources */,
 				10BADC26A432284212C22429 /* SuperPickyUITestCase.swift in Sources */,
 				B74EF03A45705183640CC48E /* XCUIApplication+Helpers.swift in Sources */,
