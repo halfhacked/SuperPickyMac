@@ -10,50 +10,9 @@ import XCTest
 /// - 20-29: Star filter and photo counter
 /// - 30-39: Export
 /// - 40-49: Species edit panel
-final class CullingWorkflowUITests: XCTestCase {
+final class CullingWorkflowUITests: SuperPickyUITestCase {
 
-    static var app: XCUIApplication!
-    static var testDir: String!
-
-    override class func setUp() {
-        super.setUp()
-
-        testDir = NSTemporaryDirectory() + "superpicky_workflow_\(UUID().uuidString.prefix(8))"
-        try? FileManager.default.removeItem(atPath: testDir)
-        try! FileManager.default.createDirectory(atPath: testDir, withIntermediateDirectories: true)
-
-        let thisFile = URL(fileURLWithPath: #filePath)
-        let projectRoot = thisFile
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let sourceDir = projectRoot.appendingPathComponent("test-photos").path
-
-        if FileManager.default.fileExists(atPath: sourceDir) {
-            let photos = try! FileManager.default.contentsOfDirectory(atPath: sourceDir)
-                .filter { $0.hasSuffix(".jpg") }
-            for photo in photos {
-                try! FileManager.default.copyItem(
-                    atPath: (sourceDir as NSString).appendingPathComponent(photo),
-                    toPath: (testDir as NSString).appendingPathComponent(photo)
-                )
-            }
-        }
-
-        app = XCUIApplication()
-        app.launchEnvironment["TEST_MODE"] = "1"
-        app.launchEnvironment["TEST_FOLDER"] = testDir
-        app.launch()
-
-        app.waitUntilProcessed()
-    }
-
-    override class func tearDown() {
-        app.terminate()
-        try? FileManager.default.removeItem(atPath: testDir)
-        super.tearDown()
-    }
+    override class var testDirPrefix: String { "superpicky_workflow" }
 
     override func setUpWithError() throws {
         continueAfterFailure = true
@@ -78,7 +37,7 @@ final class CullingWorkflowUITests: XCTestCase {
 
     func test02_PreviewAndInfoBar() {
         let app = Self.app!
-        let preview = app.images["PhotoPreview"]
+        let preview = app.images[A11y.photoPreview]
         XCTAssertTrue(preview.waitForExistence(timeout: 10),
                       "Photo preview should be visible")
 
@@ -104,7 +63,7 @@ final class CullingWorkflowUITests: XCTestCase {
 
     func test04_ExifToggle() {
         let app = Self.app!
-        let toggle = app.buttons["ExifToggle"]
+        let toggle = app.buttons[A11y.exifToggle]
         XCTAssertTrue(toggle.waitForExistence(timeout: 5),
                       "EXIF toggle button should exist")
     }
@@ -134,7 +93,7 @@ final class CullingWorkflowUITests: XCTestCase {
 
     func test06_TopBurstFilterToggle() {
         let app = Self.app!
-        let counter = app.staticTexts["PhotoCounter"]
+        let counter = app.staticTexts[A11y.photoCounter]
         XCTAssertTrue(counter.waitForExistence(timeout: 3))
         let initial = counter.value as? String ?? ""
 
@@ -154,7 +113,7 @@ final class CullingWorkflowUITests: XCTestCase {
 
     func test07_PickedFilterToggle() {
         let app = Self.app!
-        let counter = app.staticTexts["PhotoCounter"]
+        let counter = app.staticTexts[A11y.photoCounter]
         XCTAssertTrue(counter.waitForExistence(timeout: 3))
         let initial = counter.value as? String ?? ""
 
@@ -171,7 +130,7 @@ final class CullingWorkflowUITests: XCTestCase {
 
     func test08_BrightnessKeysShowIndicator() {
         let app = Self.app!
-        let preview = app.images["PhotoPreview"]
+        let preview = app.images[A11y.photoPreview]
         XCTAssertTrue(preview.waitForExistence(timeout: 10))
         preview.click()
         Thread.sleep(forTimeInterval: 0.3)
@@ -192,7 +151,7 @@ final class CullingWorkflowUITests: XCTestCase {
 
     func test10_FullscreenToggle() {
         let app = Self.app!
-        let preview = app.images["PhotoPreview"]
+        let preview = app.images[A11y.photoPreview]
         XCTAssertTrue(preview.waitForExistence(timeout: 10))
 
         // F enters fullscreen
@@ -213,7 +172,7 @@ final class CullingWorkflowUITests: XCTestCase {
 
     func test11_FullscreenArrowNavigation() {
         let app = Self.app!
-        let preview = app.images["PhotoPreview"]
+        let preview = app.images[A11y.photoPreview]
         preview.click()
 
         app.typeKey("f", modifierFlags: [])
@@ -233,7 +192,7 @@ final class CullingWorkflowUITests: XCTestCase {
 
     func test12_ZoomDoesNotCrash() {
         let app = Self.app!
-        let preview = app.images["PhotoPreview"]
+        let preview = app.images[A11y.photoPreview]
         XCTAssertTrue(preview.waitForExistence(timeout: 10))
 
         // Double-click zoom toggle
@@ -248,7 +207,7 @@ final class CullingWorkflowUITests: XCTestCase {
 
     func test13_ArrowKeyNavigation() {
         let app = Self.app!
-        let preview = app.images["PhotoPreview"]
+        let preview = app.images[A11y.photoPreview]
         preview.click()
         Thread.sleep(forTimeInterval: 0.5)
 
@@ -262,7 +221,7 @@ final class CullingWorkflowUITests: XCTestCase {
 
     func test14_FullscreenZoom() {
         let app = Self.app!
-        let preview = app.images["PhotoPreview"]
+        let preview = app.images[A11y.photoPreview]
         preview.click()
 
         // Enter fullscreen, toggle zoom, exit
@@ -282,13 +241,13 @@ final class CullingWorkflowUITests: XCTestCase {
 
     func test15_InfoToggleKey() {
         let app = Self.app!
-        let preview = app.images["PhotoPreview"]
+        let preview = app.images[A11y.photoPreview]
         XCTAssertTrue(preview.waitForExistence(timeout: 10))
         preview.click()
         Thread.sleep(forTimeInterval: 0.3)
 
         // ExifPanel is open by default; "i" toggles it closed.
-        let panel = app.scrollViews["ExifPanel"]
+        let panel = app.scrollViews[A11y.exifPanel]
         let initiallyOpen = panel.exists
         app.typeText("i")
         Thread.sleep(forTimeInterval: 0.5)
@@ -302,7 +261,7 @@ final class CullingWorkflowUITests: XCTestCase {
 
     func test16_RatingKeysDoNotCrash() {
         let app = Self.app!
-        let preview = app.images["PhotoPreview"]
+        let preview = app.images[A11y.photoPreview]
         XCTAssertTrue(preview.waitForExistence(timeout: 10))
         preview.click()
         Thread.sleep(forTimeInterval: 0.3)
@@ -321,7 +280,7 @@ final class CullingWorkflowUITests: XCTestCase {
 
     func test17_PKeyDoesNotCrash() {
         let app = Self.app!
-        let preview = app.images["PhotoPreview"]
+        let preview = app.images[A11y.photoPreview]
         XCTAssertTrue(preview.waitForExistence(timeout: 10))
         preview.click()
         Thread.sleep(forTimeInterval: 0.3)
@@ -343,11 +302,11 @@ final class CullingWorkflowUITests: XCTestCase {
 
     func test18_XKeyRejects() {
         let app = Self.app!
-        let counter = app.staticTexts["PhotoCounter"]
+        let counter = app.staticTexts[A11y.photoCounter]
         XCTAssertTrue(counter.waitForExistence(timeout: 5))
         let before = counter.value as? String ?? ""
 
-        let preview = app.images["PhotoPreview"]
+        let preview = app.images[A11y.photoPreview]
         preview.click()
         Thread.sleep(forTimeInterval: 0.3)
 
@@ -363,7 +322,7 @@ final class CullingWorkflowUITests: XCTestCase {
 
     func test19_DeleteAndUndo() {
         let app = Self.app!
-        let preview = app.images["PhotoPreview"]
+        let preview = app.images[A11y.photoPreview]
         XCTAssertTrue(preview.waitForExistence(timeout: 10))
         preview.click()
         Thread.sleep(forTimeInterval: 0.3)
@@ -405,21 +364,21 @@ final class CullingWorkflowUITests: XCTestCase {
 
     func test21_PhotoCounterVisible() {
         let app = Self.app!
-        let counter = app.staticTexts["PhotoCounter"]
+        let counter = app.staticTexts[A11y.photoCounter]
         XCTAssertTrue(counter.waitForExistence(timeout: 5),
                       "Photo counter should be visible")
     }
 
     func test22_StarFilterAndReset() {
         let app = Self.app!
-        let counter = app.staticTexts["PhotoCounter"]
+        let counter = app.staticTexts[A11y.photoCounter]
         XCTAssertTrue(counter.waitForExistence(timeout: 3))
         let initialText = counter.value as? String ?? ""
         XCTAssertTrue(initialText.contains(" of "),
                       "Counter should show 'N of M' format, got: \(initialText)")
 
         // Set filter to ≥ 5
-        let preview = app.images["PhotoPreview"]
+        let preview = app.images[A11y.photoPreview]
         preview.click()
         app.typeKey("5", modifierFlags: .command)
         Thread.sleep(forTimeInterval: 1)
@@ -441,7 +400,7 @@ final class CullingWorkflowUITests: XCTestCase {
 
     func test30_CmdEExportPicks() {
         let app = Self.app!
-        let preview = app.images["PhotoPreview"]
+        let preview = app.images[A11y.photoPreview]
         XCTAssertTrue(preview.waitForExistence(timeout: 10))
         preview.click()
         Thread.sleep(forTimeInterval: 0.3)
@@ -461,7 +420,7 @@ final class CullingWorkflowUITests: XCTestCase {
     // etc.); `.firstMatch` picks the top-level image view the existing
     // screenshot tests target too.
     private func selectThumbnail(filename: String) {
-        let thumb = Self.app.images.matching(identifier: "Thumbnail_\(filename)").firstMatch
+        let thumb = Self.app.images.matching(identifier: A11y.thumbnail(filename)).firstMatch
 
         // The strip is a LazyHStack — thumbnails outside the visible range
         // aren't in the a11y tree yet. If our target isn't rendered, arrow
@@ -490,7 +449,7 @@ final class CullingWorkflowUITests: XCTestCase {
     private func arrowStripUntil(_ condition: () -> Bool,
                                  pressesPerDirection: Int,
                                  batchSize: Int = 1) {
-        Self.app.images["PhotoPreview"].click()
+        Self.app.images[A11y.photoPreview].click()
         for direction in [XCUIKeyboardKey.rightArrow, .leftArrow] {
             var pressed = 0
             while pressed < pressesPerDirection {
@@ -507,7 +466,7 @@ final class CullingWorkflowUITests: XCTestCase {
     // from the accessibility tree when scrolled out of view. The root
     // ScrollView's identifier is a stable proxy for "panel is mounted".
     private func panelIsOpen() -> Bool {
-        Self.app.scrollViews["ExifPanel"].exists
+        Self.app.scrollViews[A11y.exifPanel].exists
     }
 
     // On macOS CI (GitHub Actions runner), SwiftUI toolbar buttons surface as a
@@ -516,7 +475,7 @@ final class CullingWorkflowUITests: XCTestCase {
     private func toolbarButton(_ identifier: String) -> XCUIElement {
         Self.app.buttons.matching(identifier: identifier).firstMatch
     }
-    private var exifToggleButton: XCUIElement { toolbarButton("ExifToggle") }
+    private var exifToggleButton: XCUIElement { toolbarButton(A11y.exifToggle) }
 
     private func ensurePanelClosed() {
         guard panelIsOpen() else { return }
@@ -528,7 +487,7 @@ final class CullingWorkflowUITests: XCTestCase {
         ensurePanelClosed()
         selectEaglePhoto()
         exifToggleButton.click()
-        XCTAssertTrue(Self.app.scrollViews["ExifPanel"].waitForExistence(timeout: 3),
+        XCTAssertTrue(Self.app.scrollViews[A11y.exifPanel].waitForExistence(timeout: 3),
                       "Panel should open")
         // Species sits below EXIF in the scrollable panel. On small windows
         // (CI) the species section is below the fold; scroll it into view
@@ -545,21 +504,21 @@ final class CullingWorkflowUITests: XCTestCase {
     private func resetEagleSpeciesToBaleagOnly() {
         let app = Self.app!
         // Drop goleag if it's still in Assigned from a prior test.
-        if app.buttons["SpeciesEditPanel_Remove_goleag"].exists {
-            tapButton(app.buttons["SpeciesEditPanel_Remove_goleag"])
-            _ = app.buttons["SpeciesEditPanel_Add_goleag"].waitForExistence(timeout: 2)
+        if app.buttons[A11y.speciesEditRemove("goleag")].exists {
+            tapButton(app.buttons[A11y.speciesEditRemove("goleag")])
+            _ = app.buttons[A11y.speciesEditAdd("goleag")].waitForExistence(timeout: 2)
         }
         // Restore baleag if it was removed.
-        if !app.buttons["SpeciesEditPanel_Remove_baleag"].exists,
-           app.buttons["SpeciesEditPanel_Add_baleag"].exists {
-            tapButton(app.buttons["SpeciesEditPanel_Add_baleag"])
-            _ = app.buttons["SpeciesEditPanel_Remove_baleag"].waitForExistence(timeout: 2)
+        if !app.buttons[A11y.speciesEditRemove("baleag")].exists,
+           app.buttons[A11y.speciesEditAdd("baleag")].exists {
+            tapButton(app.buttons[A11y.speciesEditAdd("baleag")])
+            _ = app.buttons[A11y.speciesEditRemove("baleag")].waitForExistence(timeout: 2)
         }
     }
 
     /// Scrolls the ExifPanel down so the species section becomes visible.
     private func scrollPanelToBottom() {
-        let panel = Self.app.scrollViews["ExifPanel"]
+        let panel = Self.app.scrollViews[A11y.exifPanel]
         guard panel.exists else { return }
         panel.scroll(byDeltaX: 0, deltaY: -600)
         Thread.sleep(forTimeInterval: 0.3)
@@ -583,7 +542,7 @@ final class CullingWorkflowUITests: XCTestCase {
     /// didn't receive focus.
     @discardableResult
     private func focusSearchField() -> XCUIElement {
-        let field = Self.app.textFields["SpeciesEditPanel_SearchField"]
+        let field = Self.app.textFields[A11y.speciesEditPanelSearchField]
         _ = field.waitForExistence(timeout: 3)
         let center = field.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         center.click()
@@ -637,15 +596,15 @@ final class CullingWorkflowUITests: XCTestCase {
 
     func test41_ToggleOpensPanelWithAssignedSpecies() {
         openPanelOnEagle()
-        XCTAssertTrue(Self.app.buttons["SpeciesEditPanel_Remove_baleag"].waitForExistence(timeout: 2))
+        XCTAssertTrue(Self.app.buttons[A11y.speciesEditRemove("baleag")].waitForExistence(timeout: 2))
         ensurePanelClosed()
     }
 
     func test43_CandidatesListShowsNonAssignedTop5() {
         let app = Self.app!
         openPanelOnEagle()
-        XCTAssertTrue(app.buttons["SpeciesEditPanel_Add_goleag"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.buttons["SpeciesEditPanel_Add_osprey"].exists)
+        XCTAssertTrue(app.buttons[A11y.speciesEditAdd("goleag")].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons[A11y.speciesEditAdd("osprey")].exists)
         ensurePanelClosed()
     }
 
@@ -653,18 +612,18 @@ final class CullingWorkflowUITests: XCTestCase {
         let app = Self.app!
         openPanelOnEagle()
 
-        let add = app.buttons["SpeciesEditPanel_Add_goleag"]
+        let add = app.buttons[A11y.speciesEditAdd("goleag")]
         XCTAssertTrue(add.waitForExistence(timeout: 3))
         tapButton(add)
 
-        let remove = app.buttons["SpeciesEditPanel_Remove_goleag"]
+        let remove = app.buttons[A11y.speciesEditRemove("goleag")]
         XCTAssertTrue(remove.waitForExistence(timeout: 2),
                       "After Add_goleag click, goleag should move to Assigned (Remove_goleag present)")
-        XCTAssertFalse(app.buttons["SpeciesEditPanel_Add_goleag"].exists)
+        XCTAssertFalse(app.buttons[A11y.speciesEditAdd("goleag")].exists)
 
         tapButton(remove)
         // Verify we actually returned to the initial state so test45 starts clean.
-        XCTAssertTrue(app.buttons["SpeciesEditPanel_Add_goleag"].waitForExistence(timeout: 2),
+        XCTAssertTrue(app.buttons[A11y.speciesEditAdd("goleag")].waitForExistence(timeout: 2),
                       "After Remove_goleag click, goleag should be back in Candidates (Add_goleag present)")
         ensurePanelClosed()
     }
@@ -673,13 +632,13 @@ final class CullingWorkflowUITests: XCTestCase {
         let app = Self.app!
         openPanelOnEagle()
 
-        tapButton(app.buttons["SpeciesEditPanel_Add_goleag"])
-        let remove = app.buttons["SpeciesEditPanel_Remove_goleag"]
+        tapButton(app.buttons[A11y.speciesEditAdd("goleag")])
+        let remove = app.buttons[A11y.speciesEditRemove("goleag")]
         XCTAssertTrue(remove.waitForExistence(timeout: 2))
         tapButton(remove)
 
-        XCTAssertTrue(app.buttons["SpeciesEditPanel_Add_goleag"].waitForExistence(timeout: 2))
-        XCTAssertFalse(app.buttons["SpeciesEditPanel_Remove_goleag"].exists)
+        XCTAssertTrue(app.buttons[A11y.speciesEditAdd("goleag")].waitForExistence(timeout: 2))
+        XCTAssertFalse(app.buttons[A11y.speciesEditRemove("goleag")].exists)
         ensurePanelClosed()
     }
 
@@ -715,9 +674,9 @@ final class CullingWorkflowUITests: XCTestCase {
         app.typeKey(.return, modifierFlags: [])
         Thread.sleep(forTimeInterval: 0.5)
 
-        XCTAssertFalse(app.buttons["SpeciesEditPanel_Remove_\(garbage)"].exists,
+        XCTAssertFalse(app.buttons[A11y.speciesEditRemove(garbage)].exists,
                        "Unmatched Return must not add a custom species")
-        XCTAssertTrue(app.buttons["SpeciesEditPanel_Remove_baleag"].exists)
+        XCTAssertTrue(app.buttons[A11y.speciesEditRemove("baleag")].exists)
 
         clearSearchField()
         ensurePanelClosed()
@@ -729,10 +688,10 @@ final class CullingWorkflowUITests: XCTestCase {
         // DSC09951 is a bird-but-unidentified photo in the mock fixture.
         selectThumbnail(filename: "DSC09951.jpg")
         exifToggleButton.click()
-        XCTAssertTrue(app.scrollViews["ExifPanel"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.scrollViews[A11y.exifPanel].waitForExistence(timeout: 3))
         scrollPanelToBottom()
-        XCTAssertTrue(app.staticTexts["SpeciesEditPanel_EmptyAssigned"].waitForExistence(timeout: 2))
-        XCTAssertFalse(app.buttons["SpeciesEditPanel_Remove_baleag"].exists)
+        XCTAssertTrue(app.staticTexts[A11y.speciesEditPanelEmptyAssigned].waitForExistence(timeout: 2))
+        XCTAssertFalse(app.buttons[A11y.speciesEditRemove("baleag")].exists)
         ensurePanelClosed()
     }
 
@@ -758,7 +717,7 @@ final class CullingWorkflowUITests: XCTestCase {
         let candidates = ["DSC09969.jpg", "DSC09970.jpg", "DSC09971.jpg", "DSC09972.jpg"]
         var switched = false
         for name in candidates {
-            let thumb = app.images.matching(identifier: "Thumbnail_\(name)").firstMatch
+            let thumb = app.images.matching(identifier: A11y.thumbnail(name)).firstMatch
             if thumb.exists {
                 selectThumbnail(filename: name)
                 switched = true
@@ -771,10 +730,10 @@ final class CullingWorkflowUITests: XCTestCase {
         }
 
         exifToggleButton.click()
-        XCTAssertTrue(app.scrollViews["ExifPanel"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.scrollViews[A11y.exifPanel].waitForExistence(timeout: 3))
         scrollPanelToBottom()
 
-        let newField = app.textFields["SpeciesEditPanel_SearchField"]
+        let newField = app.textFields[A11y.speciesEditPanelSearchField]
         _ = newField.waitForExistence(timeout: 2)
         XCTAssertFalse(fieldValueContains(newField, "robin"),
                        "Search field should clear on photo change " +
@@ -787,25 +746,25 @@ final class CullingWorkflowUITests: XCTestCase {
         let app = Self.app!
         openPanelOnEagle()
 
-        tapButton(app.buttons["SpeciesEditPanel_Add_goleag"])
-        XCTAssertTrue(app.buttons["SpeciesEditPanel_Remove_goleag"].waitForExistence(timeout: 2))
-        XCTAssertTrue(app.buttons["SpeciesEditPanel_MakePrimary_goleag"].exists)
-        XCTAssertFalse(app.buttons["SpeciesEditPanel_MakePrimary_baleag"].exists)
+        tapButton(app.buttons[A11y.speciesEditAdd("goleag")])
+        XCTAssertTrue(app.buttons[A11y.speciesEditRemove("goleag")].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons[A11y.speciesEditMakePrimary("goleag")].exists)
+        XCTAssertFalse(app.buttons[A11y.speciesEditMakePrimary("baleag")].exists)
 
-        tapButton(app.buttons["SpeciesEditPanel_Remove_baleag"])
+        tapButton(app.buttons[A11y.speciesEditRemove("baleag")])
         // Wait for the primary to demote out of Assigned.
-        XCTAssertTrue(app.buttons["SpeciesEditPanel_Add_baleag"].waitForExistence(timeout: 2),
+        XCTAssertTrue(app.buttons[A11y.speciesEditAdd("baleag")].waitForExistence(timeout: 2),
                       "Removed primary (baleag) should reappear in Candidates")
-        XCTAssertFalse(app.buttons["SpeciesEditPanel_Remove_baleag"].exists)
-        XCTAssertTrue(app.buttons["SpeciesEditPanel_Remove_goleag"].exists)
-        XCTAssertFalse(app.buttons["SpeciesEditPanel_MakePrimary_goleag"].exists,
+        XCTAssertFalse(app.buttons[A11y.speciesEditRemove("baleag")].exists)
+        XCTAssertTrue(app.buttons[A11y.speciesEditRemove("goleag")].exists)
+        XCTAssertFalse(app.buttons[A11y.speciesEditMakePrimary("goleag")].exists,
                        "Golden should now be primary (no MakePrimary button)")
 
         // Restore state for later tests.
-        tapButton(app.buttons["SpeciesEditPanel_Remove_goleag"])
-        _ = app.buttons["SpeciesEditPanel_Add_goleag"].waitForExistence(timeout: 2)
-        tapButton(app.buttons["SpeciesEditPanel_Add_baleag"])
-        _ = app.buttons["SpeciesEditPanel_Remove_baleag"].waitForExistence(timeout: 2)
+        tapButton(app.buttons[A11y.speciesEditRemove("goleag")])
+        _ = app.buttons[A11y.speciesEditAdd("goleag")].waitForExistence(timeout: 2)
+        tapButton(app.buttons[A11y.speciesEditAdd("baleag")])
+        _ = app.buttons[A11y.speciesEditRemove("baleag")].waitForExistence(timeout: 2)
         ensurePanelClosed()
     }
 
@@ -813,29 +772,29 @@ final class CullingWorkflowUITests: XCTestCase {
         let app = Self.app!
         openPanelOnEagle()
 
-        tapButton(app.buttons["SpeciesEditPanel_Add_goleag"])
-        XCTAssertTrue(app.buttons["SpeciesEditPanel_Remove_goleag"].waitForExistence(timeout: 2))
-        XCTAssertTrue(app.buttons["SpeciesEditPanel_MakePrimary_goleag"].exists)
-        XCTAssertFalse(app.buttons["SpeciesEditPanel_MakePrimary_baleag"].exists)
+        tapButton(app.buttons[A11y.speciesEditAdd("goleag")])
+        XCTAssertTrue(app.buttons[A11y.speciesEditRemove("goleag")].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons[A11y.speciesEditMakePrimary("goleag")].exists)
+        XCTAssertFalse(app.buttons[A11y.speciesEditMakePrimary("baleag")].exists)
 
-        tapButton(app.buttons["SpeciesEditPanel_MakePrimary_goleag"])
+        tapButton(app.buttons[A11y.speciesEditMakePrimary("goleag")])
 
-        XCTAssertTrue(app.buttons["SpeciesEditPanel_MakePrimary_baleag"].waitForExistence(timeout: 2),
+        XCTAssertTrue(app.buttons[A11y.speciesEditMakePrimary("baleag")].waitForExistence(timeout: 2),
                       "Bald should now be secondary with a make-primary button")
-        XCTAssertFalse(app.buttons["SpeciesEditPanel_MakePrimary_goleag"].exists)
-        XCTAssertTrue(app.buttons["SpeciesEditPanel_Remove_goleag"].exists)
-        XCTAssertTrue(app.buttons["SpeciesEditPanel_Remove_baleag"].exists)
+        XCTAssertFalse(app.buttons[A11y.speciesEditMakePrimary("goleag")].exists)
+        XCTAssertTrue(app.buttons[A11y.speciesEditRemove("goleag")].exists)
+        XCTAssertTrue(app.buttons[A11y.speciesEditRemove("baleag")].exists)
 
         // Restore: remove goleag so subsequent tests see the default primary.
-        tapButton(app.buttons["SpeciesEditPanel_Remove_goleag"])
-        _ = app.buttons["SpeciesEditPanel_Add_goleag"].waitForExistence(timeout: 2)
+        tapButton(app.buttons[A11y.speciesEditRemove("goleag")])
+        _ = app.buttons[A11y.speciesEditAdd("goleag")].waitForExistence(timeout: 2)
         ensurePanelClosed()
     }
 
     func test52_CandidateRowsShowLevelAndConfidence() {
         let app = Self.app!
         openPanelOnEagle()
-        XCTAssertTrue(app.buttons["SpeciesEditPanel_Add_goleag"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons[A11y.speciesEditAdd("goleag")].waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["12%"].exists, "Confidence percentage should render")
         XCTAssertTrue(app.staticTexts["Region"].exists, "thresholdUsed=country → 'Region' label")
         ensurePanelClosed()
@@ -846,16 +805,16 @@ final class CullingWorkflowUITests: XCTestCase {
         let sidecarPath = (Self.testDir! as NSString).appendingPathComponent("DSC09969.xmp")
         openPanelOnEagle()
 
-        tapButton(app.buttons["SpeciesEditPanel_Add_goleag"])
-        XCTAssertTrue(app.buttons["SpeciesEditPanel_Remove_goleag"].waitForExistence(timeout: 2),
+        tapButton(app.buttons[A11y.speciesEditAdd("goleag")])
+        XCTAssertTrue(app.buttons[A11y.speciesEditRemove("goleag")].waitForExistence(timeout: 2),
                       "Add click should have moved goleag to Assigned")
 
         XCTAssertTrue(waitForSidecar(at: sidecarPath, containing: "Golden Eagle", timeout: 3))
         let afterAdd = (try? String(contentsOfFile: sidecarPath)) ?? ""
         XCTAssertTrue(afterAdd.contains("Bald Eagle"))
 
-        tapButton(app.buttons["SpeciesEditPanel_Remove_goleag"])
-        XCTAssertTrue(app.buttons["SpeciesEditPanel_Add_goleag"].waitForExistence(timeout: 2),
+        tapButton(app.buttons[A11y.speciesEditRemove("goleag")])
+        XCTAssertTrue(app.buttons[A11y.speciesEditAdd("goleag")].waitForExistence(timeout: 2),
                       "Remove click should have moved goleag back to Candidates")
         XCTAssertTrue(waitForSidecar(at: sidecarPath,
                                      satisfying: { !$0.contains("Golden Eagle") },
@@ -877,34 +836,34 @@ final class CullingWorkflowUITests: XCTestCase {
         let sidecarPath = (Self.testDir! as NSString).appendingPathComponent("DSC09969.xmp")
         XCTAssertTrue(waitForSidecar(at: sidecarPath, containing: "Bald Eagle", timeout: 5))
 
-        let baldKeyword = app.staticTexts["ExifKeyword_Bald Eagle"]
+        let baldKeyword = app.staticTexts[A11y.exifKeyword("Bald Eagle")]
         if !baldKeyword.exists {
             exifToggleButton.click()
         }
         XCTAssertTrue(baldKeyword.waitForExistence(timeout: 5))
-        XCTAssertFalse(app.staticTexts["ExifKeyword_Golden Eagle"].exists)
+        XCTAssertFalse(app.staticTexts[A11y.exifKeyword("Golden Eagle")].exists)
 
         // Panel already open from the check above; just scroll + normalize.
-        if !app.scrollViews["ExifPanel"].exists {
+        if !app.scrollViews[A11y.exifPanel].exists {
             exifToggleButton.click()
         }
-        _ = app.scrollViews["ExifPanel"].waitForExistence(timeout: 3)
+        _ = app.scrollViews[A11y.exifPanel].waitForExistence(timeout: 3)
         scrollPanelToBottom()
         resetEagleSpeciesToBaleagOnly()
 
-        tapButton(app.buttons["SpeciesEditPanel_Add_goleag"])
-        XCTAssertTrue(app.buttons["SpeciesEditPanel_Remove_goleag"].waitForExistence(timeout: 2),
+        tapButton(app.buttons[A11y.speciesEditAdd("goleag")])
+        XCTAssertTrue(app.buttons[A11y.speciesEditRemove("goleag")].waitForExistence(timeout: 2),
                       "Add_goleag click should move goleag to Assigned")
 
         XCTAssertTrue(waitForSidecar(at: sidecarPath, containing: "Golden Eagle", timeout: 3))
-        XCTAssertTrue(app.staticTexts["ExifKeyword_Golden Eagle"].waitForExistence(timeout: 5),
+        XCTAssertTrue(app.staticTexts[A11y.exifKeyword("Golden Eagle")].waitForExistence(timeout: 5),
                       "EXIF keywords should refresh after species edit")
-        XCTAssertTrue(app.staticTexts["ExifKeyword_Bald Eagle"].exists)
+        XCTAssertTrue(app.staticTexts[A11y.exifKeyword("Bald Eagle")].exists)
 
-        tapButton(app.buttons["SpeciesEditPanel_Remove_goleag"])
-        XCTAssertTrue(app.buttons["SpeciesEditPanel_Add_goleag"].waitForExistence(timeout: 2),
+        tapButton(app.buttons[A11y.speciesEditRemove("goleag")])
+        XCTAssertTrue(app.buttons[A11y.speciesEditAdd("goleag")].waitForExistence(timeout: 2),
                       "Remove click should move goleag back to Candidates")
-        XCTAssertTrue(poll(timeout: 4) { !app.staticTexts["ExifKeyword_Golden Eagle"].exists },
+        XCTAssertTrue(poll(timeout: 4) { !app.staticTexts[A11y.exifKeyword("Golden Eagle")].exists },
                       "Keyword should drop after removal")
 
         ensurePanelClosed()

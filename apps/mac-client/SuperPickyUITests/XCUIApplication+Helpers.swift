@@ -14,7 +14,7 @@ extension XCUIApplication {
             if progressIndicators.count == 0 { break }
             Thread.sleep(forTimeInterval: 0.5)
         }
-        _ = images["PhotoPreview"].waitForExistence(timeout: timeout)
+        _ = images[A11y.photoPreview].waitForExistence(timeout: timeout)
         Thread.sleep(forTimeInterval: 1)
     }
 }
