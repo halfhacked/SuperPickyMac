@@ -413,7 +413,7 @@ struct MainView: View {
         appState.loadPhotos(for: folder)
 
         processingTask = Task {
-            let batcher = await PhotoIngestBatcher(appState: appState, pipeline: pipeline)
+            let batcher = PhotoIngestBatcher(appState: appState, pipeline: pipeline)
             await pipeline.process(
                 folder: folder,
                 ratingConfig: ratingConfig,
@@ -429,7 +429,7 @@ struct MainView: View {
                     await batcher.enqueue(photo)
                 }
             )
-            await batcher.flush()
+            batcher.flush()
 
             // Run unconditionally — cancelled runs also need the
             // sidebar to reflect the DB state (burst reassignment

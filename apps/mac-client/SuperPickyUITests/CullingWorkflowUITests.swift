@@ -32,7 +32,7 @@ final class CullingWorkflowUITests: XCTestCase {
 
         if FileManager.default.fileExists(atPath: sourceDir) {
             let photos = try! FileManager.default.contentsOfDirectory(atPath: sourceDir)
-                .filter { $0.hasSuffix(".jpg") || $0.hasSuffix(".ARW") }
+                .filter { $0.hasSuffix(".jpg") }
             for photo in photos {
                 try! FileManager.default.copyItem(
                     atPath: (sourceDir as NSString).appendingPathComponent(photo),
@@ -53,6 +53,9 @@ final class CullingWorkflowUITests: XCTestCase {
             if app.progressIndicators.count == 0 { break }
             Thread.sleep(forTimeInterval: 0.5)
         }
+        // PhotoPreview enters the a11y tree only after the auto-selected
+        // photo's full-res decode completes — CI lags on the ~3 MB fixture JPGs.
+        _ = app.images["PhotoPreview"].waitForExistence(timeout: 15)
         Thread.sleep(forTimeInterval: 1)
     }
 
@@ -469,6 +472,23 @@ final class CullingWorkflowUITests: XCTestCase {
     // screenshot tests target too.
     private func selectThumbnail(filename: String) {
         let thumb = Self.app.images.matching(identifier: "Thumbnail_\(filename)").firstMatch
+
+        // The strip is a LazyHStack — thumbnails outside the visible range
+        // aren't in the a11y tree yet. If our target isn't rendered, arrow-
+        // key through the strip to force lazy instantiation before the
+        // existence assertion.
+        if !thumb.waitForExistence(timeout: 2) {
+            Self.app.images["PhotoPreview"].click()
+            // Arrow through both directions: the target may be before or
+            // after the current selection depending on prior-test state.
+            for direction in [XCUIKeyboardKey.rightArrow, .leftArrow] {
+                for _ in 0..<50 {
+                    if thumb.exists { break }
+                    Self.app.typeKey(direction, modifierFlags: [])
+                }
+                if thumb.exists { break }
+            }
+        }
         XCTAssertTrue(thumb.waitForExistence(timeout: 10),
                       "\(filename) thumbnail should exist")
 
@@ -489,7 +509,7 @@ final class CullingWorkflowUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 0.5)
     }
 
-    private func selectEaglePhoto() { selectThumbnail(filename: "DSC09968.ARW") }
+    private func selectEaglePhoto() { selectThumbnail(filename: "DSC09969.jpg") }
 
     // SearchField sits at the bottom of a scrollable panel and can be pruned
     // from the accessibility tree when scrolled out of view. The root
@@ -714,8 +734,8 @@ final class CullingWorkflowUITests: XCTestCase {
     func test48_EmptyAssignedStateShown() {
         let app = Self.app!
         ensurePanelClosed()
-        // DSC09950 is a bird-but-unidentified photo in the mock fixture.
-        selectThumbnail(filename: "DSC09950.ARW")
+        // DSC09951 is a bird-but-unidentified photo in the mock fixture.
+        selectThumbnail(filename: "DSC09951.jpg")
         exifToggleButton.click()
         XCTAssertTrue(app.scrollViews["ExifPanel"].waitForExistence(timeout: 3))
         scrollPanelToBottom()
@@ -831,7 +851,7 @@ final class CullingWorkflowUITests: XCTestCase {
 
     func test53_SpeciesEditWritesToXMPSidecar() {
         let app = Self.app!
-        let sidecarPath = (Self.testDir! as NSString).appendingPathComponent("DSC09968.xmp")
+        let sidecarPath = (Self.testDir! as NSString).appendingPathComponent("DSC09969.xmp")
         openPanelOnEagle()
 
         tapButton(app.buttons["SpeciesEditPanel_Add_goleag"])
@@ -862,7 +882,7 @@ final class CullingWorkflowUITests: XCTestCase {
         ensurePanelClosed()
         selectEaglePhoto()
 
-        let sidecarPath = (Self.testDir! as NSString).appendingPathComponent("DSC09968.xmp")
+        let sidecarPath = (Self.testDir! as NSString).appendingPathComponent("DSC09969.xmp")
         XCTAssertTrue(waitForSidecar(at: sidecarPath, containing: "Bald Eagle", timeout: 5))
 
         let baldKeyword = app.staticTexts["ExifKeyword_Bald Eagle"]

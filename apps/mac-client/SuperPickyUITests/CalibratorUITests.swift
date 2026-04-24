@@ -23,7 +23,7 @@ final class CalibratorUITests: XCTestCase {
 
         if FileManager.default.fileExists(atPath: sourceDir) {
             let photos = try! FileManager.default.contentsOfDirectory(atPath: sourceDir)
-                .filter { $0.hasSuffix(".jpg") || $0.hasSuffix(".ARW") }
+                .filter { $0.hasSuffix(".jpg") }
             for photo in photos {
                 try! FileManager.default.copyItem(
                     atPath: (sourceDir as NSString).appendingPathComponent(photo),
@@ -43,6 +43,11 @@ final class CalibratorUITests: XCTestCase {
             if app.progressIndicators.count == 0 { break }
             Thread.sleep(forTimeInterval: 0.5)
         }
+        // Wait for the auto-selected photo to finish its full-res decode —
+        // dismissPopover relies on clicking PhotoPreview, which is only in
+        // the a11y tree once the image has rendered. CI's full-res decode
+        // lags on the ~3 MB fixture JPGs.
+        _ = app.images["PhotoPreview"].waitForExistence(timeout: 15)
         Thread.sleep(forTimeInterval: 1)
     }
 

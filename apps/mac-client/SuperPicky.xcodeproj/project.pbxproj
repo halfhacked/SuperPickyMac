@@ -1,0 +1,1938 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		006CBFEF3CA361B2F60615AB /* species_list_US-WY.json in Resources */ = {isa = PBXBuildFile; fileRef = B079855D4EA6D7FE445B24D9 /* species_list_US-WY.json */; };
+		0106105613F1068C39E464B4 /* species_list_CN-50.json in Resources */ = {isa = PBXBuildFile; fileRef = FF7BC47F186D13ED11279144 /* species_list_CN-50.json */; };
+		013134A36705408051D6EB93 /* GeneralTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = E283097C3245E4C2533065B6 /* GeneralTab.swift */; };
+		0248B7B5C0E566EFFBB63CCB /* ExifPanelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C249ECD5A8E7D02960210EA5 /* ExifPanelTests.swift */; };
+		0282798E9E2C5C127B3F1D8D /* species_list_CN-35.json in Resources */ = {isa = PBXBuildFile; fileRef = 7FC5EB11196529B2705F55B4 /* species_list_CN-35.json */; };
+		04AFCB4EB5F25BCE9F245A56 /* SuperPickyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8F78B4A7BDCFE1CE3947F19 /* SuperPickyApp.swift */; };
+		04EF6C1DD4443AF13BA6722D /* Photo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EAEF125F85AE85042A82314 /* Photo.swift */; };
+		057D3C67392C6EB97E013F6C /* CalibratorUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCFFE5AB2583A78C57369323 /* CalibratorUITests.swift */; };
+		05B7E327D3FE21AF6EDF9741 /* species_list_AR.json in Resources */ = {isa = PBXBuildFile; fileRef = 21E2F3D30F69CB0D67BCB10E /* species_list_AR.json */; };
+		06B5974B68BDC4BE7D30DD44 /* SpeciesHierarchyBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DDC8E8C649AF2E099E54AB6 /* SpeciesHierarchyBuilder.swift */; };
+		07840BD69DB598D3FE555874 /* species_list_US-NY.json in Resources */ = {isa = PBXBuildFile; fileRef = 9879470ED5E5EE64F5D97BE2 /* species_list_US-NY.json */; };
+		0871FDE9E5781152BBD6FB44 /* PhotoRatingPredictor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DF7946FDA6598F54AFD92F2 /* PhotoRatingPredictor.swift */; };
+		08ED361B5D29479A58995988 /* EyeCropSharpnessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF0BCC676F3ADE3C07F1A5FE /* EyeCropSharpnessTests.swift */; };
+		09F69EF625AAD66EBE2A7965 /* ModelManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8C851EF3E92A7DFE6910E3B /* ModelManagerTests.swift */; };
+		0A4945C29333A9D35B261081 /* FocusPointDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B52B9E4BC133A0426D127FD9 /* FocusPointDetectorTests.swift */; };
+		0A6A3CA41751F6A2A9EDA02F /* ProcessingFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A116EA5C6473F4DDDF1E4CFB /* ProcessingFlowUITests.swift */; };
+		0B3D06F1CC0C4DF53D3FEB8C /* KeypointModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1837CF5E6953334C9F59411 /* KeypointModelTests.swift */; };
+		0BDEEDA5F2180E74D049043E /* species_list_US-OH.json in Resources */ = {isa = PBXBuildFile; fileRef = 03E1F1634F2D00BB43BC1B0A /* species_list_US-OH.json */; };
+		0CCE4E0188A33EDA71AF2825 /* species_list_US-AZ.json in Resources */ = {isa = PBXBuildFile; fileRef = 4ECA615B65ED5F885DDF62F3 /* species_list_US-AZ.json */; };
+		0EB6E2DD62F7A91D53659A6E /* ExportServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B7DFAB7427E7D50B6C2F83D /* ExportServiceTests.swift */; };
+		0F35F369453991A6EEF33422 /* PhotoRatingPredictorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E78186D0F185EDD20A629C0E /* PhotoRatingPredictorTests.swift */; };
+		1093C7FDF225D9B19115B27D /* LocalizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 622BC8DFB8850CF206885FBD /* LocalizationTests.swift */; };
+		110B43DA974C272DFC9B5F32 /* species_list_ID.json in Resources */ = {isa = PBXBuildFile; fileRef = 3B75E1E7C7AF280760252360 /* species_list_ID.json */; };
+		1115C6AC4DBBC57C74E6A0AC /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 3116EFBEF1C66049A043EF0C /* GRDB */; };
+		1201CBBA48B8870EFF488738 /* species_list_GB.json in Resources */ = {isa = PBXBuildFile; fileRef = 6C752379CFE1D005A0F3C8D1 /* species_list_GB.json */; };
+		12C3DC2A58B81B29DA098B88 /* species_list_ET.json in Resources */ = {isa = PBXBuildFile; fileRef = 923F68C29AAE2B63B8E66A50 /* species_list_ET.json */; };
+		12E304BB5E45FB94140577BF /* species_list_RU.json in Resources */ = {isa = PBXBuildFile; fileRef = 70C2430E3AB7B52A4C532C3C /* species_list_RU.json */; };
+		133D4A050580B364818E78E4 /* PhotoInheritSpeciesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 961E549D049211A4D632059F /* PhotoInheritSpeciesTests.swift */; };
+		142BE216C9EBAA868F415642 /* species_list_US-TX.json in Resources */ = {isa = PBXBuildFile; fileRef = 2ABB018F44EDF2A661140EB5 /* species_list_US-TX.json */; };
+		142EF22BA97B679CCFF77E5A /* CullingConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 229472C67589424B4A5072F0 /* CullingConfigTests.swift */; };
+		157887AE29C81209B36C56EA /* species_list_AU-NSW.json in Resources */ = {isa = PBXBuildFile; fileRef = 3AF6E9E3D91B338F47900CA3 /* species_list_AU-NSW.json */; };
+		1594CB8EA833783FFE351F52 /* species_list_CN-61.json in Resources */ = {isa = PBXBuildFile; fileRef = 1E5FB961979296D57E260183 /* species_list_CN-61.json */; };
+		15A2A2C09FEA1E781757CC72 /* ModelManifestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70C655720DDAA4F6410DD923 /* ModelManifestTests.swift */; };
+		16082021E6048558E60ACE6F /* species_list_MY.json in Resources */ = {isa = PBXBuildFile; fileRef = C6C3829A72FEAC4C66A61236 /* species_list_MY.json */; };
+		164D329684AC44E8806280EE /* species_list_MX.json in Resources */ = {isa = PBXBuildFile; fileRef = FC494B9B6C6EE0E8C4C71725 /* species_list_MX.json */; };
+		174B81A795F8BB4E4F490B08 /* species_list_US-WA.json in Resources */ = {isa = PBXBuildFile; fileRef = 8D8D60E1764C1EF204A7AEC3 /* species_list_US-WA.json */; };
+		180DF517A517E6D490369BD9 /* species_list_CN-36.json in Resources */ = {isa = PBXBuildFile; fileRef = F1B52F44715CC777F828AE1A /* species_list_CN-36.json */; };
+		1AFA07A5C2E6468BDCB9CFC4 /* species_list_PH.json in Resources */ = {isa = PBXBuildFile; fileRef = 3905B37A3CD99EAF5C6AF07C /* species_list_PH.json */; };
+		1BE0E64115D2A4A91A03C59C /* KeyboardHelpUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 186285048D4F76B62A044BC2 /* KeyboardHelpUITests.swift */; };
+		1CC89CFBC3E8F304E354B3FA /* SuperPickyInference.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BE62639A4988F7ADC65C6BE7 /* SuperPickyInference.framework */; };
+		1E365AD68087DE165D07CA7E /* ScrollWheelRedirector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D33DE9FFC32E245ECAD4536 /* ScrollWheelRedirector.swift */; };
+		1F6EE45CD79999D1EF5491F3 /* EXIFReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB9A3A9BD8A728146C3DDD2F /* EXIFReaderTests.swift */; };
+		20B91A4D5721D9DA364D66C7 /* LaplacianSharpness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03FC87BEA8A390764201E242 /* LaplacianSharpness.swift */; };
+		2161F7D33F762BE7B8248B57 /* species_list_CO.json in Resources */ = {isa = PBXBuildFile; fileRef = 0405C434F890DE3A08186945 /* species_list_CO.json */; };
+		22579742F83CBF5A726147F1 /* ThresholdCalibratorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97ECE0591D7C74C6BBC6C5BD /* ThresholdCalibratorView.swift */; };
+		22B8D6F1C555998C06BDD1F3 /* AdvancedTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C60DBF0C5CDD2912B0F3E06 /* AdvancedTab.swift */; };
+		23B283FEAAAFA6DF2A6EB966 /* CullingConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB57DBDFB0D5675A8F620572 /* CullingConfig.swift */; };
+		2537E1B585BD0EFF83728969 /* DirectoryScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 950F762228EBD7BA89B8B2C0 /* DirectoryScanner.swift */; };
+		2569036ED859AAFB41DE8BDB /* species_list_SE.json in Resources */ = {isa = PBXBuildFile; fileRef = 92CA54CF4A9609C43DCDFA7B /* species_list_SE.json */; };
+		25E22E7829DC2B6ABA77729C /* CullingTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCE975693ABAA78E1853356C /* CullingTab.swift */; };
+		274E3FFBC05E772F40220564 /* species_list_CL.json in Resources */ = {isa = PBXBuildFile; fileRef = F407B1CB349606F7E02BDEBA /* species_list_CL.json */; };
+		29015E61042156029536F635 /* PipelineCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B08209CB9A6CFAC3264FF9D8 /* PipelineCoordinatorTests.swift */; };
+		29BE14736518A391A3CF4B6C /* species_list_CN-31.json in Resources */ = {isa = PBXBuildFile; fileRef = EDA285A3368464DA412604C6 /* species_list_CN-31.json */; };
+		2A58B54042E4FD0ADFCF8D3D /* species_list_CN-46.json in Resources */ = {isa = PBXBuildFile; fileRef = EF867840D7AE5F979B5F5BF0 /* species_list_CN-46.json */; };
+		2AB70913789D41371C212BDF /* species_list_CN-54.json in Resources */ = {isa = PBXBuildFile; fileRef = 64EDC4BF8BCA9B913B7ECCA0 /* species_list_CN-54.json */; };
+		2C85B2508913EF8C77F42C67 /* species_list_CN-32.json in Resources */ = {isa = PBXBuildFile; fileRef = 03365CF67C582DC2EFA5D864 /* species_list_CN-32.json */; };
+		2CF05E13A2B84DFB79CE7DD0 /* DetectionResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF0F99AF6C3E80F1945915C6 /* DetectionResult.swift */; };
+		2D6D5A9BC941BF8DE26D8662 /* RegionBounds.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56C47414BCC2DF0A9F491F21 /* RegionBounds.swift */; };
+		2E323B97A6DA61619EA87E62 /* species_list_US-MS.json in Resources */ = {isa = PBXBuildFile; fileRef = B0E6E973590479ED531F1CC0 /* species_list_US-MS.json */; };
+		2EFB327BFECBDC0E4EAB47D3 /* species_list_US.json in Resources */ = {isa = PBXBuildFile; fileRef = 61B25AB7A3A48E04945DDC33 /* species_list_US.json */; };
+		30B0D2A6F4A9BF36578C7BDD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A3C799CA5070F0F8F4848EC7 /* Assets.xcassets */; };
+		3117925FD5A77E380563283D /* species_list_AU-NT.json in Resources */ = {isa = PBXBuildFile; fileRef = 71BACA35D2B8F5453814AC38 /* species_list_AU-NT.json */; };
+		317D9D0A18C00DCF653DF299 /* RatingEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C2DB72C6CD3A9F63E0C9BBF /* RatingEngineTests.swift */; };
+		31DC39C03B2238F1EB983DF6 /* InferenceConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBE9101A4DBE4F5471C3EC9B /* InferenceConstants.swift */; };
+		32FA011E13A6D9307C9E967C /* species_list_US-MA.json in Resources */ = {isa = PBXBuildFile; fileRef = 0F3420F519C7B29640EC0102 /* species_list_US-MA.json */; };
+		338ED111C8EF8B2A300959A6 /* ModelManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 477A9B13ED9208BC9D444B7D /* ModelManifest.swift */; };
+		35E3974B722E75AA9BABC967 /* species_list_US-MT.json in Resources */ = {isa = PBXBuildFile; fileRef = 7AEB9B454F0D7BEC60B63D12 /* species_list_US-MT.json */; };
+		35E66019AA2D61ED6ED860CA /* species_list_US-IA.json in Resources */ = {isa = PBXBuildFile; fileRef = 1A85B69522B43C48B86669B7 /* species_list_US-IA.json */; };
+		386532C80D611F1BD9A18303 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = BF41AD1430AE0514A5578240 /* Localizable.strings */; };
+		3889D1E2499F4D32B9C4F63A /* MockUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FC42B7AF80A2E12BBE315A0 /* MockUITests.swift */; };
+		38BDD7274FBEA3E39AF190C2 /* ZoomStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A5220B2A07CE5136A004F40 /* ZoomStateTests.swift */; };
+		39C19098B14ADDF3056D7885 /* species_list_US-MN.json in Resources */ = {isa = PBXBuildFile; fileRef = B0092D1A9E4E726F7DFFCCE9 /* species_list_US-MN.json */; };
+		39D8B1E325F33687B5E3C846 /* species_list_US-VA.json in Resources */ = {isa = PBXBuildFile; fileRef = 07580E7FA71DB8E50F06BE95 /* species_list_US-VA.json */; };
+		3B30B50F73D434EB0A32456A /* ReportDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = E726094A2C453F4B243141FD /* ReportDatabase.swift */; };
+		3BB13D2BC4F7884AA4BB4DBA /* SpeciesAssignmentEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4D16716BD00EB694FAEF0DB /* SpeciesAssignmentEditor.swift */; };
+		3BF047E9D27A347D65D3CE0C /* LocalizationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71E1C64CFB5D669BE650C34C /* LocalizationManager.swift */; };
+		3C4B511A8F7206F3D72A2468 /* species_list_US-HI.json in Resources */ = {isa = PBXBuildFile; fileRef = 45A370ABA9E131943AD5E95B /* species_list_US-HI.json */; };
+		3CF0A61756D0E53E2AB156EB /* BirdIDTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F8BAFBDC2ECC98859327100 /* BirdIDTab.swift */; };
+		3D87959ADFDC6012A67B3C5B /* AestheticsModel.mlmodelc in Resources */ = {isa = PBXBuildFile; fileRef = 62A390085C9159F63CCD38E8 /* AestheticsModel.mlmodelc */; };
+		3E025655047B9B6982343AA4 /* species_list_US-RI.json in Resources */ = {isa = PBXBuildFile; fileRef = 018DA129CF19A052B9B26009 /* species_list_US-RI.json */; };
+		403BA759C8A610DB76B0C3E3 /* RegionBoundsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78E6C73CA5D7B00096B0C890 /* RegionBoundsTests.swift */; };
+		41CE16FF85A6D10B7356C792 /* ZoomableImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9287FBC69300612F56401CD6 /* ZoomableImageView.swift */; };
+		4274B6E23ABB183970947035 /* ThumbnailDimTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE1788F929C2EE7791DCBDFA /* ThumbnailDimTests.swift */; };
+		43EB2D92C2B2558A84086503 /* SpeciesThresholdGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29DDB2A21C13CA6CF03F37FC /* SpeciesThresholdGateTests.swift */; };
+		43EE55469BDFE35F7129E216 /* species_list_US-NC.json in Resources */ = {isa = PBXBuildFile; fileRef = B9052B4126684474CFAFF6CD /* species_list_US-NC.json */; };
+		4486C33BC0AD686718CB8BF3 /* GPSExtractorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51EDE55A1DFF91668CA1F312 /* GPSExtractorTests.swift */; };
+		456F8292CFB8BDD94F0F319C /* SpeciesAssignmentEditorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCBA5789A3ED2B17AA4EB44D /* SpeciesAssignmentEditorTests.swift */; };
+		45E677C86F854C4A78668ECB /* AestheticsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83DFEE6D8F6AE1786323884E /* AestheticsModel.swift */; };
+		45F636F202159F3ED17B2DA5 /* species_list_CN-11.json in Resources */ = {isa = PBXBuildFile; fileRef = 16EFD5F5D9E42564C0ABFFAB /* species_list_CN-11.json */; };
+		481A4C6D1CA5210017B4BD75 /* species_list_US-WI.json in Resources */ = {isa = PBXBuildFile; fileRef = F8AD6BF9D063FEDE842BFF42 /* species_list_US-WI.json */; };
+		482E40863DDA7AF36C757AF5 /* species_list_US-SC.json in Resources */ = {isa = PBXBuildFile; fileRef = A3E01C5D5F6A41F58D2108DF /* species_list_US-SC.json */; };
+		4A186AC25ADC8AB89D1BE26C /* CoreMLInferenceClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84C2BF31BA911F18F1E5D16A /* CoreMLInferenceClient.swift */; };
+		4ABE0DDF9F8E2A94847A6FB1 /* species_list_PE.json in Resources */ = {isa = PBXBuildFile; fileRef = 58AE30066FA590520817814A /* species_list_PE.json */; };
+		4AE1302AC0FCEEE98D429FA1 /* species_list_IN.json in Resources */ = {isa = PBXBuildFile; fileRef = FBC01C9BA670110F06A24201 /* species_list_IN.json */; };
+		4C3DD521E4D175364764349A /* species_list_MG.json in Resources */ = {isa = PBXBuildFile; fileRef = 665C6EF2E83D19356BF3A25F /* species_list_MG.json */; };
+		4E0ADD7F267DD8E7279A73DE /* species_list_FI.json in Resources */ = {isa = PBXBuildFile; fileRef = 55FD8383417E1258A87ACD4A /* species_list_FI.json */; };
+		5070EC3EE9F31FEED28D7C21 /* species_list_US-NE.json in Resources */ = {isa = PBXBuildFile; fileRef = A6847F1BEA963BA2F12A9AF8 /* species_list_US-NE.json */; };
+		50834EA5ADC96FDF184B10E0 /* species_list_US-SD.json in Resources */ = {isa = PBXBuildFile; fileRef = DACA966D4691B1925C4F35D4 /* species_list_US-SD.json */; };
+		50DED71601472772A3797B78 /* ReportDatabaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC04CB6F128679651B1305EF /* ReportDatabaseTests.swift */; };
+		51CF230EF9AB98F2CBCE07C7 /* ExposureDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51D9ED12BDAF2634C06DA741 /* ExposureDetector.swift */; };
+		540E12C1AFAF9D2BCF6B1F53 /* species_list_NZ.json in Resources */ = {isa = PBXBuildFile; fileRef = 15765CB9562B1DD8D9F0FD91 /* species_list_NZ.json */; };
+		544D0CBD6A8C7E9409283DB2 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 62ECFA7A1CE3D41AAF0C1F85 /* GRDB */; };
+		54EADF68B3D25271C79C5F58 /* species_list_AU-QLD.json in Resources */ = {isa = PBXBuildFile; fileRef = 36C41BBBBB9D9A15469ED880 /* species_list_AU-QLD.json */; };
+		56D42A3F92844E1969CB34A5 /* species_list_CN.json in Resources */ = {isa = PBXBuildFile; fileRef = 9AAE5D25B3F1753DA681958E /* species_list_CN.json */; };
+		58036F925FA7C04F65EAAC7C /* YOLOBirdDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39478735CE84350CA2526D87 /* YOLOBirdDetectorTests.swift */; };
+		5823240721509FA169C396EA /* LaplacianSharpnessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D88FC087F1746047FC2B2D32 /* LaplacianSharpnessTests.swift */; };
+		58F9401E454065B080971065 /* species_list_US-IN.json in Resources */ = {isa = PBXBuildFile; fileRef = 72E8D024F35D6F328318114A /* species_list_US-IN.json */; };
+		58FCA4A34B01CE90F1468982 /* species_list_US-VT.json in Resources */ = {isa = PBXBuildFile; fileRef = CCACCF0FFF8E5E99AC0BF500 /* species_list_US-VT.json */; };
+		5BD197CA2FB53AFCA53846F0 /* species_list_US-PA.json in Resources */ = {isa = PBXBuildFile; fileRef = EBCB447C1AEF40EB4FEADF09 /* species_list_US-PA.json */; };
+		5C0E47C0E985100BCE3310AB /* species_list_US-CO.json in Resources */ = {isa = PBXBuildFile; fileRef = E66A48DE28377F7091C3F0B2 /* species_list_US-CO.json */; };
+		5DDB5DE1C92A9898B21E09EB /* species_list_US-WV.json in Resources */ = {isa = PBXBuildFile; fileRef = 5B47AFD38A40ED2713B10A85 /* species_list_US-WV.json */; };
+		5E5FC9FB572CF91767738E27 /* species_list_US-KY.json in Resources */ = {isa = PBXBuildFile; fileRef = E259A8CE95239F66A1D6F69D /* species_list_US-KY.json */; };
+		5EB7DC526D950902A30771DD /* SettingsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0FEA77B7EA580CB52BFD7C1 /* SettingsUITests.swift */; };
+		5F19CB51CA2D390FE9F18C45 /* species_list_FR.json in Resources */ = {isa = PBXBuildFile; fileRef = 989AA24DA5C45881773FB833 /* species_list_FR.json */; };
+		60AF2AE87AEB5C6FF5F26C7E /* species_list_CN-43.json in Resources */ = {isa = PBXBuildFile; fileRef = CA08763D3FCEF0F16E56884D /* species_list_CN-43.json */; };
+		6109CDBA61A96C5AA48EC0C9 /* species_list_KR.json in Resources */ = {isa = PBXBuildFile; fileRef = 743CD84ED1C849A63C4B269B /* species_list_KR.json */; };
+		620FA6330AFCF8B6955EB6F6 /* SuperPickyInference.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = BE62639A4988F7ADC65C6BE7 /* SuperPickyInference.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		628781342964039FC54E5D63 /* ThumbnailStripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFB7F185F169F5E033B697F1 /* ThumbnailStripView.swift */; };
+		634D2F226E6C7E1FDA107CCE /* species_list_CN-14.json in Resources */ = {isa = PBXBuildFile; fileRef = 9B096E5BDF2FE98BB7B6F24D /* species_list_CN-14.json */; };
+		6357BF9BC349E55068B9DE1F /* species_list_IT.json in Resources */ = {isa = PBXBuildFile; fileRef = 6F3376C7BF00DA740F9315C3 /* species_list_IT.json */; };
+		6380A5FBE3A5F45CC653D33D /* YOLOBirdDetector.mlmodelc in Resources */ = {isa = PBXBuildFile; fileRef = 529CD9116E651186BFA4DA8E /* YOLOBirdDetector.mlmodelc */; };
+		63B4A7EE23EB837C0D87FEE6 /* species_list_US-NM.json in Resources */ = {isa = PBXBuildFile; fileRef = B30E6EC46EDCD5AC815F0836 /* species_list_US-NM.json */; };
+		64048C241AAAC62F561EA5E7 /* species_list_TH.json in Resources */ = {isa = PBXBuildFile; fileRef = 7BA9B546E351C65F0881D492 /* species_list_TH.json */; };
+		65C182AE4807BA7A81DBA36A /* species_list_US-OR.json in Resources */ = {isa = PBXBuildFile; fileRef = 35F7E268EAB8ADCA8CBBF702 /* species_list_US-OR.json */; };
+		66D9CC000D059826C9A5ABB6 /* SpeciesKeywordTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2EF4053556C87B2DBBAF1C1 /* SpeciesKeywordTests.swift */; };
+		6742C63ACC4A7AA2499A55AA /* ExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9D7B139DADC49E884F6DC14 /* ExportService.swift */; };
+		67BCBF184553A99B8702E259 /* GPSCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3212B6002C7368D529C9F05 /* GPSCell.swift */; };
+		695F2025AFDDC5D1103DCC06 /* BurstDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17855935BCC43C84A3B8B1B6 /* BurstDetector.swift */; };
+		6A3D55C866B011768386C5D0 /* species_list_US-IL.json in Resources */ = {isa = PBXBuildFile; fileRef = 1E28FB6BF8EA365481A5787F /* species_list_US-IL.json */; };
+		6A4A7D7C51F203825A1C919C /* PickedFlagCalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30AA27AB30CB149B9D8F6323 /* PickedFlagCalculatorTests.swift */; };
+		6A5822DDA6A5F74C8B512048 /* CullingWorkflowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4FC5A73B3D82C650DB5DA2F /* CullingWorkflowUITests.swift */; };
+		6D5757931F7710F549168285 /* CGImageExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A794AE5A39946EABE421F4D /* CGImageExtensions.swift */; };
+		6EADF3DDE501AD794F2FA592 /* species_list_CN-23.json in Resources */ = {isa = PBXBuildFile; fileRef = 4733694F70127B85919A83C5 /* species_list_CN-23.json */; };
+		6FAA0C5716916CB07E7DA5F5 /* species_list_CN-63.json in Resources */ = {isa = PBXBuildFile; fileRef = 0C95A64222EB3A31B3AC4C09 /* species_list_CN-63.json */; };
+		7026ABF159473316B5353E54 /* FlightModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3AC27931EC190A197652D78 /* FlightModel.swift */; };
+		704D3515AE8394CD89C73030 /* KeypointModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCDD77DC8C0AFD2D27F7BF8F /* KeypointModel.swift */; };
+		72593C01A639B74395F129D0 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2035E1F0D51979F7D9BD4857 /* SettingsView.swift */; };
+		743E98D2D106B2DC4CD9A375 /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = D16D64E760C59FE88930FB6D /* Logger.swift */; };
+		77015E7D20FE9E94039A4710 /* species_list_US-CT.json in Resources */ = {isa = PBXBuildFile; fileRef = FC69DB9AB0604B1868A3B299 /* species_list_US-CT.json */; };
+		77E2CDCA44CEAFF85E7A5846 /* species_list_CN-71.json in Resources */ = {isa = PBXBuildFile; fileRef = EA903F7D9120FDF6460CD01E /* species_list_CN-71.json */; };
+		78939EE79C0DDD7C2E4B4BF8 /* offline_index.json in Resources */ = {isa = PBXBuildFile; fileRef = 67D9011A882448A3C9139930 /* offline_index.json */; };
+		7C296AB9198A14949FDA6324 /* species_list_CN-33.json in Resources */ = {isa = PBXBuildFile; fileRef = 05343C95C88C0BFB339210EE /* species_list_CN-33.json */; };
+		7CF4E498D7CA0C66F2559AFE /* AssignedSpeciesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B692D00B454892AE77C8C7E2 /* AssignedSpeciesTests.swift */; };
+		7D46995817787640B2CEEF67 /* species_list_AU-WA.json in Resources */ = {isa = PBXBuildFile; fileRef = 00DE23C46649098A49F28568 /* species_list_AU-WA.json */; };
+		7D9E421E7E0A798A7B7BB69D /* species_list_US-TN.json in Resources */ = {isa = PBXBuildFile; fileRef = 63FBEA72F9F2BCE5B06075C8 /* species_list_US-TN.json */; };
+		7DAB7879F389391AD0BFAF0E /* SpeciesFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCF8B7392C1C8A28B15BD48D /* SpeciesFilter.swift */; };
+		7FC30D6C79056C7B68CE45D6 /* species_list_US-FL.json in Resources */ = {isa = PBXBuildFile; fileRef = 2DA11ABE5510E7AF0C59CCDC /* species_list_US-FL.json */; };
+		8059EC941CC1AEC5B5CB2069 /* species_list_US-NH.json in Resources */ = {isa = PBXBuildFile; fileRef = B3FF674364AA10C06A60169B /* species_list_US-NH.json */; };
+		810E57FFB1CB73981A864F1B /* manifest.json in Resources */ = {isa = PBXBuildFile; fileRef = 72025F6C826C04F2ED023A80 /* manifest.json */; };
+		8304EA5BEBEFA4BD65D8B5F4 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4107B44DB5215D297E698FAF /* ContentView.swift */; };
+		8470A4946CF028603F792276 /* EyeCropSharpness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69576E5469D18F7A15647585 /* EyeCropSharpness.swift */; };
+		8584664A4127BFC8FD475EDB /* KeyboardMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AED6E82EFBEB905F3087E8AC /* KeyboardMonitor.swift */; };
+		874AEB2C3E81F8DF82B9D744 /* YOLOBirdDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFD05DF5AFC994E0A5CF74B3 /* YOLOBirdDetector.swift */; };
+		88CDBFCCDE8AA1187A783327 /* SpeciesDatabaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDF6737F75129550ED5069A2 /* SpeciesDatabaseTests.swift */; };
+		89450DB7EF897F06A5AA5750 /* species_list_BO.json in Resources */ = {isa = PBXBuildFile; fileRef = 98EC2DA90BF8B3CEECA6B71D /* species_list_BO.json */; };
+		8B233100DC4AFD8DBFEA3998 /* species_list_US-ME.json in Resources */ = {isa = PBXBuildFile; fileRef = B09F2A462A860A0649F02FD9 /* species_list_US-ME.json */; };
+		8C7E3BD81A11C5A4F771A784 /* species_list_CN-65.json in Resources */ = {isa = PBXBuildFile; fileRef = 5D01C78BEFA03F125F1947C9 /* species_list_CN-65.json */; };
+		8C825D79EFF43103F60A8B15 /* species_list_CN-92.json in Resources */ = {isa = PBXBuildFile; fileRef = 5B221E47F483F97E331FD12D /* species_list_CN-92.json */; };
+		8CD0EADBFC14282A02804EEE /* TestImageHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBE942F11FEC6DD140A2A482 /* TestImageHelpers.swift */; };
+		8D6EA52385D28EA1B9D1B25F /* ExifPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D61960564355CE428DB7AAB /* ExifPanelView.swift */; };
+		8EFB8822A06651B2A0246633 /* MockInferenceClientForUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ECDED56E207C1C5527AFA61 /* MockInferenceClientForUI.swift */; };
+		8F46A9ABBB9BF467139BDD85 /* species_list_VN.json in Resources */ = {isa = PBXBuildFile; fileRef = 3853CA5EACD52FAB410C2FB4 /* species_list_VN.json */; };
+		9035B09CE55BBE873463E780 /* species_list_CN-45.json in Resources */ = {isa = PBXBuildFile; fileRef = 9DF7520AFB604991C3E5FE9E /* species_list_CN-45.json */; };
+		90521F86596F50FE063A8ABE /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DA8D0BDAF85657AB9C123BE /* AppState.swift */; };
+		90F86733FDE40E550DD8B982 /* PipelinePrewarmTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0489E5D77DB7CA63F489D2D9 /* PipelinePrewarmTests.swift */; };
+		92111F4E0D26E7C74911689F /* species_list_HN.json in Resources */ = {isa = PBXBuildFile; fileRef = 639EE06D764047BB9F92EE22 /* species_list_HN.json */; };
+		93DFF6C1F94162A500AB340A /* PreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D354E8BFE2BB6211ADAA855F /* PreviewView.swift */; };
+		964B6A7D156A55F0174BA44C /* BurstDetectorGPSTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4B59971656A9AD18B236A2D /* BurstDetectorGPSTests.swift */; };
+		993CD37468A24B709B548C0D /* species_list_CN-13.json in Resources */ = {isa = PBXBuildFile; fileRef = 6BAE259F49B382A29C715A18 /* species_list_CN-13.json */; };
+		99FC5ED91FFB6C8927B21E1C /* species_list_TZ.json in Resources */ = {isa = PBXBuildFile; fileRef = FF3BC9CF5AB8F2385AF7A7A4 /* species_list_TZ.json */; };
+		9A70E092814FF140C98B68A5 /* species_list_US-LA.json in Resources */ = {isa = PBXBuildFile; fileRef = 387E7B05A16958C7DD185DA2 /* species_list_US-LA.json */; };
+		9A98C0E1C963851E9417B8B6 /* SpeciesFilterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2B908941577935C56AB5353 /* SpeciesFilterTests.swift */; };
+		9AEB5BD3B3C640F148348A87 /* species_list_JP.json in Resources */ = {isa = PBXBuildFile; fileRef = 25C714E7C28E46525ADC02A3 /* species_list_JP.json */; };
+		9B2EEEDB009051B2A3D45E6C /* species_list_US-UT.json in Resources */ = {isa = PBXBuildFile; fileRef = D3A36E4779D719861038F9E4 /* species_list_US-UT.json */; };
+		9BA13D038626F75986BC297F /* FocusPointDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24FEF008D651B45C2E5D9732 /* FocusPointDetector.swift */; };
+		9BC078E348C1DAA1AB362743 /* species_list_AU-SA.json in Resources */ = {isa = PBXBuildFile; fileRef = 0B7B5A32D888ED5133F2A2AC /* species_list_AU-SA.json */; };
+		9D4ECA70D7ADFCD4F457549F /* species_list_CN-52.json in Resources */ = {isa = PBXBuildFile; fileRef = AE4042C17B7295DB37F5F473 /* species_list_CN-52.json */; };
+		9FC4DBD9C5F7F22B329823C9 /* species_list_NI.json in Resources */ = {isa = PBXBuildFile; fileRef = E3C702AE334C9AA2752E111C /* species_list_NI.json */; };
+		A0B585F04E1DA46955FAEA26 /* species_list_CN-53.json in Resources */ = {isa = PBXBuildFile; fileRef = E5A9BAB68FB28CAFE6AB4040 /* species_list_CN-53.json */; };
+		A2AF54D15C013AE2E0A78E66 /* species_list_US-ID.json in Resources */ = {isa = PBXBuildFile; fileRef = 8D0804F653E43FD4460C5AF8 /* species_list_US-ID.json */; };
+		A35CFB043D790AA58F21DF81 /* species_list_BZ.json in Resources */ = {isa = PBXBuildFile; fileRef = 0EB885DB2DA8F5954AB40CE2 /* species_list_BZ.json */; };
+		A45538EE30405C3484714F22 /* species_list_US-MD.json in Resources */ = {isa = PBXBuildFile; fileRef = C8FA20813C22D6F8B6067AE3 /* species_list_US-MD.json */; };
+		A50A9A682A928CCB91591A21 /* species_list_NG.json in Resources */ = {isa = PBXBuildFile; fileRef = 0890D37335193BB0DDC284AB /* species_list_NG.json */; };
+		A5C3BF3715F69A698E7C4AA7 /* GPSExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9600609E865C4376743C10B /* GPSExtractor.swift */; };
+		A677967B8F5115A2BA4E50F7 /* DirectoryScannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FA9426449B0EC209F1F0B91 /* DirectoryScannerTests.swift */; };
+		A715FA9A5EAA73CF83B9E3D4 /* species_list_US-AR.json in Resources */ = {isa = PBXBuildFile; fileRef = 341A6E790FEEF335963B81FD /* species_list_US-AR.json */; };
+		A723606E100F492AF8B60196 /* species_list_CN-42.json in Resources */ = {isa = PBXBuildFile; fileRef = 5CDD907C3528AB931314515D /* species_list_CN-42.json */; };
+		A757D28A8C7C16F77F9BF61D /* SpeciesMatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DB5E6511A425B77A9DE0E1A /* SpeciesMatch.swift */; };
+		A96697B3A0D19976062AE52E /* species_list_CN-62.json in Resources */ = {isa = PBXBuildFile; fileRef = 2A992B601664F146B2A46CDA /* species_list_CN-62.json */; };
+		AB454647C2709C8EFC07D5C1 /* species_list_KE.json in Resources */ = {isa = PBXBuildFile; fileRef = 4150DBAB6F606D030D7EABC0 /* species_list_KE.json */; };
+		AC209243584F679DDFA0BC56 /* species_list_CN-51.json in Resources */ = {isa = PBXBuildFile; fileRef = DC2E7AA1F2836B3F2C82BD0C /* species_list_CN-51.json */; };
+		AD9998180DB9935038EF3D5A /* ExifFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6D8E5ED328E7CA41C95BBD9 /* ExifFormatters.swift */; };
+		AF1CBDD8FB68E2F47896384C /* OSEAClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9FCE95C53617AE7CDEEE642 /* OSEAClassifier.swift */; };
+		AFA73FA3CD14DD5FC3856C79 /* species_list_US-DE.json in Resources */ = {isa = PBXBuildFile; fileRef = D28E71A56423EBF1C3153D43 /* species_list_US-DE.json */; };
+		B01C44C20A0CD808BB7F3BC2 /* OSEAClassifier.mlmodelc in Resources */ = {isa = PBXBuildFile; fileRef = BA0E9D1BEE1CDDE92D076028 /* OSEAClassifier.mlmodelc */; };
+		B01CEBCB6D8240CA0BF197E8 /* species_list_US-OK.json in Resources */ = {isa = PBXBuildFile; fileRef = 0FD4B4D9133D47D0A91D95E0 /* species_list_US-OK.json */; };
+		B07735B3BC75E0E13DFC78E2 /* species_list_PL.json in Resources */ = {isa = PBXBuildFile; fileRef = 48D1442728D2675C1C8B9C81 /* species_list_PL.json */; };
+		B1A180464E0D3ED2F10B1C21 /* ExposureDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42EA84402A20D3F540816789 /* ExposureDetectorTests.swift */; };
+		B3DC4418BE214210BC699BE4 /* PipelineCoordinatorDatabaseNameTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84174ECCE34EBFCB5E91A2FD /* PipelineCoordinatorDatabaseNameTests.swift */; };
+		B410B08651B89F0366179458 /* GPSCellTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADB21E6D8CB2BE644B0B26B6 /* GPSCellTests.swift */; };
+		B417A37B6D7ECFAF188BF88E /* species_list_CR.json in Resources */ = {isa = PBXBuildFile; fileRef = 9851FFE3625EC5081864EEA0 /* species_list_CR.json */; };
+		B6B76A0E59A2F4F0E8C9F653 /* XMPWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6841A0114CD6BBE3D1E4008E /* XMPWriter.swift */; };
+		B7C487C80F842681FF5238C2 /* SpeciesHierarchyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 147A9109CECBC05DDFA79729 /* SpeciesHierarchyTests.swift */; };
+		B81DEDB967D4E2E4525BCB91 /* FullscreenViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD58D52864274CD6EF36539F /* FullscreenViewer.swift */; };
+		B82DADDA6E847D661290CA33 /* species_list_AU-TAS.json in Resources */ = {isa = PBXBuildFile; fileRef = 04B0CD927C39EDBDC73609CA /* species_list_AU-TAS.json */; };
+		BA292C82707DE3519F838495 /* KeypointDetector.mlmodelc in Resources */ = {isa = PBXBuildFile; fileRef = CC3D3D70982334420509714C /* KeypointDetector.mlmodelc */; };
+		BA7DFC9FC045959F69C131C0 /* species_list_CN-22.json in Resources */ = {isa = PBXBuildFile; fileRef = 5DB715907C882D7043E9420D /* species_list_CN-22.json */; };
+		BBEB9FC0A982439506A82FAF /* BurstDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 874D5B3B2230C5E5693018BA /* BurstDetectorTests.swift */; };
+		BC047EF6ED6E33E5B38B4B89 /* species_list_CM.json in Resources */ = {isa = PBXBuildFile; fileRef = E89E31481D020CC9570B438D /* species_list_CM.json */; };
+		BC412EA71F0E4035D1B02054 /* species_list_US-GA.json in Resources */ = {isa = PBXBuildFile; fileRef = F57E6BE649DCE625E1A90FF9 /* species_list_US-GA.json */; };
+		BD8DD0F4E91D9092FC2276FF /* species_list_CN-64.json in Resources */ = {isa = PBXBuildFile; fileRef = 0474EBFDB310B19FFD7FC791 /* species_list_CN-64.json */; };
+		BE4F93B4BD74DD899C66590E /* ScreenshotAuditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79C2F63B6B529E331DFC29AB /* ScreenshotAuditTests.swift */; };
+		BE622FABCAF982C2E34EF522 /* ebird_classid_mapping.json in Resources */ = {isa = PBXBuildFile; fileRef = FE8D27059948F5C30C01DB8B /* ebird_classid_mapping.json */; };
+		BF1F360951BDD376B01C20FE /* FlightDetector.mlmodelc in Resources */ = {isa = PBXBuildFile; fileRef = B27E6CDFA4FD9B9486D0172D /* FlightDetector.mlmodelc */; };
+		BF1F623CB9139EECF00CF7BB /* XMPWriterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 007143E831325DD4E910840C /* XMPWriterTests.swift */; };
+		BFB870EA95CAE4B2A8C9C33B /* ModelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53490B87D12E17877E5E5830 /* ModelManager.swift */; };
+		BFD6DCFD7A7D8700EB577954 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EAD42F7354C92EFBAC2DD94 /* AppDelegate.swift */; };
+		C1190ABA7B6C1127C621598E /* species_list_US-MI.json in Resources */ = {isa = PBXBuildFile; fileRef = 3DB24FB1B459A0B4A4363422 /* species_list_US-MI.json */; };
+		C182C206677665A752E69844 /* species_list_CN-37.json in Resources */ = {isa = PBXBuildFile; fileRef = 6F73FD52DC01377E6C1D9226 /* species_list_CN-37.json */; };
+		C21CBBB7F3BAD879795D102C /* species_list_DE.json in Resources */ = {isa = PBXBuildFile; fileRef = 078ED0CEC847F95D0A6924EF /* species_list_DE.json */; };
+		C4C1B719F8B6A6E22DBB1B38 /* EXIFOffsetReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B0DFDEC10521C90189BDE9F /* EXIFOffsetReaderTests.swift */; };
+		C5A9C5215B4033F612B488DB /* species_list_BR.json in Resources */ = {isa = PBXBuildFile; fileRef = 767C198185AAF4A0DACB7E4C /* species_list_BR.json */; };
+		C66812EEB0D764D40B2A882C /* species_list_GT.json in Resources */ = {isa = PBXBuildFile; fileRef = 5ED61CA816EA4416F8244414 /* species_list_GT.json */; };
+		C7AED39A5D383B3A3616A610 /* species_list_US-ND.json in Resources */ = {isa = PBXBuildFile; fileRef = F657558E42CD479006C1A8C5 /* species_list_US-ND.json */; };
+		C8B71FD5634761985FC15545 /* ExifFormattersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2D4034E9FA4FAEA2BFB8D8D /* ExifFormattersTests.swift */; };
+		C8DC0C9C5326D67D8648CB31 /* PickedFlagCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B15A1A5D0F460C6EAFB87B0 /* PickedFlagCalculator.swift */; };
+		CA72C6008712387A88EF0778 /* CompareViewUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B41F890C0F4B6826B048C97 /* CompareViewUITests.swift */; };
+		CC17EB879BCADA46E70CBDDE /* bird_reference.sqlite in Resources */ = {isa = PBXBuildFile; fileRef = 53825945C4B0B728CC8B1189 /* bird_reference.sqlite */; };
+		CC7BAF4DFA1380997D56794D /* FlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6185C3D655B6106EFBFBEF9A /* FlowLayout.swift */; };
+		CD1F6A552A6E91CEB6414BB4 /* species_list_US-AL.json in Resources */ = {isa = PBXBuildFile; fileRef = AA00B21E20AC7C19FA96AE96 /* species_list_US-AL.json */; };
+		CD3660BE54B387D8D3035C9D /* CompareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85C9065956BE44CE6D958D6B /* CompareView.swift */; };
+		CD3824070350FA074C2EA462 /* species_list_US-AK.json in Resources */ = {isa = PBXBuildFile; fileRef = 54FECD0590A3C20869543AFA /* species_list_US-AK.json */; };
+		CFE3CFD2C30BB8159586E4CF /* species_list_TR.json in Resources */ = {isa = PBXBuildFile; fileRef = BC9E50AD616AF244345F5745 /* species_list_TR.json */; };
+		D0CB8BD3324BE76EE0E716B4 /* PipelineCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93BD233E1B5ECE7A7C1FDAB1 /* PipelineCoordinator.swift */; };
+		D1197EA9F228E4B15D05CD9C /* InferenceConstantsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10D2D98829319D70C4556FA /* InferenceConstantsTests.swift */; };
+		D26E06E986C669DB868B7F06 /* StarRatingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E6F8B5A1F51928F3F226F23 /* StarRatingView.swift */; };
+		D3633C04CD8ADC594F2841D6 /* species_list_US-NV.json in Resources */ = {isa = PBXBuildFile; fileRef = 66D8537010F05461FCD2FF0A /* species_list_US-NV.json */; };
+		D3AB1B683EDBD7F05D14C18C /* ReverseGeocoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E0746DF7299012FFAB245AC /* ReverseGeocoder.swift */; };
+		D4B41663AF0FD67BBA6422DC /* species_list_CN-44.json in Resources */ = {isa = PBXBuildFile; fileRef = BEE856D59E22C64D1ACC4EB6 /* species_list_CN-44.json */; };
+		D562D508BE9BC7F68F390C75 /* species_list_CN-41.json in Resources */ = {isa = PBXBuildFile; fileRef = 83CCD975564900EE5E75D5D4 /* species_list_CN-41.json */; };
+		D5780C7327D0F6E8E642EA4E /* EXIFOffsetReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55DC1B03F94601690B7CEE70 /* EXIFOffsetReader.swift */; };
+		D6070A885F8DE451AE897CEE /* ImageLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1508E6CA44451D6B09FAD8BF /* ImageLoader.swift */; };
+		D716E8F51325F58C77043E42 /* species_list_CN-91.json in Resources */ = {isa = PBXBuildFile; fileRef = 0840F652B0CB17459DB81648 /* species_list_CN-91.json */; };
+		D7C44A0A7CB40C61F07B0E60 /* species_list_EC.json in Resources */ = {isa = PBXBuildFile; fileRef = 13F27D4ED0A3709B0C5A410D /* species_list_EC.json */; };
+		D846F6D40E95F052E6E6CCD5 /* RAWConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 197514D16AE317EA0B6F2795 /* RAWConverter.swift */; };
+		DAB34C6FE71B2D8C8CB0A7B4 /* species_list_AU.json in Resources */ = {isa = PBXBuildFile; fileRef = AA01D22B226173769BF5C9A7 /* species_list_AU.json */; };
+		DCC5D3701237850CFFA424E3 /* species_list_SG.json in Resources */ = {isa = PBXBuildFile; fileRef = C91C32CE134CB576AB14AF9D /* species_list_SG.json */; };
+		DCF54F3EAA45807F86547522 /* species_list_CN-21.json in Resources */ = {isa = PBXBuildFile; fileRef = 8A88AA7B997C67426FC3E3DE /* species_list_CN-21.json */; };
+		DDE8E519157564DD655F575A /* AestheticsModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DC3715223CF6A27524FF960 /* AestheticsModelTests.swift */; };
+		E0160F8B17617703E31466F2 /* species_list_CN-12.json in Resources */ = {isa = PBXBuildFile; fileRef = A9EBF634334BADAF97C8EBD3 /* species_list_CN-12.json */; };
+		E0B05DE538CC0A9CECAB49DD /* species_list_RO.json in Resources */ = {isa = PBXBuildFile; fileRef = 630E0E89318F8DD9B239C3CF /* species_list_RO.json */; };
+		E0EE37CCF733B5B791B59CC5 /* SourceListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C1BBBB42C2CD216C1D02DAF /* SourceListView.swift */; };
+		E1FCA59C8FC8E5512E0AA81B /* species_list_CN-34.json in Resources */ = {isa = PBXBuildFile; fileRef = EBDE1BB7D41B36A0E8FCD82B /* species_list_CN-34.json */; };
+		E2EF039AD03AF4B1634A1B8E /* species_list_US-KS.json in Resources */ = {isa = PBXBuildFile; fileRef = E2E8038D8ACEA4821EB52B46 /* species_list_US-KS.json */; };
+		E35151E7C480D8AA62F668A2 /* species_list_ZA.json in Resources */ = {isa = PBXBuildFile; fileRef = F032247F3FF943B296C8ECF3 /* species_list_ZA.json */; };
+		E53A277C30ACADDDFD315376 /* species_list_CA.json in Resources */ = {isa = PBXBuildFile; fileRef = AEE66FC2A48AA5CDC0CB5B74 /* species_list_CA.json */; };
+		E7055239176397E5707CB254 /* species_list_US-MO.json in Resources */ = {isa = PBXBuildFile; fileRef = DF5D3CF1D48B0D291383547D /* species_list_US-MO.json */; };
+		E8908C70FFC495E1F2E6660E /* FlightModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F28C4D25E62A78B6BC9F182A /* FlightModelTests.swift */; };
+		E8A2927BC88504E05E879CEC /* EXIFReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75A29A263D346C79918EC367 /* EXIFReader.swift */; };
+		E954F0E4DB534ACB591C8360 /* ImageProperties.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0A7B3239FE09D816B73264E /* ImageProperties.swift */; };
+		E99609D4C4CD0F6AE0B1249A /* OSEAClassifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13A69AD44D8BB173C950B87D /* OSEAClassifierTests.swift */; };
+		EAC14471D1C96D9321F33BC8 /* KeyboardHelpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4D8E1B3F95E2F7898E3F95A /* KeyboardHelpView.swift */; };
+		EB19D10DC37F2D73CFE2276D /* species_list_NO.json in Resources */ = {isa = PBXBuildFile; fileRef = 503127F688087918020308D8 /* species_list_NO.json */; };
+		EB526AFC3879286A8B692A21 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978BD285BA4245F2711720E0 /* MainView.swift */; };
+		EBF5CA183B675C06C247A2CE /* species_list_CN-15.json in Resources */ = {isa = PBXBuildFile; fileRef = 72DA9EF35167D5FEE913B72B /* species_list_CN-15.json */; };
+		EC0ED4B80B5BF938491915DF /* SpeciesHierarchyIncrementalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D03B7B3D939AB0A665F70A8 /* SpeciesHierarchyIncrementalTests.swift */; };
+		EC4348D959AECB902C064AE4 /* SpeciesDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 535FE103CC293FD0B56E843E /* SpeciesDatabase.swift */; };
+		ECDF2885BBBC0857092547C5 /* SuperPickyInference.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BE62639A4988F7ADC65C6BE7 /* SuperPickyInference.framework */; };
+		EEE71D9CDEA197DC1AB1542F /* InferenceClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 383C2AE26F03BE2BA8C8AF84 /* InferenceClient.swift */; };
+		EFF6DFE7203D1850D24393E5 /* SuperPickyInference.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = BE62639A4988F7ADC65C6BE7 /* SuperPickyInference.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		F0E93BA6594B7964B23E6005 /* RatingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0252F59F2B2852A81A8FB56F /* RatingEngine.swift */; };
+		F1AEACFD599251A9017FD123 /* species_list_GH.json in Resources */ = {isa = PBXBuildFile; fileRef = 2DF402CFA2CC35EF411BE2EF /* species_list_GH.json */; };
+		F30B6F6F28A81CD8C62D6C46 /* species_list_SV.json in Resources */ = {isa = PBXBuildFile; fileRef = CE8140A5E163360D2640F003 /* species_list_SV.json */; };
+		F6BE6677B6D5FFE64B2EBBB5 /* species_list_UG.json in Resources */ = {isa = PBXBuildFile; fileRef = 1784C7EC52F720A6E270EA6A /* species_list_UG.json */; };
+		F784544598017180F7DC9B1F /* species_list_ES.json in Resources */ = {isa = PBXBuildFile; fileRef = 5499883D90EB9C2A5F5622CF /* species_list_ES.json */; };
+		F849FFECDD60F6D1D3F1D0BE /* species_list_VE.json in Resources */ = {isa = PBXBuildFile; fileRef = B8ACF6973D837B9A2BD21B22 /* species_list_VE.json */; };
+		F8FAB9501490128A41FC6265 /* species_list_AU-ACT.json in Resources */ = {isa = PBXBuildFile; fileRef = 635388DACE8D3F1D6285ACEE /* species_list_AU-ACT.json */; };
+		F9E9BF0F8051AC5E8F1795F5 /* species_list_AU-VIC.json in Resources */ = {isa = PBXBuildFile; fileRef = 2F7A3AFB121ADF5B23A8D2A4 /* species_list_AU-VIC.json */; };
+		F9F521B99BB8CDD0FBC46DB0 /* StarFilterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54A7888D696878AA3088420A /* StarFilterTests.swift */; };
+		F9FEBE6AC487BCB13206B6C9 /* species_list_US-NJ.json in Resources */ = {isa = PBXBuildFile; fileRef = 3E26808722501524D57DA389 /* species_list_US-NJ.json */; };
+		FA202D59B11B2F6EBF802E7D /* species_list_US-CA.json in Resources */ = {isa = PBXBuildFile; fileRef = D8F545A87D37ADDF0206371F /* species_list_US-CA.json */; };
+		FD88011C2B88AA14A229AB4E /* ProcessingFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A98F3BB70D3CF55D89A9E02D /* ProcessingFlowTests.swift */; };
+		FEADBD63286F2C2664CE146C /* species_list_PA.json in Resources */ = {isa = PBXBuildFile; fileRef = BCB9FC3272BB00F1519857B6 /* species_list_PA.json */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		4CC6E7DF787F55C8610D04BE /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 64B23F78DE7ADD0BB17AA4F8 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1993305FA06737AAC95C2C3A;
+			remoteInfo = SuperPicky;
+		};
+		6081A3D774017D8CCCBF36D8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 64B23F78DE7ADD0BB17AA4F8 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CBAA08EFAF7230EC1F35CEC1;
+			remoteInfo = SuperPickyInference;
+		};
+		C1151C30A8AB76C82FD8C2D6 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 64B23F78DE7ADD0BB17AA4F8 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CBAA08EFAF7230EC1F35CEC1;
+			remoteInfo = SuperPickyInference;
+		};
+		FFFA95017F94360B788123ED /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 64B23F78DE7ADD0BB17AA4F8 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1993305FA06737AAC95C2C3A;
+			remoteInfo = SuperPicky;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		E46B896C17691C1080EA58AB /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				620FA6330AFCF8B6955EB6F6 /* SuperPickyInference.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FE0CB9B6A900FDF26239042F /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				EFF6DFE7203D1850D24393E5 /* SuperPickyInference.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		007143E831325DD4E910840C /* XMPWriterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XMPWriterTests.swift; sourceTree = "<group>"; };
+		00DE23C46649098A49F28568 /* species_list_AU-WA.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_AU-WA.json"; sourceTree = "<group>"; };
+		018DA129CF19A052B9B26009 /* species_list_US-RI.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-RI.json"; sourceTree = "<group>"; };
+		0252F59F2B2852A81A8FB56F /* RatingEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RatingEngine.swift; sourceTree = "<group>"; };
+		03365CF67C582DC2EFA5D864 /* species_list_CN-32.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-32.json"; sourceTree = "<group>"; };
+		03E1F1634F2D00BB43BC1B0A /* species_list_US-OH.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-OH.json"; sourceTree = "<group>"; };
+		03FC87BEA8A390764201E242 /* LaplacianSharpness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaplacianSharpness.swift; sourceTree = "<group>"; };
+		0405C434F890DE3A08186945 /* species_list_CO.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_CO.json; sourceTree = "<group>"; };
+		0474EBFDB310B19FFD7FC791 /* species_list_CN-64.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-64.json"; sourceTree = "<group>"; };
+		0489E5D77DB7CA63F489D2D9 /* PipelinePrewarmTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelinePrewarmTests.swift; sourceTree = "<group>"; };
+		04B0CD927C39EDBDC73609CA /* species_list_AU-TAS.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_AU-TAS.json"; sourceTree = "<group>"; };
+		05343C95C88C0BFB339210EE /* species_list_CN-33.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-33.json"; sourceTree = "<group>"; };
+		07580E7FA71DB8E50F06BE95 /* species_list_US-VA.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-VA.json"; sourceTree = "<group>"; };
+		078ED0CEC847F95D0A6924EF /* species_list_DE.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_DE.json; sourceTree = "<group>"; };
+		0840F652B0CB17459DB81648 /* species_list_CN-91.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-91.json"; sourceTree = "<group>"; };
+		0890D37335193BB0DDC284AB /* species_list_NG.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_NG.json; sourceTree = "<group>"; };
+		0B7B5A32D888ED5133F2A2AC /* species_list_AU-SA.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_AU-SA.json"; sourceTree = "<group>"; };
+		0C60DBF0C5CDD2912B0F3E06 /* AdvancedTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvancedTab.swift; sourceTree = "<group>"; };
+		0C95A64222EB3A31B3AC4C09 /* species_list_CN-63.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-63.json"; sourceTree = "<group>"; };
+		0D2B2B609758193D81A70C8A /* SuperPickyUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SuperPickyUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		0EB885DB2DA8F5954AB40CE2 /* species_list_BZ.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_BZ.json; sourceTree = "<group>"; };
+		0F3420F519C7B29640EC0102 /* species_list_US-MA.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-MA.json"; sourceTree = "<group>"; };
+		0FD4B4D9133D47D0A91D95E0 /* species_list_US-OK.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-OK.json"; sourceTree = "<group>"; };
+		13A69AD44D8BB173C950B87D /* OSEAClassifierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OSEAClassifierTests.swift; sourceTree = "<group>"; };
+		13F27D4ED0A3709B0C5A410D /* species_list_EC.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_EC.json; sourceTree = "<group>"; };
+		147A9109CECBC05DDFA79729 /* SpeciesHierarchyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeciesHierarchyTests.swift; sourceTree = "<group>"; };
+		1508E6CA44451D6B09FAD8BF /* ImageLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageLoader.swift; sourceTree = "<group>"; };
+		15765CB9562B1DD8D9F0FD91 /* species_list_NZ.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_NZ.json; sourceTree = "<group>"; };
+		16EFD5F5D9E42564C0ABFFAB /* species_list_CN-11.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-11.json"; sourceTree = "<group>"; };
+		1784C7EC52F720A6E270EA6A /* species_list_UG.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_UG.json; sourceTree = "<group>"; };
+		17855935BCC43C84A3B8B1B6 /* BurstDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BurstDetector.swift; sourceTree = "<group>"; };
+		186285048D4F76B62A044BC2 /* KeyboardHelpUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardHelpUITests.swift; sourceTree = "<group>"; };
+		197514D16AE317EA0B6F2795 /* RAWConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RAWConverter.swift; sourceTree = "<group>"; };
+		1A85B69522B43C48B86669B7 /* species_list_US-IA.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-IA.json"; sourceTree = "<group>"; };
+		1B0DFDEC10521C90189BDE9F /* EXIFOffsetReaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EXIFOffsetReaderTests.swift; sourceTree = "<group>"; };
+		1E28FB6BF8EA365481A5787F /* species_list_US-IL.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-IL.json"; sourceTree = "<group>"; };
+		1E5FB961979296D57E260183 /* species_list_CN-61.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-61.json"; sourceTree = "<group>"; };
+		2035E1F0D51979F7D9BD4857 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		21E2F3D30F69CB0D67BCB10E /* species_list_AR.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_AR.json; sourceTree = "<group>"; };
+		229472C67589424B4A5072F0 /* CullingConfigTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CullingConfigTests.swift; sourceTree = "<group>"; };
+		24FEF008D651B45C2E5D9732 /* FocusPointDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusPointDetector.swift; sourceTree = "<group>"; };
+		25C714E7C28E46525ADC02A3 /* species_list_JP.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_JP.json; sourceTree = "<group>"; };
+		29DDB2A21C13CA6CF03F37FC /* SpeciesThresholdGateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeciesThresholdGateTests.swift; sourceTree = "<group>"; };
+		2A794AE5A39946EABE421F4D /* CGImageExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CGImageExtensions.swift; sourceTree = "<group>"; };
+		2A992B601664F146B2A46CDA /* species_list_CN-62.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-62.json"; sourceTree = "<group>"; };
+		2ABB018F44EDF2A661140EB5 /* species_list_US-TX.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-TX.json"; sourceTree = "<group>"; };
+		2B41F890C0F4B6826B048C97 /* CompareViewUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompareViewUITests.swift; sourceTree = "<group>"; };
+		2DA11ABE5510E7AF0C59CCDC /* species_list_US-FL.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-FL.json"; sourceTree = "<group>"; };
+		2DF402CFA2CC35EF411BE2EF /* species_list_GH.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_GH.json; sourceTree = "<group>"; };
+		2E6F8B5A1F51928F3F226F23 /* StarRatingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarRatingView.swift; sourceTree = "<group>"; };
+		2F7A3AFB121ADF5B23A8D2A4 /* species_list_AU-VIC.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_AU-VIC.json"; sourceTree = "<group>"; };
+		30AA27AB30CB149B9D8F6323 /* PickedFlagCalculatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PickedFlagCalculatorTests.swift; sourceTree = "<group>"; };
+		341A6E790FEEF335963B81FD /* species_list_US-AR.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-AR.json"; sourceTree = "<group>"; };
+		35F7E268EAB8ADCA8CBBF702 /* species_list_US-OR.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-OR.json"; sourceTree = "<group>"; };
+		36C41BBBBB9D9A15469ED880 /* species_list_AU-QLD.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_AU-QLD.json"; sourceTree = "<group>"; };
+		383C2AE26F03BE2BA8C8AF84 /* InferenceClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InferenceClient.swift; sourceTree = "<group>"; };
+		3853CA5EACD52FAB410C2FB4 /* species_list_VN.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_VN.json; sourceTree = "<group>"; };
+		387E7B05A16958C7DD185DA2 /* species_list_US-LA.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-LA.json"; sourceTree = "<group>"; };
+		3905B37A3CD99EAF5C6AF07C /* species_list_PH.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_PH.json; sourceTree = "<group>"; };
+		39478735CE84350CA2526D87 /* YOLOBirdDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YOLOBirdDetectorTests.swift; sourceTree = "<group>"; };
+		3AF6E9E3D91B338F47900CA3 /* species_list_AU-NSW.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_AU-NSW.json"; sourceTree = "<group>"; };
+		3B75E1E7C7AF280760252360 /* species_list_ID.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_ID.json; sourceTree = "<group>"; };
+		3C2DB72C6CD3A9F63E0C9BBF /* RatingEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RatingEngineTests.swift; sourceTree = "<group>"; };
+		3DB24FB1B459A0B4A4363422 /* species_list_US-MI.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-MI.json"; sourceTree = "<group>"; };
+		3E26808722501524D57DA389 /* species_list_US-NJ.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-NJ.json"; sourceTree = "<group>"; };
+		4107B44DB5215D297E698FAF /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		4150DBAB6F606D030D7EABC0 /* species_list_KE.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_KE.json; sourceTree = "<group>"; };
+		42EA84402A20D3F540816789 /* ExposureDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExposureDetectorTests.swift; sourceTree = "<group>"; };
+		45A370ABA9E131943AD5E95B /* species_list_US-HI.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-HI.json"; sourceTree = "<group>"; };
+		4733694F70127B85919A83C5 /* species_list_CN-23.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-23.json"; sourceTree = "<group>"; };
+		477A9B13ED9208BC9D444B7D /* ModelManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManifest.swift; sourceTree = "<group>"; };
+		48D1442728D2675C1C8B9C81 /* species_list_PL.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_PL.json; sourceTree = "<group>"; };
+		4C2AA103F1873621DA143CB8 /* SuperPickyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SuperPickyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4C41998714EA5D80B730DBEF /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		4DB5E6511A425B77A9DE0E1A /* SpeciesMatch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeciesMatch.swift; sourceTree = "<group>"; };
+		4EAD42F7354C92EFBAC2DD94 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		4ECA615B65ED5F885DDF62F3 /* species_list_US-AZ.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-AZ.json"; sourceTree = "<group>"; };
+		503127F688087918020308D8 /* species_list_NO.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_NO.json; sourceTree = "<group>"; };
+		51D9ED12BDAF2634C06DA741 /* ExposureDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExposureDetector.swift; sourceTree = "<group>"; };
+		51EDE55A1DFF91668CA1F312 /* GPSExtractorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GPSExtractorTests.swift; sourceTree = "<group>"; };
+		529CD9116E651186BFA4DA8E /* YOLOBirdDetector.mlmodelc */ = {isa = PBXFileReference; path = YOLOBirdDetector.mlmodelc; sourceTree = "<group>"; };
+		53490B87D12E17877E5E5830 /* ModelManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManager.swift; sourceTree = "<group>"; };
+		535FE103CC293FD0B56E843E /* SpeciesDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeciesDatabase.swift; sourceTree = "<group>"; };
+		53825945C4B0B728CC8B1189 /* bird_reference.sqlite */ = {isa = PBXFileReference; lastKnownFileType = file; path = bird_reference.sqlite; sourceTree = "<group>"; };
+		5499883D90EB9C2A5F5622CF /* species_list_ES.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_ES.json; sourceTree = "<group>"; };
+		54A7888D696878AA3088420A /* StarFilterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarFilterTests.swift; sourceTree = "<group>"; };
+		54FECD0590A3C20869543AFA /* species_list_US-AK.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-AK.json"; sourceTree = "<group>"; };
+		55DC1B03F94601690B7CEE70 /* EXIFOffsetReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EXIFOffsetReader.swift; sourceTree = "<group>"; };
+		55FD8383417E1258A87ACD4A /* species_list_FI.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_FI.json; sourceTree = "<group>"; };
+		56C47414BCC2DF0A9F491F21 /* RegionBounds.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegionBounds.swift; sourceTree = "<group>"; };
+		58AE30066FA590520817814A /* species_list_PE.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_PE.json; sourceTree = "<group>"; };
+		5B221E47F483F97E331FD12D /* species_list_CN-92.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-92.json"; sourceTree = "<group>"; };
+		5B47AFD38A40ED2713B10A85 /* species_list_US-WV.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-WV.json"; sourceTree = "<group>"; };
+		5CDD907C3528AB931314515D /* species_list_CN-42.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-42.json"; sourceTree = "<group>"; };
+		5D01C78BEFA03F125F1947C9 /* species_list_CN-65.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-65.json"; sourceTree = "<group>"; };
+		5DB715907C882D7043E9420D /* species_list_CN-22.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-22.json"; sourceTree = "<group>"; };
+		5DF7946FDA6598F54AFD92F2 /* PhotoRatingPredictor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoRatingPredictor.swift; sourceTree = "<group>"; };
+		5EAEF125F85AE85042A82314 /* Photo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Photo.swift; sourceTree = "<group>"; };
+		5ECDED56E207C1C5527AFA61 /* MockInferenceClientForUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockInferenceClientForUI.swift; sourceTree = "<group>"; };
+		5ED61CA816EA4416F8244414 /* species_list_GT.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_GT.json; sourceTree = "<group>"; };
+		6185C3D655B6106EFBFBEF9A /* FlowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowLayout.swift; sourceTree = "<group>"; };
+		61B25AB7A3A48E04945DDC33 /* species_list_US.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_US.json; sourceTree = "<group>"; };
+		622BC8DFB8850CF206885FBD /* LocalizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationTests.swift; sourceTree = "<group>"; };
+		62A390085C9159F63CCD38E8 /* AestheticsModel.mlmodelc */ = {isa = PBXFileReference; path = AestheticsModel.mlmodelc; sourceTree = "<group>"; };
+		630E0E89318F8DD9B239C3CF /* species_list_RO.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_RO.json; sourceTree = "<group>"; };
+		635388DACE8D3F1D6285ACEE /* species_list_AU-ACT.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_AU-ACT.json"; sourceTree = "<group>"; };
+		639EE06D764047BB9F92EE22 /* species_list_HN.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_HN.json; sourceTree = "<group>"; };
+		63FBEA72F9F2BCE5B06075C8 /* species_list_US-TN.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-TN.json"; sourceTree = "<group>"; };
+		64EDC4BF8BCA9B913B7ECCA0 /* species_list_CN-54.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-54.json"; sourceTree = "<group>"; };
+		665C6EF2E83D19356BF3A25F /* species_list_MG.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_MG.json; sourceTree = "<group>"; };
+		66D8537010F05461FCD2FF0A /* species_list_US-NV.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-NV.json"; sourceTree = "<group>"; };
+		67D9011A882448A3C9139930 /* offline_index.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = offline_index.json; sourceTree = "<group>"; };
+		6841A0114CD6BBE3D1E4008E /* XMPWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XMPWriter.swift; sourceTree = "<group>"; };
+		69576E5469D18F7A15647585 /* EyeCropSharpness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EyeCropSharpness.swift; sourceTree = "<group>"; };
+		6BAE259F49B382A29C715A18 /* species_list_CN-13.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-13.json"; sourceTree = "<group>"; };
+		6C1BBBB42C2CD216C1D02DAF /* SourceListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceListView.swift; sourceTree = "<group>"; };
+		6C752379CFE1D005A0F3C8D1 /* species_list_GB.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_GB.json; sourceTree = "<group>"; };
+		6D03B7B3D939AB0A665F70A8 /* SpeciesHierarchyIncrementalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeciesHierarchyIncrementalTests.swift; sourceTree = "<group>"; };
+		6DC3715223CF6A27524FF960 /* AestheticsModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AestheticsModelTests.swift; sourceTree = "<group>"; };
+		6DDC8E8C649AF2E099E54AB6 /* SpeciesHierarchyBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeciesHierarchyBuilder.swift; sourceTree = "<group>"; };
+		6F3376C7BF00DA740F9315C3 /* species_list_IT.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_IT.json; sourceTree = "<group>"; };
+		6F73FD52DC01377E6C1D9226 /* species_list_CN-37.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-37.json"; sourceTree = "<group>"; };
+		70C2430E3AB7B52A4C532C3C /* species_list_RU.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_RU.json; sourceTree = "<group>"; };
+		70C655720DDAA4F6410DD923 /* ModelManifestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManifestTests.swift; sourceTree = "<group>"; };
+		71BACA35D2B8F5453814AC38 /* species_list_AU-NT.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_AU-NT.json"; sourceTree = "<group>"; };
+		71E1C64CFB5D669BE650C34C /* LocalizationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationManager.swift; sourceTree = "<group>"; };
+		72025F6C826C04F2ED023A80 /* manifest.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = manifest.json; sourceTree = "<group>"; };
+		72DA9EF35167D5FEE913B72B /* species_list_CN-15.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-15.json"; sourceTree = "<group>"; };
+		72E8D024F35D6F328318114A /* species_list_US-IN.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-IN.json"; sourceTree = "<group>"; };
+		743CD84ED1C849A63C4B269B /* species_list_KR.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_KR.json; sourceTree = "<group>"; };
+		75A29A263D346C79918EC367 /* EXIFReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EXIFReader.swift; sourceTree = "<group>"; };
+		767C198185AAF4A0DACB7E4C /* species_list_BR.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_BR.json; sourceTree = "<group>"; };
+		78E6C73CA5D7B00096B0C890 /* RegionBoundsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegionBoundsTests.swift; sourceTree = "<group>"; };
+		79C2F63B6B529E331DFC29AB /* ScreenshotAuditTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotAuditTests.swift; sourceTree = "<group>"; };
+		7AEB9B454F0D7BEC60B63D12 /* species_list_US-MT.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-MT.json"; sourceTree = "<group>"; };
+		7B7DFAB7427E7D50B6C2F83D /* ExportServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportServiceTests.swift; sourceTree = "<group>"; };
+		7BA9B546E351C65F0881D492 /* species_list_TH.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_TH.json; sourceTree = "<group>"; };
+		7D33DE9FFC32E245ECAD4536 /* ScrollWheelRedirector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollWheelRedirector.swift; sourceTree = "<group>"; };
+		7FA9426449B0EC209F1F0B91 /* DirectoryScannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectoryScannerTests.swift; sourceTree = "<group>"; };
+		7FC42B7AF80A2E12BBE315A0 /* MockUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockUITests.swift; sourceTree = "<group>"; };
+		7FC5EB11196529B2705F55B4 /* species_list_CN-35.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-35.json"; sourceTree = "<group>"; };
+		83CCD975564900EE5E75D5D4 /* species_list_CN-41.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-41.json"; sourceTree = "<group>"; };
+		83DFEE6D8F6AE1786323884E /* AestheticsModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AestheticsModel.swift; sourceTree = "<group>"; };
+		84174ECCE34EBFCB5E91A2FD /* PipelineCoordinatorDatabaseNameTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineCoordinatorDatabaseNameTests.swift; sourceTree = "<group>"; };
+		84C2BF31BA911F18F1E5D16A /* CoreMLInferenceClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreMLInferenceClient.swift; sourceTree = "<group>"; };
+		85C9065956BE44CE6D958D6B /* CompareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompareView.swift; sourceTree = "<group>"; };
+		874D5B3B2230C5E5693018BA /* BurstDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BurstDetectorTests.swift; sourceTree = "<group>"; };
+		88BE904F561D8C65A8EBC315 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		8A88AA7B997C67426FC3E3DE /* species_list_CN-21.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-21.json"; sourceTree = "<group>"; };
+		8B15A1A5D0F460C6EAFB87B0 /* PickedFlagCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PickedFlagCalculator.swift; sourceTree = "<group>"; };
+		8D0804F653E43FD4460C5AF8 /* species_list_US-ID.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-ID.json"; sourceTree = "<group>"; };
+		8D61960564355CE428DB7AAB /* ExifPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExifPanelView.swift; sourceTree = "<group>"; };
+		8D8D60E1764C1EF204A7AEC3 /* species_list_US-WA.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-WA.json"; sourceTree = "<group>"; };
+		923F68C29AAE2B63B8E66A50 /* species_list_ET.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_ET.json; sourceTree = "<group>"; };
+		9287FBC69300612F56401CD6 /* ZoomableImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoomableImageView.swift; sourceTree = "<group>"; };
+		92CA54CF4A9609C43DCDFA7B /* species_list_SE.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_SE.json; sourceTree = "<group>"; };
+		93BD233E1B5ECE7A7C1FDAB1 /* PipelineCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineCoordinator.swift; sourceTree = "<group>"; };
+		950F762228EBD7BA89B8B2C0 /* DirectoryScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectoryScanner.swift; sourceTree = "<group>"; };
+		961E549D049211A4D632059F /* PhotoInheritSpeciesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoInheritSpeciesTests.swift; sourceTree = "<group>"; };
+		978BD285BA4245F2711720E0 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
+		97ECE0591D7C74C6BBC6C5BD /* ThresholdCalibratorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThresholdCalibratorView.swift; sourceTree = "<group>"; };
+		9851FFE3625EC5081864EEA0 /* species_list_CR.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_CR.json; sourceTree = "<group>"; };
+		9879470ED5E5EE64F5D97BE2 /* species_list_US-NY.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-NY.json"; sourceTree = "<group>"; };
+		989AA24DA5C45881773FB833 /* species_list_FR.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_FR.json; sourceTree = "<group>"; };
+		98EC2DA90BF8B3CEECA6B71D /* species_list_BO.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_BO.json; sourceTree = "<group>"; };
+		9A5220B2A07CE5136A004F40 /* ZoomStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoomStateTests.swift; sourceTree = "<group>"; };
+		9AAE5D25B3F1753DA681958E /* species_list_CN.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_CN.json; sourceTree = "<group>"; };
+		9B096E5BDF2FE98BB7B6F24D /* species_list_CN-14.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-14.json"; sourceTree = "<group>"; };
+		9DA8D0BDAF85657AB9C123BE /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		9DF7520AFB604991C3E5FE9E /* species_list_CN-45.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-45.json"; sourceTree = "<group>"; };
+		9E0746DF7299012FFAB245AC /* ReverseGeocoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReverseGeocoder.swift; sourceTree = "<group>"; };
+		9F8BAFBDC2ECC98859327100 /* BirdIDTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BirdIDTab.swift; sourceTree = "<group>"; };
+		A116EA5C6473F4DDDF1E4CFB /* ProcessingFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessingFlowUITests.swift; sourceTree = "<group>"; };
+		A2EF4053556C87B2DBBAF1C1 /* SpeciesKeywordTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeciesKeywordTests.swift; sourceTree = "<group>"; };
+		A3C799CA5070F0F8F4848EC7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A3E01C5D5F6A41F58D2108DF /* species_list_US-SC.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-SC.json"; sourceTree = "<group>"; };
+		A4B59971656A9AD18B236A2D /* BurstDetectorGPSTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BurstDetectorGPSTests.swift; sourceTree = "<group>"; };
+		A6847F1BEA963BA2F12A9AF8 /* species_list_US-NE.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-NE.json"; sourceTree = "<group>"; };
+		A98F3BB70D3CF55D89A9E02D /* ProcessingFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessingFlowTests.swift; sourceTree = "<group>"; };
+		A9EBF634334BADAF97C8EBD3 /* species_list_CN-12.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-12.json"; sourceTree = "<group>"; };
+		A9FCE95C53617AE7CDEEE642 /* OSEAClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OSEAClassifier.swift; sourceTree = "<group>"; };
+		AA00B21E20AC7C19FA96AE96 /* species_list_US-AL.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-AL.json"; sourceTree = "<group>"; };
+		AA01D22B226173769BF5C9A7 /* species_list_AU.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_AU.json; sourceTree = "<group>"; };
+		ADB21E6D8CB2BE644B0B26B6 /* GPSCellTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GPSCellTests.swift; sourceTree = "<group>"; };
+		AE4042C17B7295DB37F5F473 /* species_list_CN-52.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-52.json"; sourceTree = "<group>"; };
+		AED6E82EFBEB905F3087E8AC /* KeyboardMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardMonitor.swift; sourceTree = "<group>"; };
+		AEE66FC2A48AA5CDC0CB5B74 /* species_list_CA.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_CA.json; sourceTree = "<group>"; };
+		AF0BCC676F3ADE3C07F1A5FE /* EyeCropSharpnessTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EyeCropSharpnessTests.swift; sourceTree = "<group>"; };
+		B0092D1A9E4E726F7DFFCCE9 /* species_list_US-MN.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-MN.json"; sourceTree = "<group>"; };
+		B079855D4EA6D7FE445B24D9 /* species_list_US-WY.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-WY.json"; sourceTree = "<group>"; };
+		B08209CB9A6CFAC3264FF9D8 /* PipelineCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineCoordinatorTests.swift; sourceTree = "<group>"; };
+		B09F2A462A860A0649F02FD9 /* species_list_US-ME.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-ME.json"; sourceTree = "<group>"; };
+		B0E6E973590479ED531F1CC0 /* species_list_US-MS.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-MS.json"; sourceTree = "<group>"; };
+		B27E6CDFA4FD9B9486D0172D /* FlightDetector.mlmodelc */ = {isa = PBXFileReference; path = FlightDetector.mlmodelc; sourceTree = "<group>"; };
+		B2D4034E9FA4FAEA2BFB8D8D /* ExifFormattersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExifFormattersTests.swift; sourceTree = "<group>"; };
+		B30E6EC46EDCD5AC815F0836 /* species_list_US-NM.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-NM.json"; sourceTree = "<group>"; };
+		B3FF674364AA10C06A60169B /* species_list_US-NH.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-NH.json"; sourceTree = "<group>"; };
+		B52B9E4BC133A0426D127FD9 /* FocusPointDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusPointDetectorTests.swift; sourceTree = "<group>"; };
+		B692D00B454892AE77C8C7E2 /* AssignedSpeciesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignedSpeciesTests.swift; sourceTree = "<group>"; };
+		B8ACF6973D837B9A2BD21B22 /* species_list_VE.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_VE.json; sourceTree = "<group>"; };
+		B9052B4126684474CFAFF6CD /* species_list_US-NC.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-NC.json"; sourceTree = "<group>"; };
+		BA0E9D1BEE1CDDE92D076028 /* OSEAClassifier.mlmodelc */ = {isa = PBXFileReference; path = OSEAClassifier.mlmodelc; sourceTree = "<group>"; };
+		BC04CB6F128679651B1305EF /* ReportDatabaseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportDatabaseTests.swift; sourceTree = "<group>"; };
+		BC9E50AD616AF244345F5745 /* species_list_TR.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_TR.json; sourceTree = "<group>"; };
+		BCB9FC3272BB00F1519857B6 /* species_list_PA.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_PA.json; sourceTree = "<group>"; };
+		BE62639A4988F7ADC65C6BE7 /* SuperPickyInference.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = SuperPickyInference.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		BEE856D59E22C64D1ACC4EB6 /* species_list_CN-44.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-44.json"; sourceTree = "<group>"; };
+		BF0F99AF6C3E80F1945915C6 /* DetectionResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectionResult.swift; sourceTree = "<group>"; };
+		C1837CF5E6953334C9F59411 /* KeypointModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeypointModelTests.swift; sourceTree = "<group>"; };
+		C249ECD5A8E7D02960210EA5 /* ExifPanelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExifPanelTests.swift; sourceTree = "<group>"; };
+		C2B908941577935C56AB5353 /* SpeciesFilterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeciesFilterTests.swift; sourceTree = "<group>"; };
+		C4D16716BD00EB694FAEF0DB /* SpeciesAssignmentEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeciesAssignmentEditor.swift; sourceTree = "<group>"; };
+		C4D8E1B3F95E2F7898E3F95A /* KeyboardHelpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardHelpView.swift; sourceTree = "<group>"; };
+		C6C3829A72FEAC4C66A61236 /* species_list_MY.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_MY.json; sourceTree = "<group>"; };
+		C8F78B4A7BDCFE1CE3947F19 /* SuperPickyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuperPickyApp.swift; sourceTree = "<group>"; };
+		C8FA20813C22D6F8B6067AE3 /* species_list_US-MD.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-MD.json"; sourceTree = "<group>"; };
+		C91C32CE134CB576AB14AF9D /* species_list_SG.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_SG.json; sourceTree = "<group>"; };
+		C9D7B139DADC49E884F6DC14 /* ExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportService.swift; sourceTree = "<group>"; };
+		CA08763D3FCEF0F16E56884D /* species_list_CN-43.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-43.json"; sourceTree = "<group>"; };
+		CB9A3A9BD8A728146C3DDD2F /* EXIFReaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EXIFReaderTests.swift; sourceTree = "<group>"; };
+		CC3D3D70982334420509714C /* KeypointDetector.mlmodelc */ = {isa = PBXFileReference; path = KeypointDetector.mlmodelc; sourceTree = "<group>"; };
+		CCACCF0FFF8E5E99AC0BF500 /* species_list_US-VT.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-VT.json"; sourceTree = "<group>"; };
+		CCBA5789A3ED2B17AA4EB44D /* SpeciesAssignmentEditorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeciesAssignmentEditorTests.swift; sourceTree = "<group>"; };
+		CCFFE5AB2583A78C57369323 /* CalibratorUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibratorUITests.swift; sourceTree = "<group>"; };
+		CD58D52864274CD6EF36539F /* FullscreenViewer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullscreenViewer.swift; sourceTree = "<group>"; };
+		CE8140A5E163360D2640F003 /* species_list_SV.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_SV.json; sourceTree = "<group>"; };
+		CFD05DF5AFC994E0A5CF74B3 /* YOLOBirdDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YOLOBirdDetector.swift; sourceTree = "<group>"; };
+		D16D64E760C59FE88930FB6D /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
+		D28E71A56423EBF1C3153D43 /* species_list_US-DE.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-DE.json"; sourceTree = "<group>"; };
+		D3212B6002C7368D529C9F05 /* GPSCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GPSCell.swift; sourceTree = "<group>"; };
+		D354E8BFE2BB6211ADAA855F /* PreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewView.swift; sourceTree = "<group>"; };
+		D3A36E4779D719861038F9E4 /* species_list_US-UT.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-UT.json"; sourceTree = "<group>"; };
+		D3AC27931EC190A197652D78 /* FlightModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlightModel.swift; sourceTree = "<group>"; };
+		D6D8E5ED328E7CA41C95BBD9 /* ExifFormatters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExifFormatters.swift; sourceTree = "<group>"; };
+		D88FC087F1746047FC2B2D32 /* LaplacianSharpnessTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaplacianSharpnessTests.swift; sourceTree = "<group>"; };
+		D8C851EF3E92A7DFE6910E3B /* ModelManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManagerTests.swift; sourceTree = "<group>"; };
+		D8F545A87D37ADDF0206371F /* species_list_US-CA.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-CA.json"; sourceTree = "<group>"; };
+		DACA966D4691B1925C4F35D4 /* species_list_US-SD.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-SD.json"; sourceTree = "<group>"; };
+		DBE9101A4DBE4F5471C3EC9B /* InferenceConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InferenceConstants.swift; sourceTree = "<group>"; };
+		DC2E7AA1F2836B3F2C82BD0C /* species_list_CN-51.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-51.json"; sourceTree = "<group>"; };
+		DE0705F7EBD203EAB6E4E775 /* SuperPicky.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SuperPicky.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		DF5D3CF1D48B0D291383547D /* species_list_US-MO.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-MO.json"; sourceTree = "<group>"; };
+		E0A7B3239FE09D816B73264E /* ImageProperties.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageProperties.swift; sourceTree = "<group>"; };
+		E10D2D98829319D70C4556FA /* InferenceConstantsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InferenceConstantsTests.swift; sourceTree = "<group>"; };
+		E259A8CE95239F66A1D6F69D /* species_list_US-KY.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-KY.json"; sourceTree = "<group>"; };
+		E283097C3245E4C2533065B6 /* GeneralTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralTab.swift; sourceTree = "<group>"; };
+		E2E8038D8ACEA4821EB52B46 /* species_list_US-KS.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-KS.json"; sourceTree = "<group>"; };
+		E3C702AE334C9AA2752E111C /* species_list_NI.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_NI.json; sourceTree = "<group>"; };
+		E5A9BAB68FB28CAFE6AB4040 /* species_list_CN-53.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-53.json"; sourceTree = "<group>"; };
+		E66A48DE28377F7091C3F0B2 /* species_list_US-CO.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-CO.json"; sourceTree = "<group>"; };
+		E726094A2C453F4B243141FD /* ReportDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportDatabase.swift; sourceTree = "<group>"; };
+		E78186D0F185EDD20A629C0E /* PhotoRatingPredictorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoRatingPredictorTests.swift; sourceTree = "<group>"; };
+		E89E31481D020CC9570B438D /* species_list_CM.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_CM.json; sourceTree = "<group>"; };
+		E9600609E865C4376743C10B /* GPSExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GPSExtractor.swift; sourceTree = "<group>"; };
+		EA903F7D9120FDF6460CD01E /* species_list_CN-71.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-71.json"; sourceTree = "<group>"; };
+		EBCB447C1AEF40EB4FEADF09 /* species_list_US-PA.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-PA.json"; sourceTree = "<group>"; };
+		EBDE1BB7D41B36A0E8FCD82B /* species_list_CN-34.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-34.json"; sourceTree = "<group>"; };
+		EDA285A3368464DA412604C6 /* species_list_CN-31.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-31.json"; sourceTree = "<group>"; };
+		EDF6737F75129550ED5069A2 /* SpeciesDatabaseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeciesDatabaseTests.swift; sourceTree = "<group>"; };
+		EF867840D7AE5F979B5F5BF0 /* species_list_CN-46.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-46.json"; sourceTree = "<group>"; };
+		EFB7F185F169F5E033B697F1 /* ThumbnailStripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailStripView.swift; sourceTree = "<group>"; };
+		F032247F3FF943B296C8ECF3 /* species_list_ZA.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_ZA.json; sourceTree = "<group>"; };
+		F0FEA77B7EA580CB52BFD7C1 /* SettingsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsUITests.swift; sourceTree = "<group>"; };
+		F1B52F44715CC777F828AE1A /* species_list_CN-36.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-36.json"; sourceTree = "<group>"; };
+		F28C4D25E62A78B6BC9F182A /* FlightModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlightModelTests.swift; sourceTree = "<group>"; };
+		F407B1CB349606F7E02BDEBA /* species_list_CL.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_CL.json; sourceTree = "<group>"; };
+		F4FC5A73B3D82C650DB5DA2F /* CullingWorkflowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CullingWorkflowUITests.swift; sourceTree = "<group>"; };
+		F57E6BE649DCE625E1A90FF9 /* species_list_US-GA.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-GA.json"; sourceTree = "<group>"; };
+		F657558E42CD479006C1A8C5 /* species_list_US-ND.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-ND.json"; sourceTree = "<group>"; };
+		F8AD6BF9D063FEDE842BFF42 /* species_list_US-WI.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-WI.json"; sourceTree = "<group>"; };
+		FB57DBDFB0D5675A8F620572 /* CullingConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CullingConfig.swift; sourceTree = "<group>"; };
+		FBC01C9BA670110F06A24201 /* species_list_IN.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_IN.json; sourceTree = "<group>"; };
+		FBE942F11FEC6DD140A2A482 /* TestImageHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestImageHelpers.swift; sourceTree = "<group>"; };
+		FC494B9B6C6EE0E8C4C71725 /* species_list_MX.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_MX.json; sourceTree = "<group>"; };
+		FC69DB9AB0604B1868A3B299 /* species_list_US-CT.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-CT.json"; sourceTree = "<group>"; };
+		FCDD77DC8C0AFD2D27F7BF8F /* KeypointModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeypointModel.swift; sourceTree = "<group>"; };
+		FCE975693ABAA78E1853356C /* CullingTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CullingTab.swift; sourceTree = "<group>"; };
+		FCF8B7392C1C8A28B15BD48D /* SpeciesFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeciesFilter.swift; sourceTree = "<group>"; };
+		FE1788F929C2EE7791DCBDFA /* ThumbnailDimTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailDimTests.swift; sourceTree = "<group>"; };
+		FE8D27059948F5C30C01DB8B /* ebird_classid_mapping.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ebird_classid_mapping.json; sourceTree = "<group>"; };
+		FF3BC9CF5AB8F2385AF7A7A4 /* species_list_TZ.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_TZ.json; sourceTree = "<group>"; };
+		FF7BC47F186D13ED11279144 /* species_list_CN-50.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-50.json"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		718E99713B94EC78F7AA872D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				544D0CBD6A8C7E9409283DB2 /* GRDB in Frameworks */,
+				ECDF2885BBBC0857092547C5 /* SuperPickyInference.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		769B94CE8478AC6E8E1A229B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1CC89CFBC3E8F304E354B3FA /* SuperPickyInference.framework in Frameworks */,
+				1115C6AC4DBBC57C74E6A0AC /* GRDB in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		056C93A87C58385357A8F82F /* SuperPickyTests */ = {
+			isa = PBXGroup;
+			children = (
+				7C8AA94CF44A773B643A4F54 /* BDD */,
+				2E5D1A7C0537062D38627762 /* Core */,
+				F582AD01D33735F014FED1D8 /* Data */,
+				8D82E5E955C1CE46C17F3138 /* Helpers */,
+				53D0852AB312FF53463D5F36 /* Inference */,
+			);
+			path = SuperPickyTests;
+			sourceTree = "<group>";
+		};
+		26DAE99B7BD56B1FE64F431E /* Download */ = {
+			isa = PBXGroup;
+			children = (
+				53490B87D12E17877E5E5830 /* ModelManager.swift */,
+				477A9B13ED9208BC9D444B7D /* ModelManifest.swift */,
+			);
+			path = Download;
+			sourceTree = "<group>";
+		};
+		2E5D1A7C0537062D38627762 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				B692D00B454892AE77C8C7E2 /* AssignedSpeciesTests.swift */,
+				A4B59971656A9AD18B236A2D /* BurstDetectorGPSTests.swift */,
+				874D5B3B2230C5E5693018BA /* BurstDetectorTests.swift */,
+				229472C67589424B4A5072F0 /* CullingConfigTests.swift */,
+				B2D4034E9FA4FAEA2BFB8D8D /* ExifFormattersTests.swift */,
+				1B0DFDEC10521C90189BDE9F /* EXIFOffsetReaderTests.swift */,
+				CB9A3A9BD8A728146C3DDD2F /* EXIFReaderTests.swift */,
+				7B7DFAB7427E7D50B6C2F83D /* ExportServiceTests.swift */,
+				42EA84402A20D3F540816789 /* ExposureDetectorTests.swift */,
+				AF0BCC676F3ADE3C07F1A5FE /* EyeCropSharpnessTests.swift */,
+				B52B9E4BC133A0426D127FD9 /* FocusPointDetectorTests.swift */,
+				ADB21E6D8CB2BE644B0B26B6 /* GPSCellTests.swift */,
+				D88FC087F1746047FC2B2D32 /* LaplacianSharpnessTests.swift */,
+				622BC8DFB8850CF206885FBD /* LocalizationTests.swift */,
+				961E549D049211A4D632059F /* PhotoInheritSpeciesTests.swift */,
+				E78186D0F185EDD20A629C0E /* PhotoRatingPredictorTests.swift */,
+				30AA27AB30CB149B9D8F6323 /* PickedFlagCalculatorTests.swift */,
+				84174ECCE34EBFCB5E91A2FD /* PipelineCoordinatorDatabaseNameTests.swift */,
+				B08209CB9A6CFAC3264FF9D8 /* PipelineCoordinatorTests.swift */,
+				0489E5D77DB7CA63F489D2D9 /* PipelinePrewarmTests.swift */,
+				3C2DB72C6CD3A9F63E0C9BBF /* RatingEngineTests.swift */,
+				CCBA5789A3ED2B17AA4EB44D /* SpeciesAssignmentEditorTests.swift */,
+				6D03B7B3D939AB0A665F70A8 /* SpeciesHierarchyIncrementalTests.swift */,
+				147A9109CECBC05DDFA79729 /* SpeciesHierarchyTests.swift */,
+				54A7888D696878AA3088420A /* StarFilterTests.swift */,
+				FE1788F929C2EE7791DCBDFA /* ThumbnailDimTests.swift */,
+				007143E831325DD4E910840C /* XMPWriterTests.swift */,
+				9A5220B2A07CE5136A004F40 /* ZoomStateTests.swift */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		3D2E40F1529978878D1AE584 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				53825945C4B0B728CC8B1189 /* bird_reference.sqlite */,
+				72025F6C826C04F2ED023A80 /* manifest.json */,
+			);
+			name = Resources;
+			path = SuperPickyInference/Resources;
+			sourceTree = "<group>";
+		};
+		4FB695B3C833E25955BBBA7F /* SuperPickyApp */ = {
+			isa = PBXGroup;
+			children = (
+				0C60DBF0C5CDD2912B0F3E06 /* AdvancedTab.swift */,
+				4EAD42F7354C92EFBAC2DD94 /* AppDelegate.swift */,
+				9DA8D0BDAF85657AB9C123BE /* AppState.swift */,
+				A3C799CA5070F0F8F4848EC7 /* Assets.xcassets */,
+				9F8BAFBDC2ECC98859327100 /* BirdIDTab.swift */,
+				17855935BCC43C84A3B8B1B6 /* BurstDetector.swift */,
+				85C9065956BE44CE6D958D6B /* CompareView.swift */,
+				4107B44DB5215D297E698FAF /* ContentView.swift */,
+				84C2BF31BA911F18F1E5D16A /* CoreMLInferenceClient.swift */,
+				FB57DBDFB0D5675A8F620572 /* CullingConfig.swift */,
+				FCE975693ABAA78E1853356C /* CullingTab.swift */,
+				BF0F99AF6C3E80F1945915C6 /* DetectionResult.swift */,
+				950F762228EBD7BA89B8B2C0 /* DirectoryScanner.swift */,
+				D6D8E5ED328E7CA41C95BBD9 /* ExifFormatters.swift */,
+				55DC1B03F94601690B7CEE70 /* EXIFOffsetReader.swift */,
+				8D61960564355CE428DB7AAB /* ExifPanelView.swift */,
+				75A29A263D346C79918EC367 /* EXIFReader.swift */,
+				C9D7B139DADC49E884F6DC14 /* ExportService.swift */,
+				51D9ED12BDAF2634C06DA741 /* ExposureDetector.swift */,
+				69576E5469D18F7A15647585 /* EyeCropSharpness.swift */,
+				6185C3D655B6106EFBFBEF9A /* FlowLayout.swift */,
+				24FEF008D651B45C2E5D9732 /* FocusPointDetector.swift */,
+				CD58D52864274CD6EF36539F /* FullscreenViewer.swift */,
+				E283097C3245E4C2533065B6 /* GeneralTab.swift */,
+				1508E6CA44451D6B09FAD8BF /* ImageLoader.swift */,
+				E0A7B3239FE09D816B73264E /* ImageProperties.swift */,
+				383C2AE26F03BE2BA8C8AF84 /* InferenceClient.swift */,
+				C4D8E1B3F95E2F7898E3F95A /* KeyboardHelpView.swift */,
+				AED6E82EFBEB905F3087E8AC /* KeyboardMonitor.swift */,
+				03FC87BEA8A390764201E242 /* LaplacianSharpness.swift */,
+				71E1C64CFB5D669BE650C34C /* LocalizationManager.swift */,
+				D16D64E760C59FE88930FB6D /* Logger.swift */,
+				978BD285BA4245F2711720E0 /* MainView.swift */,
+				5EAEF125F85AE85042A82314 /* Photo.swift */,
+				5DF7946FDA6598F54AFD92F2 /* PhotoRatingPredictor.swift */,
+				8B15A1A5D0F460C6EAFB87B0 /* PickedFlagCalculator.swift */,
+				93BD233E1B5ECE7A7C1FDAB1 /* PipelineCoordinator.swift */,
+				D354E8BFE2BB6211ADAA855F /* PreviewView.swift */,
+				0252F59F2B2852A81A8FB56F /* RatingEngine.swift */,
+				197514D16AE317EA0B6F2795 /* RAWConverter.swift */,
+				E726094A2C453F4B243141FD /* ReportDatabase.swift */,
+				9E0746DF7299012FFAB245AC /* ReverseGeocoder.swift */,
+				7D33DE9FFC32E245ECAD4536 /* ScrollWheelRedirector.swift */,
+				2035E1F0D51979F7D9BD4857 /* SettingsView.swift */,
+				6C1BBBB42C2CD216C1D02DAF /* SourceListView.swift */,
+				C4D16716BD00EB694FAEF0DB /* SpeciesAssignmentEditor.swift */,
+				6DDC8E8C649AF2E099E54AB6 /* SpeciesHierarchyBuilder.swift */,
+				4DB5E6511A425B77A9DE0E1A /* SpeciesMatch.swift */,
+				2E6F8B5A1F51928F3F226F23 /* StarRatingView.swift */,
+				C8F78B4A7BDCFE1CE3947F19 /* SuperPickyApp.swift */,
+				97ECE0591D7C74C6BBC6C5BD /* ThresholdCalibratorView.swift */,
+				EFB7F185F169F5E033B697F1 /* ThumbnailStripView.swift */,
+				6841A0114CD6BBE3D1E4008E /* XMPWriter.swift */,
+				9287FBC69300612F56401CD6 /* ZoomableImageView.swift */,
+				BF41AD1430AE0514A5578240 /* Localizable.strings */,
+				CCF190E7339337C11AEC235D /* TestSupport */,
+			);
+			path = SuperPickyApp;
+			sourceTree = "<group>";
+		};
+		53D0852AB312FF53463D5F36 /* Inference */ = {
+			isa = PBXGroup;
+			children = (
+				6DC3715223CF6A27524FF960 /* AestheticsModelTests.swift */,
+				F28C4D25E62A78B6BC9F182A /* FlightModelTests.swift */,
+				51EDE55A1DFF91668CA1F312 /* GPSExtractorTests.swift */,
+				E10D2D98829319D70C4556FA /* InferenceConstantsTests.swift */,
+				C1837CF5E6953334C9F59411 /* KeypointModelTests.swift */,
+				D8C851EF3E92A7DFE6910E3B /* ModelManagerTests.swift */,
+				70C655720DDAA4F6410DD923 /* ModelManifestTests.swift */,
+				13A69AD44D8BB173C950B87D /* OSEAClassifierTests.swift */,
+				78E6C73CA5D7B00096B0C890 /* RegionBoundsTests.swift */,
+				EDF6737F75129550ED5069A2 /* SpeciesDatabaseTests.swift */,
+				C2B908941577935C56AB5353 /* SpeciesFilterTests.swift */,
+				29DDB2A21C13CA6CF03F37FC /* SpeciesThresholdGateTests.swift */,
+				39478735CE84350CA2526D87 /* YOLOBirdDetectorTests.swift */,
+			);
+			path = Inference;
+			sourceTree = "<group>";
+		};
+		6C47D4F4D90A7011E4C70C90 = {
+			isa = PBXGroup;
+			children = (
+				F55DD2021954E87D8B6A0AC6 /* ebird */,
+				FE581B6634F4566A7774FFB8 /* Models */,
+				3D2E40F1529978878D1AE584 /* Resources */,
+				4FB695B3C833E25955BBBA7F /* SuperPickyApp */,
+				CD17B7EBD5AC6B26DB5DA9EF /* SuperPickyInference */,
+				056C93A87C58385357A8F82F /* SuperPickyTests */,
+				F4BF3F945E2DB827478F7D52 /* SuperPickyUITests */,
+				CC1BE826E1394B2331C7FAEC /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		7C8AA94CF44A773B643A4F54 /* BDD */ = {
+			isa = PBXGroup;
+			children = (
+				C249ECD5A8E7D02960210EA5 /* ExifPanelTests.swift */,
+				A98F3BB70D3CF55D89A9E02D /* ProcessingFlowTests.swift */,
+				A2EF4053556C87B2DBBAF1C1 /* SpeciesKeywordTests.swift */,
+			);
+			path = BDD;
+			sourceTree = "<group>";
+		};
+		8D82E5E955C1CE46C17F3138 /* Helpers */ = {
+			isa = PBXGroup;
+			children = (
+				FBE942F11FEC6DD140A2A482 /* TestImageHelpers.swift */,
+			);
+			path = Helpers;
+			sourceTree = "<group>";
+		};
+		CC1BE826E1394B2331C7FAEC /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				DE0705F7EBD203EAB6E4E775 /* SuperPicky.app */,
+				BE62639A4988F7ADC65C6BE7 /* SuperPickyInference.framework */,
+				4C2AA103F1873621DA143CB8 /* SuperPickyTests.xctest */,
+				0D2B2B609758193D81A70C8A /* SuperPickyUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		CCF190E7339337C11AEC235D /* TestSupport */ = {
+			isa = PBXGroup;
+			children = (
+				5ECDED56E207C1C5527AFA61 /* MockInferenceClientForUI.swift */,
+			);
+			path = TestSupport;
+			sourceTree = "<group>";
+		};
+		CD17B7EBD5AC6B26DB5DA9EF /* SuperPickyInference */ = {
+			isa = PBXGroup;
+			children = (
+				DBE9101A4DBE4F5471C3EC9B /* InferenceConstants.swift */,
+				EA023DAE3B9FB521FFFCC47A /* Data */,
+				26DAE99B7BD56B1FE64F431E /* Download */,
+				EB33406265F5310B730918C2 /* Models */,
+				DF0DC239B93985EFCBA6B009 /* Utils */,
+			);
+			path = SuperPickyInference;
+			sourceTree = "<group>";
+		};
+		DF0DC239B93985EFCBA6B009 /* Utils */ = {
+			isa = PBXGroup;
+			children = (
+				2A794AE5A39946EABE421F4D /* CGImageExtensions.swift */,
+			);
+			path = Utils;
+			sourceTree = "<group>";
+		};
+		EA023DAE3B9FB521FFFCC47A /* Data */ = {
+			isa = PBXGroup;
+			children = (
+				D3212B6002C7368D529C9F05 /* GPSCell.swift */,
+				E9600609E865C4376743C10B /* GPSExtractor.swift */,
+				56C47414BCC2DF0A9F491F21 /* RegionBounds.swift */,
+				535FE103CC293FD0B56E843E /* SpeciesDatabase.swift */,
+				FCF8B7392C1C8A28B15BD48D /* SpeciesFilter.swift */,
+			);
+			path = Data;
+			sourceTree = "<group>";
+		};
+		EB33406265F5310B730918C2 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				83DFEE6D8F6AE1786323884E /* AestheticsModel.swift */,
+				D3AC27931EC190A197652D78 /* FlightModel.swift */,
+				FCDD77DC8C0AFD2D27F7BF8F /* KeypointModel.swift */,
+				A9FCE95C53617AE7CDEEE642 /* OSEAClassifier.swift */,
+				CFD05DF5AFC994E0A5CF74B3 /* YOLOBirdDetector.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		F4BF3F945E2DB827478F7D52 /* SuperPickyUITests */ = {
+			isa = PBXGroup;
+			children = (
+				CCFFE5AB2583A78C57369323 /* CalibratorUITests.swift */,
+				2B41F890C0F4B6826B048C97 /* CompareViewUITests.swift */,
+				F4FC5A73B3D82C650DB5DA2F /* CullingWorkflowUITests.swift */,
+				186285048D4F76B62A044BC2 /* KeyboardHelpUITests.swift */,
+				7FC42B7AF80A2E12BBE315A0 /* MockUITests.swift */,
+				A116EA5C6473F4DDDF1E4CFB /* ProcessingFlowUITests.swift */,
+				79C2F63B6B529E331DFC29AB /* ScreenshotAuditTests.swift */,
+				F0FEA77B7EA580CB52BFD7C1 /* SettingsUITests.swift */,
+			);
+			path = SuperPickyUITests;
+			sourceTree = "<group>";
+		};
+		F55DD2021954E87D8B6A0AC6 /* ebird */ = {
+			isa = PBXGroup;
+			children = (
+				FE8D27059948F5C30C01DB8B /* ebird_classid_mapping.json */,
+				67D9011A882448A3C9139930 /* offline_index.json */,
+				21E2F3D30F69CB0D67BCB10E /* species_list_AR.json */,
+				635388DACE8D3F1D6285ACEE /* species_list_AU-ACT.json */,
+				3AF6E9E3D91B338F47900CA3 /* species_list_AU-NSW.json */,
+				71BACA35D2B8F5453814AC38 /* species_list_AU-NT.json */,
+				36C41BBBBB9D9A15469ED880 /* species_list_AU-QLD.json */,
+				0B7B5A32D888ED5133F2A2AC /* species_list_AU-SA.json */,
+				04B0CD927C39EDBDC73609CA /* species_list_AU-TAS.json */,
+				2F7A3AFB121ADF5B23A8D2A4 /* species_list_AU-VIC.json */,
+				00DE23C46649098A49F28568 /* species_list_AU-WA.json */,
+				AA01D22B226173769BF5C9A7 /* species_list_AU.json */,
+				98EC2DA90BF8B3CEECA6B71D /* species_list_BO.json */,
+				767C198185AAF4A0DACB7E4C /* species_list_BR.json */,
+				0EB885DB2DA8F5954AB40CE2 /* species_list_BZ.json */,
+				AEE66FC2A48AA5CDC0CB5B74 /* species_list_CA.json */,
+				F407B1CB349606F7E02BDEBA /* species_list_CL.json */,
+				E89E31481D020CC9570B438D /* species_list_CM.json */,
+				16EFD5F5D9E42564C0ABFFAB /* species_list_CN-11.json */,
+				A9EBF634334BADAF97C8EBD3 /* species_list_CN-12.json */,
+				6BAE259F49B382A29C715A18 /* species_list_CN-13.json */,
+				9B096E5BDF2FE98BB7B6F24D /* species_list_CN-14.json */,
+				72DA9EF35167D5FEE913B72B /* species_list_CN-15.json */,
+				8A88AA7B997C67426FC3E3DE /* species_list_CN-21.json */,
+				5DB715907C882D7043E9420D /* species_list_CN-22.json */,
+				4733694F70127B85919A83C5 /* species_list_CN-23.json */,
+				EDA285A3368464DA412604C6 /* species_list_CN-31.json */,
+				03365CF67C582DC2EFA5D864 /* species_list_CN-32.json */,
+				05343C95C88C0BFB339210EE /* species_list_CN-33.json */,
+				EBDE1BB7D41B36A0E8FCD82B /* species_list_CN-34.json */,
+				7FC5EB11196529B2705F55B4 /* species_list_CN-35.json */,
+				F1B52F44715CC777F828AE1A /* species_list_CN-36.json */,
+				6F73FD52DC01377E6C1D9226 /* species_list_CN-37.json */,
+				83CCD975564900EE5E75D5D4 /* species_list_CN-41.json */,
+				5CDD907C3528AB931314515D /* species_list_CN-42.json */,
+				CA08763D3FCEF0F16E56884D /* species_list_CN-43.json */,
+				BEE856D59E22C64D1ACC4EB6 /* species_list_CN-44.json */,
+				9DF7520AFB604991C3E5FE9E /* species_list_CN-45.json */,
+				EF867840D7AE5F979B5F5BF0 /* species_list_CN-46.json */,
+				FF7BC47F186D13ED11279144 /* species_list_CN-50.json */,
+				DC2E7AA1F2836B3F2C82BD0C /* species_list_CN-51.json */,
+				AE4042C17B7295DB37F5F473 /* species_list_CN-52.json */,
+				E5A9BAB68FB28CAFE6AB4040 /* species_list_CN-53.json */,
+				64EDC4BF8BCA9B913B7ECCA0 /* species_list_CN-54.json */,
+				1E5FB961979296D57E260183 /* species_list_CN-61.json */,
+				2A992B601664F146B2A46CDA /* species_list_CN-62.json */,
+				0C95A64222EB3A31B3AC4C09 /* species_list_CN-63.json */,
+				0474EBFDB310B19FFD7FC791 /* species_list_CN-64.json */,
+				5D01C78BEFA03F125F1947C9 /* species_list_CN-65.json */,
+				EA903F7D9120FDF6460CD01E /* species_list_CN-71.json */,
+				0840F652B0CB17459DB81648 /* species_list_CN-91.json */,
+				5B221E47F483F97E331FD12D /* species_list_CN-92.json */,
+				9AAE5D25B3F1753DA681958E /* species_list_CN.json */,
+				0405C434F890DE3A08186945 /* species_list_CO.json */,
+				9851FFE3625EC5081864EEA0 /* species_list_CR.json */,
+				078ED0CEC847F95D0A6924EF /* species_list_DE.json */,
+				13F27D4ED0A3709B0C5A410D /* species_list_EC.json */,
+				5499883D90EB9C2A5F5622CF /* species_list_ES.json */,
+				923F68C29AAE2B63B8E66A50 /* species_list_ET.json */,
+				55FD8383417E1258A87ACD4A /* species_list_FI.json */,
+				989AA24DA5C45881773FB833 /* species_list_FR.json */,
+				6C752379CFE1D005A0F3C8D1 /* species_list_GB.json */,
+				2DF402CFA2CC35EF411BE2EF /* species_list_GH.json */,
+				5ED61CA816EA4416F8244414 /* species_list_GT.json */,
+				639EE06D764047BB9F92EE22 /* species_list_HN.json */,
+				3B75E1E7C7AF280760252360 /* species_list_ID.json */,
+				FBC01C9BA670110F06A24201 /* species_list_IN.json */,
+				6F3376C7BF00DA740F9315C3 /* species_list_IT.json */,
+				25C714E7C28E46525ADC02A3 /* species_list_JP.json */,
+				4150DBAB6F606D030D7EABC0 /* species_list_KE.json */,
+				743CD84ED1C849A63C4B269B /* species_list_KR.json */,
+				665C6EF2E83D19356BF3A25F /* species_list_MG.json */,
+				FC494B9B6C6EE0E8C4C71725 /* species_list_MX.json */,
+				C6C3829A72FEAC4C66A61236 /* species_list_MY.json */,
+				0890D37335193BB0DDC284AB /* species_list_NG.json */,
+				E3C702AE334C9AA2752E111C /* species_list_NI.json */,
+				503127F688087918020308D8 /* species_list_NO.json */,
+				15765CB9562B1DD8D9F0FD91 /* species_list_NZ.json */,
+				BCB9FC3272BB00F1519857B6 /* species_list_PA.json */,
+				58AE30066FA590520817814A /* species_list_PE.json */,
+				3905B37A3CD99EAF5C6AF07C /* species_list_PH.json */,
+				48D1442728D2675C1C8B9C81 /* species_list_PL.json */,
+				630E0E89318F8DD9B239C3CF /* species_list_RO.json */,
+				70C2430E3AB7B52A4C532C3C /* species_list_RU.json */,
+				92CA54CF4A9609C43DCDFA7B /* species_list_SE.json */,
+				C91C32CE134CB576AB14AF9D /* species_list_SG.json */,
+				CE8140A5E163360D2640F003 /* species_list_SV.json */,
+				7BA9B546E351C65F0881D492 /* species_list_TH.json */,
+				BC9E50AD616AF244345F5745 /* species_list_TR.json */,
+				FF3BC9CF5AB8F2385AF7A7A4 /* species_list_TZ.json */,
+				1784C7EC52F720A6E270EA6A /* species_list_UG.json */,
+				54FECD0590A3C20869543AFA /* species_list_US-AK.json */,
+				AA00B21E20AC7C19FA96AE96 /* species_list_US-AL.json */,
+				341A6E790FEEF335963B81FD /* species_list_US-AR.json */,
+				4ECA615B65ED5F885DDF62F3 /* species_list_US-AZ.json */,
+				D8F545A87D37ADDF0206371F /* species_list_US-CA.json */,
+				E66A48DE28377F7091C3F0B2 /* species_list_US-CO.json */,
+				FC69DB9AB0604B1868A3B299 /* species_list_US-CT.json */,
+				D28E71A56423EBF1C3153D43 /* species_list_US-DE.json */,
+				2DA11ABE5510E7AF0C59CCDC /* species_list_US-FL.json */,
+				F57E6BE649DCE625E1A90FF9 /* species_list_US-GA.json */,
+				45A370ABA9E131943AD5E95B /* species_list_US-HI.json */,
+				1A85B69522B43C48B86669B7 /* species_list_US-IA.json */,
+				8D0804F653E43FD4460C5AF8 /* species_list_US-ID.json */,
+				1E28FB6BF8EA365481A5787F /* species_list_US-IL.json */,
+				72E8D024F35D6F328318114A /* species_list_US-IN.json */,
+				E2E8038D8ACEA4821EB52B46 /* species_list_US-KS.json */,
+				E259A8CE95239F66A1D6F69D /* species_list_US-KY.json */,
+				387E7B05A16958C7DD185DA2 /* species_list_US-LA.json */,
+				0F3420F519C7B29640EC0102 /* species_list_US-MA.json */,
+				C8FA20813C22D6F8B6067AE3 /* species_list_US-MD.json */,
+				B09F2A462A860A0649F02FD9 /* species_list_US-ME.json */,
+				3DB24FB1B459A0B4A4363422 /* species_list_US-MI.json */,
+				B0092D1A9E4E726F7DFFCCE9 /* species_list_US-MN.json */,
+				DF5D3CF1D48B0D291383547D /* species_list_US-MO.json */,
+				B0E6E973590479ED531F1CC0 /* species_list_US-MS.json */,
+				7AEB9B454F0D7BEC60B63D12 /* species_list_US-MT.json */,
+				B9052B4126684474CFAFF6CD /* species_list_US-NC.json */,
+				F657558E42CD479006C1A8C5 /* species_list_US-ND.json */,
+				A6847F1BEA963BA2F12A9AF8 /* species_list_US-NE.json */,
+				B3FF674364AA10C06A60169B /* species_list_US-NH.json */,
+				3E26808722501524D57DA389 /* species_list_US-NJ.json */,
+				B30E6EC46EDCD5AC815F0836 /* species_list_US-NM.json */,
+				66D8537010F05461FCD2FF0A /* species_list_US-NV.json */,
+				9879470ED5E5EE64F5D97BE2 /* species_list_US-NY.json */,
+				03E1F1634F2D00BB43BC1B0A /* species_list_US-OH.json */,
+				0FD4B4D9133D47D0A91D95E0 /* species_list_US-OK.json */,
+				35F7E268EAB8ADCA8CBBF702 /* species_list_US-OR.json */,
+				EBCB447C1AEF40EB4FEADF09 /* species_list_US-PA.json */,
+				018DA129CF19A052B9B26009 /* species_list_US-RI.json */,
+				A3E01C5D5F6A41F58D2108DF /* species_list_US-SC.json */,
+				DACA966D4691B1925C4F35D4 /* species_list_US-SD.json */,
+				63FBEA72F9F2BCE5B06075C8 /* species_list_US-TN.json */,
+				2ABB018F44EDF2A661140EB5 /* species_list_US-TX.json */,
+				D3A36E4779D719861038F9E4 /* species_list_US-UT.json */,
+				07580E7FA71DB8E50F06BE95 /* species_list_US-VA.json */,
+				CCACCF0FFF8E5E99AC0BF500 /* species_list_US-VT.json */,
+				8D8D60E1764C1EF204A7AEC3 /* species_list_US-WA.json */,
+				F8AD6BF9D063FEDE842BFF42 /* species_list_US-WI.json */,
+				5B47AFD38A40ED2713B10A85 /* species_list_US-WV.json */,
+				B079855D4EA6D7FE445B24D9 /* species_list_US-WY.json */,
+				61B25AB7A3A48E04945DDC33 /* species_list_US.json */,
+				B8ACF6973D837B9A2BD21B22 /* species_list_VE.json */,
+				3853CA5EACD52FAB410C2FB4 /* species_list_VN.json */,
+				F032247F3FF943B296C8ECF3 /* species_list_ZA.json */,
+			);
+			name = ebird;
+			path = SuperPickyInference/Resources/ebird;
+			sourceTree = "<group>";
+		};
+		F582AD01D33735F014FED1D8 /* Data */ = {
+			isa = PBXGroup;
+			children = (
+				7FA9426449B0EC209F1F0B91 /* DirectoryScannerTests.swift */,
+				BC04CB6F128679651B1305EF /* ReportDatabaseTests.swift */,
+			);
+			path = Data;
+			sourceTree = "<group>";
+		};
+		FE581B6634F4566A7774FFB8 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				62A390085C9159F63CCD38E8 /* AestheticsModel.mlmodelc */,
+				B27E6CDFA4FD9B9486D0172D /* FlightDetector.mlmodelc */,
+				CC3D3D70982334420509714C /* KeypointDetector.mlmodelc */,
+				BA0E9D1BEE1CDDE92D076028 /* OSEAClassifier.mlmodelc */,
+				529CD9116E651186BFA4DA8E /* YOLOBirdDetector.mlmodelc */,
+			);
+			name = Models;
+			path = SuperPickyInference/Resources/Models;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		1993305FA06737AAC95C2C3A /* SuperPicky */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 780271FECC6A2B167F070075 /* Build configuration list for PBXNativeTarget "SuperPicky" */;
+			buildPhases = (
+				7F9969121064321562687ED1 /* Sources */,
+				7A0423185E20D806CD9C65F4 /* Resources */,
+				718E99713B94EC78F7AA872D /* Frameworks */,
+				E46B896C17691C1080EA58AB /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				77BFF038E6A9D68E0B910D75 /* PBXTargetDependency */,
+			);
+			name = SuperPicky;
+			packageProductDependencies = (
+				62ECFA7A1CE3D41AAF0C1F85 /* GRDB */,
+			);
+			productName = SuperPicky;
+			productReference = DE0705F7EBD203EAB6E4E775 /* SuperPicky.app */;
+			productType = "com.apple.product-type.application";
+		};
+		225201FAFE2A9AF22FD7BD16 /* SuperPickyTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1E4086D2E420081C4D395202 /* Build configuration list for PBXNativeTarget "SuperPickyTests" */;
+			buildPhases = (
+				6D4718F4D3AA4367906A9E21 /* Sources */,
+				769B94CE8478AC6E8E1A229B /* Frameworks */,
+				FE0CB9B6A900FDF26239042F /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				4E935528D505BC0D29A7511F /* PBXTargetDependency */,
+				984AA7B2E184667833B54D29 /* PBXTargetDependency */,
+			);
+			name = SuperPickyTests;
+			packageProductDependencies = (
+				3116EFBEF1C66049A043EF0C /* GRDB */,
+			);
+			productName = SuperPickyTests;
+			productReference = 4C2AA103F1873621DA143CB8 /* SuperPickyTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		4106A94E20C8B4CFCAEB938C /* SuperPickyUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7F3798C2BD1B2870C36C077A /* Build configuration list for PBXNativeTarget "SuperPickyUITests" */;
+			buildPhases = (
+				2B7AAA51F3B199B5866BDF21 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				CF7CA108963A3399EE385797 /* PBXTargetDependency */,
+			);
+			name = SuperPickyUITests;
+			packageProductDependencies = (
+			);
+			productName = SuperPickyUITests;
+			productReference = 0D2B2B609758193D81A70C8A /* SuperPickyUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		CBAA08EFAF7230EC1F35CEC1 /* SuperPickyInference */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C3A5F32CEAEEE89C0A21A54F /* Build configuration list for PBXNativeTarget "SuperPickyInference" */;
+			buildPhases = (
+				692A91B1D77148E0FADF824E /* Sources */,
+				6CB92283303587A5221BF994 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SuperPickyInference;
+			packageProductDependencies = (
+			);
+			productName = SuperPickyInference;
+			productReference = BE62639A4988F7ADC65C6BE7 /* SuperPickyInference.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		64B23F78DE7ADD0BB17AA4F8 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					4106A94E20C8B4CFCAEB938C = {
+						TestTargetID = 1993305FA06737AAC95C2C3A;
+					};
+				};
+			};
+			buildConfigurationList = 77DF3A6536212516469D920E /* Build configuration list for PBXProject "SuperPicky" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+				"zh-Hans",
+			);
+			mainGroup = 6C47D4F4D90A7011E4C70C90;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				5A5F7A6D5FAD7147C33780C8 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = CC1BE826E1394B2331C7FAEC /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				1993305FA06737AAC95C2C3A /* SuperPicky */,
+				CBAA08EFAF7230EC1F35CEC1 /* SuperPickyInference */,
+				225201FAFE2A9AF22FD7BD16 /* SuperPickyTests */,
+				4106A94E20C8B4CFCAEB938C /* SuperPickyUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		6CB92283303587A5221BF994 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3D87959ADFDC6012A67B3C5B /* AestheticsModel.mlmodelc in Resources */,
+				BF1F360951BDD376B01C20FE /* FlightDetector.mlmodelc in Resources */,
+				BA292C82707DE3519F838495 /* KeypointDetector.mlmodelc in Resources */,
+				B01C44C20A0CD808BB7F3BC2 /* OSEAClassifier.mlmodelc in Resources */,
+				6380A5FBE3A5F45CC653D33D /* YOLOBirdDetector.mlmodelc in Resources */,
+				CC17EB879BCADA46E70CBDDE /* bird_reference.sqlite in Resources */,
+				BE622FABCAF982C2E34EF522 /* ebird_classid_mapping.json in Resources */,
+				810E57FFB1CB73981A864F1B /* manifest.json in Resources */,
+				78939EE79C0DDD7C2E4B4BF8 /* offline_index.json in Resources */,
+				05B7E327D3FE21AF6EDF9741 /* species_list_AR.json in Resources */,
+				F8FAB9501490128A41FC6265 /* species_list_AU-ACT.json in Resources */,
+				157887AE29C81209B36C56EA /* species_list_AU-NSW.json in Resources */,
+				3117925FD5A77E380563283D /* species_list_AU-NT.json in Resources */,
+				54EADF68B3D25271C79C5F58 /* species_list_AU-QLD.json in Resources */,
+				9BC078E348C1DAA1AB362743 /* species_list_AU-SA.json in Resources */,
+				B82DADDA6E847D661290CA33 /* species_list_AU-TAS.json in Resources */,
+				F9E9BF0F8051AC5E8F1795F5 /* species_list_AU-VIC.json in Resources */,
+				7D46995817787640B2CEEF67 /* species_list_AU-WA.json in Resources */,
+				DAB34C6FE71B2D8C8CB0A7B4 /* species_list_AU.json in Resources */,
+				89450DB7EF897F06A5AA5750 /* species_list_BO.json in Resources */,
+				C5A9C5215B4033F612B488DB /* species_list_BR.json in Resources */,
+				A35CFB043D790AA58F21DF81 /* species_list_BZ.json in Resources */,
+				E53A277C30ACADDDFD315376 /* species_list_CA.json in Resources */,
+				274E3FFBC05E772F40220564 /* species_list_CL.json in Resources */,
+				BC047EF6ED6E33E5B38B4B89 /* species_list_CM.json in Resources */,
+				45F636F202159F3ED17B2DA5 /* species_list_CN-11.json in Resources */,
+				E0160F8B17617703E31466F2 /* species_list_CN-12.json in Resources */,
+				993CD37468A24B709B548C0D /* species_list_CN-13.json in Resources */,
+				634D2F226E6C7E1FDA107CCE /* species_list_CN-14.json in Resources */,
+				EBF5CA183B675C06C247A2CE /* species_list_CN-15.json in Resources */,
+				DCF54F3EAA45807F86547522 /* species_list_CN-21.json in Resources */,
+				BA7DFC9FC045959F69C131C0 /* species_list_CN-22.json in Resources */,
+				6EADF3DDE501AD794F2FA592 /* species_list_CN-23.json in Resources */,
+				29BE14736518A391A3CF4B6C /* species_list_CN-31.json in Resources */,
+				2C85B2508913EF8C77F42C67 /* species_list_CN-32.json in Resources */,
+				7C296AB9198A14949FDA6324 /* species_list_CN-33.json in Resources */,
+				E1FCA59C8FC8E5512E0AA81B /* species_list_CN-34.json in Resources */,
+				0282798E9E2C5C127B3F1D8D /* species_list_CN-35.json in Resources */,
+				180DF517A517E6D490369BD9 /* species_list_CN-36.json in Resources */,
+				C182C206677665A752E69844 /* species_list_CN-37.json in Resources */,
+				D562D508BE9BC7F68F390C75 /* species_list_CN-41.json in Resources */,
+				A723606E100F492AF8B60196 /* species_list_CN-42.json in Resources */,
+				60AF2AE87AEB5C6FF5F26C7E /* species_list_CN-43.json in Resources */,
+				D4B41663AF0FD67BBA6422DC /* species_list_CN-44.json in Resources */,
+				9035B09CE55BBE873463E780 /* species_list_CN-45.json in Resources */,
+				2A58B54042E4FD0ADFCF8D3D /* species_list_CN-46.json in Resources */,
+				0106105613F1068C39E464B4 /* species_list_CN-50.json in Resources */,
+				AC209243584F679DDFA0BC56 /* species_list_CN-51.json in Resources */,
+				9D4ECA70D7ADFCD4F457549F /* species_list_CN-52.json in Resources */,
+				A0B585F04E1DA46955FAEA26 /* species_list_CN-53.json in Resources */,
+				2AB70913789D41371C212BDF /* species_list_CN-54.json in Resources */,
+				1594CB8EA833783FFE351F52 /* species_list_CN-61.json in Resources */,
+				A96697B3A0D19976062AE52E /* species_list_CN-62.json in Resources */,
+				6FAA0C5716916CB07E7DA5F5 /* species_list_CN-63.json in Resources */,
+				BD8DD0F4E91D9092FC2276FF /* species_list_CN-64.json in Resources */,
+				8C7E3BD81A11C5A4F771A784 /* species_list_CN-65.json in Resources */,
+				77E2CDCA44CEAFF85E7A5846 /* species_list_CN-71.json in Resources */,
+				D716E8F51325F58C77043E42 /* species_list_CN-91.json in Resources */,
+				8C825D79EFF43103F60A8B15 /* species_list_CN-92.json in Resources */,
+				56D42A3F92844E1969CB34A5 /* species_list_CN.json in Resources */,
+				2161F7D33F762BE7B8248B57 /* species_list_CO.json in Resources */,
+				B417A37B6D7ECFAF188BF88E /* species_list_CR.json in Resources */,
+				C21CBBB7F3BAD879795D102C /* species_list_DE.json in Resources */,
+				D7C44A0A7CB40C61F07B0E60 /* species_list_EC.json in Resources */,
+				F784544598017180F7DC9B1F /* species_list_ES.json in Resources */,
+				12C3DC2A58B81B29DA098B88 /* species_list_ET.json in Resources */,
+				4E0ADD7F267DD8E7279A73DE /* species_list_FI.json in Resources */,
+				5F19CB51CA2D390FE9F18C45 /* species_list_FR.json in Resources */,
+				1201CBBA48B8870EFF488738 /* species_list_GB.json in Resources */,
+				F1AEACFD599251A9017FD123 /* species_list_GH.json in Resources */,
+				C66812EEB0D764D40B2A882C /* species_list_GT.json in Resources */,
+				92111F4E0D26E7C74911689F /* species_list_HN.json in Resources */,
+				110B43DA974C272DFC9B5F32 /* species_list_ID.json in Resources */,
+				4AE1302AC0FCEEE98D429FA1 /* species_list_IN.json in Resources */,
+				6357BF9BC349E55068B9DE1F /* species_list_IT.json in Resources */,
+				9AEB5BD3B3C640F148348A87 /* species_list_JP.json in Resources */,
+				AB454647C2709C8EFC07D5C1 /* species_list_KE.json in Resources */,
+				6109CDBA61A96C5AA48EC0C9 /* species_list_KR.json in Resources */,
+				4C3DD521E4D175364764349A /* species_list_MG.json in Resources */,
+				164D329684AC44E8806280EE /* species_list_MX.json in Resources */,
+				16082021E6048558E60ACE6F /* species_list_MY.json in Resources */,
+				A50A9A682A928CCB91591A21 /* species_list_NG.json in Resources */,
+				9FC4DBD9C5F7F22B329823C9 /* species_list_NI.json in Resources */,
+				EB19D10DC37F2D73CFE2276D /* species_list_NO.json in Resources */,
+				540E12C1AFAF9D2BCF6B1F53 /* species_list_NZ.json in Resources */,
+				FEADBD63286F2C2664CE146C /* species_list_PA.json in Resources */,
+				4ABE0DDF9F8E2A94847A6FB1 /* species_list_PE.json in Resources */,
+				1AFA07A5C2E6468BDCB9CFC4 /* species_list_PH.json in Resources */,
+				B07735B3BC75E0E13DFC78E2 /* species_list_PL.json in Resources */,
+				E0B05DE538CC0A9CECAB49DD /* species_list_RO.json in Resources */,
+				12E304BB5E45FB94140577BF /* species_list_RU.json in Resources */,
+				2569036ED859AAFB41DE8BDB /* species_list_SE.json in Resources */,
+				DCC5D3701237850CFFA424E3 /* species_list_SG.json in Resources */,
+				F30B6F6F28A81CD8C62D6C46 /* species_list_SV.json in Resources */,
+				64048C241AAAC62F561EA5E7 /* species_list_TH.json in Resources */,
+				CFE3CFD2C30BB8159586E4CF /* species_list_TR.json in Resources */,
+				99FC5ED91FFB6C8927B21E1C /* species_list_TZ.json in Resources */,
+				F6BE6677B6D5FFE64B2EBBB5 /* species_list_UG.json in Resources */,
+				CD3824070350FA074C2EA462 /* species_list_US-AK.json in Resources */,
+				CD1F6A552A6E91CEB6414BB4 /* species_list_US-AL.json in Resources */,
+				A715FA9A5EAA73CF83B9E3D4 /* species_list_US-AR.json in Resources */,
+				0CCE4E0188A33EDA71AF2825 /* species_list_US-AZ.json in Resources */,
+				FA202D59B11B2F6EBF802E7D /* species_list_US-CA.json in Resources */,
+				5C0E47C0E985100BCE3310AB /* species_list_US-CO.json in Resources */,
+				77015E7D20FE9E94039A4710 /* species_list_US-CT.json in Resources */,
+				AFA73FA3CD14DD5FC3856C79 /* species_list_US-DE.json in Resources */,
+				7FC30D6C79056C7B68CE45D6 /* species_list_US-FL.json in Resources */,
+				BC412EA71F0E4035D1B02054 /* species_list_US-GA.json in Resources */,
+				3C4B511A8F7206F3D72A2468 /* species_list_US-HI.json in Resources */,
+				35E66019AA2D61ED6ED860CA /* species_list_US-IA.json in Resources */,
+				A2AF54D15C013AE2E0A78E66 /* species_list_US-ID.json in Resources */,
+				6A3D55C866B011768386C5D0 /* species_list_US-IL.json in Resources */,
+				58F9401E454065B080971065 /* species_list_US-IN.json in Resources */,
+				E2EF039AD03AF4B1634A1B8E /* species_list_US-KS.json in Resources */,
+				5E5FC9FB572CF91767738E27 /* species_list_US-KY.json in Resources */,
+				9A70E092814FF140C98B68A5 /* species_list_US-LA.json in Resources */,
+				32FA011E13A6D9307C9E967C /* species_list_US-MA.json in Resources */,
+				A45538EE30405C3484714F22 /* species_list_US-MD.json in Resources */,
+				8B233100DC4AFD8DBFEA3998 /* species_list_US-ME.json in Resources */,
+				C1190ABA7B6C1127C621598E /* species_list_US-MI.json in Resources */,
+				39C19098B14ADDF3056D7885 /* species_list_US-MN.json in Resources */,
+				E7055239176397E5707CB254 /* species_list_US-MO.json in Resources */,
+				2E323B97A6DA61619EA87E62 /* species_list_US-MS.json in Resources */,
+				35E3974B722E75AA9BABC967 /* species_list_US-MT.json in Resources */,
+				43EE55469BDFE35F7129E216 /* species_list_US-NC.json in Resources */,
+				C7AED39A5D383B3A3616A610 /* species_list_US-ND.json in Resources */,
+				5070EC3EE9F31FEED28D7C21 /* species_list_US-NE.json in Resources */,
+				8059EC941CC1AEC5B5CB2069 /* species_list_US-NH.json in Resources */,
+				F9FEBE6AC487BCB13206B6C9 /* species_list_US-NJ.json in Resources */,
+				63B4A7EE23EB837C0D87FEE6 /* species_list_US-NM.json in Resources */,
+				D3633C04CD8ADC594F2841D6 /* species_list_US-NV.json in Resources */,
+				07840BD69DB598D3FE555874 /* species_list_US-NY.json in Resources */,
+				0BDEEDA5F2180E74D049043E /* species_list_US-OH.json in Resources */,
+				B01CEBCB6D8240CA0BF197E8 /* species_list_US-OK.json in Resources */,
+				65C182AE4807BA7A81DBA36A /* species_list_US-OR.json in Resources */,
+				5BD197CA2FB53AFCA53846F0 /* species_list_US-PA.json in Resources */,
+				3E025655047B9B6982343AA4 /* species_list_US-RI.json in Resources */,
+				482E40863DDA7AF36C757AF5 /* species_list_US-SC.json in Resources */,
+				50834EA5ADC96FDF184B10E0 /* species_list_US-SD.json in Resources */,
+				7D9E421E7E0A798A7B7BB69D /* species_list_US-TN.json in Resources */,
+				142BE216C9EBAA868F415642 /* species_list_US-TX.json in Resources */,
+				9B2EEEDB009051B2A3D45E6C /* species_list_US-UT.json in Resources */,
+				39D8B1E325F33687B5E3C846 /* species_list_US-VA.json in Resources */,
+				58FCA4A34B01CE90F1468982 /* species_list_US-VT.json in Resources */,
+				174B81A795F8BB4E4F490B08 /* species_list_US-WA.json in Resources */,
+				481A4C6D1CA5210017B4BD75 /* species_list_US-WI.json in Resources */,
+				5DDB5DE1C92A9898B21E09EB /* species_list_US-WV.json in Resources */,
+				006CBFEF3CA361B2F60615AB /* species_list_US-WY.json in Resources */,
+				2EFB327BFECBDC0E4EAB47D3 /* species_list_US.json in Resources */,
+				F849FFECDD60F6D1D3F1D0BE /* species_list_VE.json in Resources */,
+				8F46A9ABBB9BF467139BDD85 /* species_list_VN.json in Resources */,
+				E35151E7C480D8AA62F668A2 /* species_list_ZA.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7A0423185E20D806CD9C65F4 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				30B0D2A6F4A9BF36578C7BDD /* Assets.xcassets in Resources */,
+				386532C80D611F1BD9A18303 /* Localizable.strings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		2B7AAA51F3B199B5866BDF21 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				057D3C67392C6EB97E013F6C /* CalibratorUITests.swift in Sources */,
+				CA72C6008712387A88EF0778 /* CompareViewUITests.swift in Sources */,
+				6A5822DDA6A5F74C8B512048 /* CullingWorkflowUITests.swift in Sources */,
+				1BE0E64115D2A4A91A03C59C /* KeyboardHelpUITests.swift in Sources */,
+				3889D1E2499F4D32B9C4F63A /* MockUITests.swift in Sources */,
+				0A6A3CA41751F6A2A9EDA02F /* ProcessingFlowUITests.swift in Sources */,
+				BE4F93B4BD74DD899C66590E /* ScreenshotAuditTests.swift in Sources */,
+				5EB7DC526D950902A30771DD /* SettingsUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		692A91B1D77148E0FADF824E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				45E677C86F854C4A78668ECB /* AestheticsModel.swift in Sources */,
+				6D5757931F7710F549168285 /* CGImageExtensions.swift in Sources */,
+				7026ABF159473316B5353E54 /* FlightModel.swift in Sources */,
+				67BCBF184553A99B8702E259 /* GPSCell.swift in Sources */,
+				A5C3BF3715F69A698E7C4AA7 /* GPSExtractor.swift in Sources */,
+				31DC39C03B2238F1EB983DF6 /* InferenceConstants.swift in Sources */,
+				704D3515AE8394CD89C73030 /* KeypointModel.swift in Sources */,
+				BFB870EA95CAE4B2A8C9C33B /* ModelManager.swift in Sources */,
+				338ED111C8EF8B2A300959A6 /* ModelManifest.swift in Sources */,
+				AF1CBDD8FB68E2F47896384C /* OSEAClassifier.swift in Sources */,
+				2D6D5A9BC941BF8DE26D8662 /* RegionBounds.swift in Sources */,
+				EC4348D959AECB902C064AE4 /* SpeciesDatabase.swift in Sources */,
+				7DAB7879F389391AD0BFAF0E /* SpeciesFilter.swift in Sources */,
+				874AEB2C3E81F8DF82B9D744 /* YOLOBirdDetector.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6D4718F4D3AA4367906A9E21 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DDE8E519157564DD655F575A /* AestheticsModelTests.swift in Sources */,
+				7CF4E498D7CA0C66F2559AFE /* AssignedSpeciesTests.swift in Sources */,
+				964B6A7D156A55F0174BA44C /* BurstDetectorGPSTests.swift in Sources */,
+				BBEB9FC0A982439506A82FAF /* BurstDetectorTests.swift in Sources */,
+				142EF22BA97B679CCFF77E5A /* CullingConfigTests.swift in Sources */,
+				A677967B8F5115A2BA4E50F7 /* DirectoryScannerTests.swift in Sources */,
+				C4C1B719F8B6A6E22DBB1B38 /* EXIFOffsetReaderTests.swift in Sources */,
+				1F6EE45CD79999D1EF5491F3 /* EXIFReaderTests.swift in Sources */,
+				C8B71FD5634761985FC15545 /* ExifFormattersTests.swift in Sources */,
+				0248B7B5C0E566EFFBB63CCB /* ExifPanelTests.swift in Sources */,
+				0EB6E2DD62F7A91D53659A6E /* ExportServiceTests.swift in Sources */,
+				B1A180464E0D3ED2F10B1C21 /* ExposureDetectorTests.swift in Sources */,
+				08ED361B5D29479A58995988 /* EyeCropSharpnessTests.swift in Sources */,
+				E8908C70FFC495E1F2E6660E /* FlightModelTests.swift in Sources */,
+				0A4945C29333A9D35B261081 /* FocusPointDetectorTests.swift in Sources */,
+				B410B08651B89F0366179458 /* GPSCellTests.swift in Sources */,
+				4486C33BC0AD686718CB8BF3 /* GPSExtractorTests.swift in Sources */,
+				D1197EA9F228E4B15D05CD9C /* InferenceConstantsTests.swift in Sources */,
+				0B3D06F1CC0C4DF53D3FEB8C /* KeypointModelTests.swift in Sources */,
+				5823240721509FA169C396EA /* LaplacianSharpnessTests.swift in Sources */,
+				1093C7FDF225D9B19115B27D /* LocalizationTests.swift in Sources */,
+				09F69EF625AAD66EBE2A7965 /* ModelManagerTests.swift in Sources */,
+				15A2A2C09FEA1E781757CC72 /* ModelManifestTests.swift in Sources */,
+				E99609D4C4CD0F6AE0B1249A /* OSEAClassifierTests.swift in Sources */,
+				133D4A050580B364818E78E4 /* PhotoInheritSpeciesTests.swift in Sources */,
+				0F35F369453991A6EEF33422 /* PhotoRatingPredictorTests.swift in Sources */,
+				6A4A7D7C51F203825A1C919C /* PickedFlagCalculatorTests.swift in Sources */,
+				B3DC4418BE214210BC699BE4 /* PipelineCoordinatorDatabaseNameTests.swift in Sources */,
+				29015E61042156029536F635 /* PipelineCoordinatorTests.swift in Sources */,
+				90F86733FDE40E550DD8B982 /* PipelinePrewarmTests.swift in Sources */,
+				FD88011C2B88AA14A229AB4E /* ProcessingFlowTests.swift in Sources */,
+				317D9D0A18C00DCF653DF299 /* RatingEngineTests.swift in Sources */,
+				403BA759C8A610DB76B0C3E3 /* RegionBoundsTests.swift in Sources */,
+				50DED71601472772A3797B78 /* ReportDatabaseTests.swift in Sources */,
+				456F8292CFB8BDD94F0F319C /* SpeciesAssignmentEditorTests.swift in Sources */,
+				88CDBFCCDE8AA1187A783327 /* SpeciesDatabaseTests.swift in Sources */,
+				9A98C0E1C963851E9417B8B6 /* SpeciesFilterTests.swift in Sources */,
+				EC0ED4B80B5BF938491915DF /* SpeciesHierarchyIncrementalTests.swift in Sources */,
+				B7C487C80F842681FF5238C2 /* SpeciesHierarchyTests.swift in Sources */,
+				66D9CC000D059826C9A5ABB6 /* SpeciesKeywordTests.swift in Sources */,
+				43EB2D92C2B2558A84086503 /* SpeciesThresholdGateTests.swift in Sources */,
+				F9F521B99BB8CDD0FBC46DB0 /* StarFilterTests.swift in Sources */,
+				8CD0EADBFC14282A02804EEE /* TestImageHelpers.swift in Sources */,
+				4274B6E23ABB183970947035 /* ThumbnailDimTests.swift in Sources */,
+				BF1F623CB9139EECF00CF7BB /* XMPWriterTests.swift in Sources */,
+				58036F925FA7C04F65EAAC7C /* YOLOBirdDetectorTests.swift in Sources */,
+				38BDD7274FBEA3E39AF190C2 /* ZoomStateTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7F9969121064321562687ED1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				22B8D6F1C555998C06BDD1F3 /* AdvancedTab.swift in Sources */,
+				BFD6DCFD7A7D8700EB577954 /* AppDelegate.swift in Sources */,
+				90521F86596F50FE063A8ABE /* AppState.swift in Sources */,
+				3CF0A61756D0E53E2AB156EB /* BirdIDTab.swift in Sources */,
+				695F2025AFDDC5D1103DCC06 /* BurstDetector.swift in Sources */,
+				CD3660BE54B387D8D3035C9D /* CompareView.swift in Sources */,
+				8304EA5BEBEFA4BD65D8B5F4 /* ContentView.swift in Sources */,
+				4A186AC25ADC8AB89D1BE26C /* CoreMLInferenceClient.swift in Sources */,
+				23B283FEAAAFA6DF2A6EB966 /* CullingConfig.swift in Sources */,
+				25E22E7829DC2B6ABA77729C /* CullingTab.swift in Sources */,
+				2CF05E13A2B84DFB79CE7DD0 /* DetectionResult.swift in Sources */,
+				2537E1B585BD0EFF83728969 /* DirectoryScanner.swift in Sources */,
+				D5780C7327D0F6E8E642EA4E /* EXIFOffsetReader.swift in Sources */,
+				E8A2927BC88504E05E879CEC /* EXIFReader.swift in Sources */,
+				AD9998180DB9935038EF3D5A /* ExifFormatters.swift in Sources */,
+				8D6EA52385D28EA1B9D1B25F /* ExifPanelView.swift in Sources */,
+				6742C63ACC4A7AA2499A55AA /* ExportService.swift in Sources */,
+				51CF230EF9AB98F2CBCE07C7 /* ExposureDetector.swift in Sources */,
+				8470A4946CF028603F792276 /* EyeCropSharpness.swift in Sources */,
+				CC7BAF4DFA1380997D56794D /* FlowLayout.swift in Sources */,
+				9BA13D038626F75986BC297F /* FocusPointDetector.swift in Sources */,
+				B81DEDB967D4E2E4525BCB91 /* FullscreenViewer.swift in Sources */,
+				013134A36705408051D6EB93 /* GeneralTab.swift in Sources */,
+				D6070A885F8DE451AE897CEE /* ImageLoader.swift in Sources */,
+				E954F0E4DB534ACB591C8360 /* ImageProperties.swift in Sources */,
+				EEE71D9CDEA197DC1AB1542F /* InferenceClient.swift in Sources */,
+				EAC14471D1C96D9321F33BC8 /* KeyboardHelpView.swift in Sources */,
+				8584664A4127BFC8FD475EDB /* KeyboardMonitor.swift in Sources */,
+				20B91A4D5721D9DA364D66C7 /* LaplacianSharpness.swift in Sources */,
+				3BF047E9D27A347D65D3CE0C /* LocalizationManager.swift in Sources */,
+				743E98D2D106B2DC4CD9A375 /* Logger.swift in Sources */,
+				EB526AFC3879286A8B692A21 /* MainView.swift in Sources */,
+				8EFB8822A06651B2A0246633 /* MockInferenceClientForUI.swift in Sources */,
+				04EF6C1DD4443AF13BA6722D /* Photo.swift in Sources */,
+				0871FDE9E5781152BBD6FB44 /* PhotoRatingPredictor.swift in Sources */,
+				C8DC0C9C5326D67D8648CB31 /* PickedFlagCalculator.swift in Sources */,
+				D0CB8BD3324BE76EE0E716B4 /* PipelineCoordinator.swift in Sources */,
+				93DFF6C1F94162A500AB340A /* PreviewView.swift in Sources */,
+				D846F6D40E95F052E6E6CCD5 /* RAWConverter.swift in Sources */,
+				F0E93BA6594B7964B23E6005 /* RatingEngine.swift in Sources */,
+				3B30B50F73D434EB0A32456A /* ReportDatabase.swift in Sources */,
+				D3AB1B683EDBD7F05D14C18C /* ReverseGeocoder.swift in Sources */,
+				1E365AD68087DE165D07CA7E /* ScrollWheelRedirector.swift in Sources */,
+				72593C01A639B74395F129D0 /* SettingsView.swift in Sources */,
+				E0EE37CCF733B5B791B59CC5 /* SourceListView.swift in Sources */,
+				3BB13D2BC4F7884AA4BB4DBA /* SpeciesAssignmentEditor.swift in Sources */,
+				06B5974B68BDC4BE7D30DD44 /* SpeciesHierarchyBuilder.swift in Sources */,
+				A757D28A8C7C16F77F9BF61D /* SpeciesMatch.swift in Sources */,
+				D26E06E986C669DB868B7F06 /* StarRatingView.swift in Sources */,
+				04AFCB4EB5F25BCE9F245A56 /* SuperPickyApp.swift in Sources */,
+				22579742F83CBF5A726147F1 /* ThresholdCalibratorView.swift in Sources */,
+				628781342964039FC54E5D63 /* ThumbnailStripView.swift in Sources */,
+				B6B76A0E59A2F4F0E8C9F653 /* XMPWriter.swift in Sources */,
+				41CE16FF85A6D10B7356C792 /* ZoomableImageView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		4E935528D505BC0D29A7511F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1993305FA06737AAC95C2C3A /* SuperPicky */;
+			targetProxy = FFFA95017F94360B788123ED /* PBXContainerItemProxy */;
+		};
+		77BFF038E6A9D68E0B910D75 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CBAA08EFAF7230EC1F35CEC1 /* SuperPickyInference */;
+			targetProxy = 6081A3D774017D8CCCBF36D8 /* PBXContainerItemProxy */;
+		};
+		984AA7B2E184667833B54D29 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CBAA08EFAF7230EC1F35CEC1 /* SuperPickyInference */;
+			targetProxy = C1151C30A8AB76C82FD8C2D6 /* PBXContainerItemProxy */;
+		};
+		CF7CA108963A3399EE385797 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1993305FA06737AAC95C2C3A /* SuperPicky */;
+			targetProxy = 4CC6E7DF787F55C8610D04BE /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin PBXVariantGroup section */
+		BF41AD1430AE0514A5578240 /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				88BE904F561D8C65A8EBC315 /* en */,
+				4C41998714EA5D80B730DBEF /* zh-Hans */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
+/* Begin XCBuildConfiguration section */
+		1E06759DE551E7BF41A79864 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "-";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 3;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDevelopmentRegion = en;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.0.3;
+				PRODUCT_BUNDLE_IDENTIFIER = com.superpicky.SuperPicky;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		40293D38A9CE32084BF518B8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.superpicky.SuperPickyTests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SuperPicky.app/Contents/MacOS/SuperPicky";
+			};
+			name = Release;
+		};
+		722CC39AAA8477C1A21CDA27 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.superpicky.SuperPickyUITests;
+				SDKROOT = macosx;
+				TEST_TARGET_NAME = SuperPicky;
+			};
+			name = Debug;
+		};
+		73F5F38DA1277C1C5A64E2FC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "-";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDevelopmentRegion = en;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.superpicky.SuperPickyInference;
+				SDKROOT = macosx;
+				SKIP_INSTALL = NO;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		9E77046FA3C32F4DAC8CCD54 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "-";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 3;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDevelopmentRegion = en;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.0.3;
+				PRODUCT_BUNDLE_IDENTIFIER = com.superpicky.SuperPicky;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		AC6420F8504585966C1FCDC6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "-";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDevelopmentRegion = en;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.superpicky.SuperPickyInference;
+				SDKROOT = macosx;
+				SKIP_INSTALL = NO;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Debug;
+		};
+		CD8C020CED8D500D4094B801 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				EXCLUDED_ARCHS = x86_64;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
+				SWIFT_VERSION = 5.0;
+				VALID_ARCHS = arm64;
+			};
+			name = Debug;
+		};
+		D4CB3C4043992CCEDD776797 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.superpicky.SuperPickyTests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SuperPicky.app/Contents/MacOS/SuperPicky";
+			};
+			name = Debug;
+		};
+		E964E4790872FC67257DC31A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				EXCLUDED_ARCHS = x86_64;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
+				SWIFT_VERSION = 5.0;
+				VALID_ARCHS = arm64;
+			};
+			name = Release;
+		};
+		ED250622A613EF7544EC19BB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.superpicky.SuperPickyUITests;
+				SDKROOT = macosx;
+				TEST_TARGET_NAME = SuperPicky;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1E4086D2E420081C4D395202 /* Build configuration list for PBXNativeTarget "SuperPickyTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D4CB3C4043992CCEDD776797 /* Debug */,
+				40293D38A9CE32084BF518B8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		77DF3A6536212516469D920E /* Build configuration list for PBXProject "SuperPicky" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CD8C020CED8D500D4094B801 /* Debug */,
+				E964E4790872FC67257DC31A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		780271FECC6A2B167F070075 /* Build configuration list for PBXNativeTarget "SuperPicky" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9E77046FA3C32F4DAC8CCD54 /* Debug */,
+				1E06759DE551E7BF41A79864 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		7F3798C2BD1B2870C36C077A /* Build configuration list for PBXNativeTarget "SuperPickyUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				722CC39AAA8477C1A21CDA27 /* Debug */,
+				ED250622A613EF7544EC19BB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		C3A5F32CEAEEE89C0A21A54F /* Build configuration list for PBXNativeTarget "SuperPickyInference" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AC6420F8504585966C1FCDC6 /* Debug */,
+				73F5F38DA1277C1C5A64E2FC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		5A5F7A6D5FAD7147C33780C8 /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/groue/GRDB.swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 7.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		3116EFBEF1C66049A043EF0C /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5A5F7A6D5FAD7147C33780C8 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			productName = GRDB;
+		};
+		62ECFA7A1CE3D41AAF0C1F85 /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5A5F7A6D5FAD7147C33780C8 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			productName = GRDB;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 64B23F78DE7ADD0BB17AA4F8 /* Project object */;
+}

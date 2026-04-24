@@ -13,8 +13,7 @@ final class RecordingInferenceClient: InferenceClient, @unchecked Sendable {
     private var _prewarmCalls: [[(lat: Double, lon: Double)]] = []
 
     var prewarmCalls: [[(lat: Double, lon: Double)]] {
-        lock.lock(); defer { lock.unlock() }
-        return _prewarmCalls
+        lock.withLock { _prewarmCalls }
     }
 
     func detect(image: CGImage) async throws -> DetectionResult {
@@ -37,8 +36,7 @@ final class RecordingInferenceClient: InferenceClient, @unchecked Sendable {
         IdentifyResponse(species: [], birds: identifyBirds, totalDetected: identifyBirds.count)
     }
     func prewarmGPSCells(_ cells: [(lat: Double, lon: Double)]) async {
-        lock.lock(); defer { lock.unlock() }
-        _prewarmCalls.append(cells)
+        lock.withLock { _prewarmCalls.append(cells) }
     }
 }
 

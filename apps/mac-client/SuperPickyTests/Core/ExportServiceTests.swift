@@ -192,17 +192,20 @@ import Foundation
         let photo1 = try makePhoto(in: sourceDir, filename: "IMG_0001.CR3")
         let photo2 = try makePhoto(in: sourceDir, filename: "IMG_0002.CR3")
 
-        var progressCalls: [(Int, Int)] = []
-        let _ = try await ExportService.export(
+        final class ProgressRecorder: @unchecked Sendable {
+            var calls: [(Int, Int)] = []
+        }
+        let recorder = ProgressRecorder()
+        _ = try await ExportService.export(
             photos: [photo1, photo2],
             to: destDir,
             onProgress: { current, total in
-                progressCalls.append((current, total))
+                recorder.calls.append((current, total))
             }
         )
 
-        #expect(progressCalls.count == 2)
-        #expect(progressCalls[0] == (1, 2))
-        #expect(progressCalls[1] == (2, 2))
+        #expect(recorder.calls.count == 2)
+        #expect(recorder.calls[0] == (1, 2))
+        #expect(recorder.calls[1] == (2, 2))
     }
 }
