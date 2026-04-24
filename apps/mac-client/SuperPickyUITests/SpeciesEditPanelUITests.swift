@@ -37,6 +37,11 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
         XCTAssertTrue(thumb.waitForExistence(timeout: 5),
                       "\(filename) thumbnail should exist in the 3-photo species fixture")
         thumb.click()
+        // Brief settle so a subsequent `exifToggleButton.click()` doesn't
+        // race the still-processing thumbnail selection. Removing this
+        // caused a measurable CI regression (waitForExistence(panel) ate
+        // most of its 3 s budget instead of returning immediately).
+        Thread.sleep(forTimeInterval: 0.3)
         Self.currentPhotoFilename = filename
     }
 
@@ -74,11 +79,10 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
     private func openPanelOnEagle() {
         // Fast path: panel already open on the eagle from the previous
         // test in the shared-app suite. Skip the toggle-off / reselect /
-        // toggle-on cycle (roughly 1.5–2.5 s on the CI runner) and just
-        // re-establish the post-open contract (species section visible,
-        // assignments reset to the fixture default).
+        // toggle-on + re-scroll cycle (roughly 2–3 s on the CI runner).
+        // The panel's scroll offset persists, so the species section is
+        // already visible — only state-normalization is needed.
         if panelIsOpenOnEagle() {
-            scrollPanelToBottom()
             resetEagleSpeciesToBaleagOnly()
             return
         }
@@ -130,47 +134,22 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
     }
 
     /// Scrolls the ExifPanel down so the species section becomes visible.
-    /// Distinct from "species elements in the a11y tree": the ExifPanel
-    /// VStack mounts both EXIF and species children eagerly, so existence
-    /// is true from the moment the panel opens even when the candidate
-    /// buttons are off-screen. `tapButton` uses a coordinate click at the
-    /// element's reported center, which lands off-screen if we haven't
-    /// scrolled — so we must poll on `isHittable` of a candidate row
-    /// (not the assigned row, which can be hittable while candidates are
-    /// still below the fold).
+    /// A fixed post-scroll settle is simpler and faster on CI than polling
+    /// `.isHittable` on candidate elements — each `.isHittable` probe
+    /// triggers a snapshot refresh (~0.5 s on the macOS-15 runner) and
+    /// calling three of them in a poll loop costs more than a plain 0.3 s
+    /// wait. The race being mitigated is: the SwiftUI scroll animation
+    /// completes a frame or two after XCUITest returns from `scroll(...)`,
+    /// and a coordinate click issued before that frame lands off-screen.
     private func scrollPanelToBottom() {
         let panel = Self.app.scrollViews[A11y.exifPanel]
         guard panel.exists else { return }
-        // Fast out when a candidate-row element is already hittable (the
-        // panel retains its scroll offset between tests in the shared-app
-        // suite). Avoids another scroll animation on consecutive tests.
-        if candidateRowHittable() { return }
         // -600 is the original, proven-on-CI delta. Larger values risk
         // over-scrolling past the scroll-view's content bottom, which
         // XCTest reports as "Unable to find hit point" and aborts the
         // current test.
         panel.scroll(byDeltaX: 0, deltaY: -600)
-        // Poll until a candidate row is actually hittable — replaces a
-        // fixed 0.3 s post-scroll sleep. This is the "scroll has settled
-        // and clicks will land" signal that subsequent coordinate taps
-        // rely on.
-        _ = poll(timeout: 1.5) { self.candidateRowHittable() }
-    }
-
-    /// True when the *first* candidate row in the species section is
-    /// actually in the viewport — not just in the a11y tree. We check
-    /// `Add_goleag` specifically (the first-candidate default for the
-    /// eagle photo) because coordinate clicks on off-screen elements
-    /// silently miss: if we only check `Add_osprey`, an over-scroll past
-    /// goleag would still report "hittable" while the test's Add_goleag
-    /// click lands off-screen. `Remove_goleag` covers the leaked-state
-    /// case where goleag already moved to Assigned; `EmptyAssigned`
-    /// covers the DSC09951 (bird-no-species) path used by test48.
-    private func candidateRowHittable() -> Bool {
-        let app = Self.app!
-        return app.buttons[A11y.speciesEditAdd("goleag")].isHittable
-            || app.buttons[A11y.speciesEditRemove("goleag")].isHittable
-            || app.staticTexts[A11y.speciesEditPanelEmptyAssigned].isHittable
+        Thread.sleep(forTimeInterval: 0.3)
     }
 
     /// Click a button reliably on CI. The 12-pt SF-symbol Add/Remove
@@ -183,47 +162,22 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
         element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
     }
 
-    /// Grant keyboard focus to the species search TextField. The
-    /// coordinate click at the field's reported centre is the most
-    /// reliable focus-grant on the CI runner; a follow-up hover + click
-    /// pair covers occasional dropped first-clicks.
-    ///
-    /// Returns `nil` when the field can't be focused — callers MUST
-    /// branch on a nil return and skip any subsequent `typeText` /
-    /// `Cmd+A` / `Delete` sequence, which would otherwise route through
-    /// the app's global keyboard monitor (`x` rejects photo, Delete can
-    /// delete selected items) and corrupt state for downstream tests.
+    /// Grant keyboard focus to the species search TextField. CI's smaller
+    /// window occasionally leaves a single `field.click()` non-focus-
+    /// granting, so approach with a coordinate click first, then a hover
+    /// + click pair to cover dropped first-clicks.  Callers verify focus
+    /// landed by asserting on the typed value afterwards (`typeAndWaitFor`).
     @discardableResult
-    private func focusSearchField() -> XCUIElement? {
+    private func focusSearchField() -> XCUIElement {
         let field = Self.app.textFields[A11y.speciesEditPanelSearchField]
-        guard field.waitForExistence(timeout: 3) else {
-            XCTFail("Search field should exist after panel scroll")
-            return nil
-        }
+        _ = field.waitForExistence(timeout: 3)
         let center = field.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        let sentinel = "q"
-        for attempt in 0..<3 {
-            // Only call `hover()` when the field is actually hittable —
-            // calling it on a clipped element throws "Not hittable" and
-            // fails the test. The coordinate click on `center` always
-            // proceeds (coordinate clicks don't require hittability).
-            if attempt > 0, field.isHittable { field.hover() }
-            center.click()
-            Self.app.typeText(sentinel)
-            if poll(timeout: 0.6, { self.fieldValueContains(field, sentinel) }) {
-                // Clear the sentinel via targeted key presses — at this
-                // point focus is confirmed, so the Cmd+A / Delete pair
-                // stays scoped to the field rather than the app window.
-                Self.app.typeKey("a", modifierFlags: .command)
-                Self.app.typeKey(.delete, modifierFlags: [])
-                _ = poll(timeout: 0.5) { (field.value as? String ?? "").isEmpty }
-                return field
-            }
-        }
-        XCTFail("Search field did not accept focus after 3 click attempts; " +
-                "test bodies must treat the nil return as fatal to avoid " +
-                "routing keystrokes through the app's global keyboard monitor")
-        return nil
+        center.click()
+        Thread.sleep(forTimeInterval: 0.15)
+        field.hover()
+        center.click()
+        Thread.sleep(forTimeInterval: 0.15)
+        return field
     }
 
     /// Returns true if the field currently carries the expected value.
@@ -346,7 +300,7 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
     func test46_SearchFieldAcceptsInput() {
         openPanelOnEagle()
 
-        guard let field = focusSearchField() else { return }
+        let field = focusSearchField()
         XCTAssertTrue(typeAndWaitFor(field, "robin"),
                       "SearchField should contain 'robin' after typing " +
                       "(value=\(String(describing: field.value)))")
@@ -358,7 +312,7 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
         let app = Self.app!
         openPanelOnEagle()
 
-        guard let field = focusSearchField() else { return }
+        let field = focusSearchField()
         let garbage = "MyCustomSpeciesXYZ"
         guard typeAndWaitFor(field, garbage) else {
             XCTFail("SearchField did not receive input; cannot verify Return behaviour")
@@ -389,10 +343,9 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
         scrollPanelToBottom()
         XCTAssertTrue(app.staticTexts[A11y.speciesEditPanelEmptyAssigned].waitForExistence(timeout: 2))
         XCTAssertFalse(app.buttons[A11y.speciesEditRemove("baleag")].exists)
-        // Close so the next test (test49) starts from a known-closed state
-        // — leaving the panel open on DSC09951 would force test49's
-        // openPanelOnEagle() to take the slow path anyway (different photo).
-        ensurePanelClosed()
+        // Leave the panel open; the next test's openPanelOnEagle() takes
+        // the slow path (different photo) and closes it before re-opening
+        // on the eagle — an explicit close here would just double-pay.
     }
 
     func test49_PhotoChangeClearsSearch() {
@@ -401,7 +354,7 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
         app.typeKey("0", modifierFlags: .command)
         openPanelOnEagle()
 
-        guard let field = focusSearchField() else { return }
+        let field = focusSearchField()
         guard typeAndWaitFor(field, "robin") else {
             XCTFail("SearchField did not receive input; cannot verify clear-on-photo-change")
             clearSearchField()
@@ -422,11 +375,9 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
         XCTAssertFalse(fieldValueContains(newField, "robin"),
                        "Search field should clear on photo change " +
                        "(value=\(String(describing: newField.value)))")
-
-        // Close so the next eagle test re-selects DSC09969 via the slow
-        // path (panelIsOpenOnEagle returns false when currentPhotoFilename
-        // tracks DSC09970).
-        ensurePanelClosed()
+        // Leave the panel open on DSC09970; the next eagle test's
+        // openPanelOnEagle() slow path (currentPhotoFilename != DSC09969)
+        // closes it before re-opening on the eagle.
     }
 
     func test50_RemovePrimaryPromotesNext() {
