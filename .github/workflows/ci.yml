@@ -63,11 +63,7 @@ jobs:
 
   xcuitest:
     name: XCUITest / ${{ matrix.name }}
-    # macos-15 pool mixes 1024x768 and larger virtual displays — the
-    # 1024 variant pushes rightmost toolbar items off-screen and
-    # XCUITest reports them as "not hittable" (see PR #45 diagnostic
-    # dump). -xlarge should give us a larger, uniform display.
-    runs-on: macos-15-xlarge
+    runs-on: macos-15
     needs: build-ui
     strategy:
       # Four shards grouped by the UI area they exercise. Each shard
