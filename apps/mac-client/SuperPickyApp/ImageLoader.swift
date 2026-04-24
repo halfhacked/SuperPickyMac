@@ -32,21 +32,7 @@ enum ImageLoader {
                     return
                 }
                 if let maxPixelSize {
-                    // RAWs embed a ~1600 px preview that satisfies `maxPixelSize`;
-                    // use it (IfAbsent). Smaller sources (e.g. 1600 px JPEGs
-                    // with only a 160 px embedded thumbnail) must fall through
-                    // to a real decode — `IfAbsent` would prefer the tiny
-                    // thumbnail and the preview ends up blurry.
-                    let sourceSide = sourceMaxDimension(source: source)
-                    let useEmbedded = sourceSide > maxPixelSize
-                    let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, [
-                        kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
-                        (useEmbedded
-                         ? kCGImageSourceCreateThumbnailFromImageIfAbsent
-                         : kCGImageSourceCreateThumbnailFromImageAlways): true,
-                        kCGImageSourceCreateThumbnailWithTransform: true,
-                    ] as CFDictionary)
-                    continuation.resume(returning: cgImage)
+                    continuation.resume(returning: decodePreview(source: source, maxPixelSize: maxPixelSize))
                 } else {
                     // Full-res: actual image decode
                     let cgImage = CGImageSourceCreateImageAtIndex(source, 0, [
@@ -57,6 +43,61 @@ enum ImageLoader {
             }
         }
     }
+
+    /// Return a preview CGImage sized at most `maxPixelSize` on its longest side.
+    ///
+    /// The decode strategy is driven by the *embedded thumbnail's* actual size,
+    /// not by the source's dimensions. Many containers advertise a large source
+    /// but embed only a tiny EXIF thumbnail — e.g. a 6000 px JPG with a 160 px
+    /// thumb. Using that thumb for a 2000 px preview would upscale 12× and look
+    /// visibly blurry (the reported bug in #47); those cases must decode from
+    /// the full image. Conversely, RAW files embed a ~1616 px preview that
+    /// satisfies a 2000 px request with only a ~1.24× upscale, and decoding
+    /// the full RAW would be needlessly expensive — so we reuse it directly.
+    private static func decodePreview(source: CGImageSource, maxPixelSize: Int) -> CGImage? {
+        let embeddedThumb = embeddedThumbnail(source: source)
+        let embeddedSide = embeddedThumb.map { max($0.width, $0.height) } ?? 0
+        // Accept the embedded thumbnail when it's at least two-thirds of the
+        // target size — a 1.5× on-screen upscale is the largest that still
+        // looks sharp to the eye. Below that threshold, decode the full image.
+        let embeddedIsSharpEnough = embeddedSide * 3 >= maxPixelSize * 2
+        if embeddedIsSharpEnough, let embeddedThumb {
+            if embeddedSide <= maxPixelSize {
+                // Reuse probe — already within the target size cap.
+                return embeddedThumb
+            }
+            // Embedded thumb is larger than target: re-decode with size cap.
+            return CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+                kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+            ] as CFDictionary)
+        }
+        // No embedded thumb, or too small to produce a sharp preview —
+        // force a decode of the full image downsampled to maxPixelSize.
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, [
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+        ] as CFDictionary)
+    }
+
+    /// Decode only the container's embedded thumbnail. Returns nil if none
+    /// exists (ImageIO does not synthesise one from the full image because
+    /// both `IfAbsent` and `Always` are explicitly false). `MaxPixelSize`
+    /// must be set — without it the function returns the full image.
+    private static func embeddedThumbnail(source: CGImageSource) -> CGImage? {
+        CGImageSourceCreateThumbnailAtIndex(source, 0, [
+            kCGImageSourceThumbnailMaxPixelSize: embeddedThumbnailProbeCap,
+            kCGImageSourceCreateThumbnailFromImageIfAbsent: false,
+            kCGImageSourceCreateThumbnailFromImageAlways: false,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+        ] as CFDictionary)
+    }
+
+    /// Larger than any plausible embedded-thumbnail side so the probe
+    /// returns the thumb at its native dimensions.
+    private static let embeddedThumbnailProbeCap = 99_999
 
     /// Source dimensions in pixels (no decode — metadata only).
     static func pixelSize(path: String) -> CGSize? {
@@ -82,8 +123,4 @@ enum ImageLoader {
             : CGSize(width: w, height: h)
     }
 
-    private static func sourceMaxDimension(source: CGImageSource) -> Int {
-        guard let size = sourcePixelSize(source: source) else { return 0 }
-        return max(Int(size.width), Int(size.height))
-    }
 }
