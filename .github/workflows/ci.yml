@@ -29,75 +29,63 @@ jobs:
             -only-testing:SuperPickyTests
 
   xcuitest:
-    name: XCUITest (Mock)
+    name: XCUITest / ${{ matrix.name }}
     runs-on: macos-15
+    strategy:
+      # Each shard runs one `xcodebuild test` per UI test class (the
+      # 1-class-per-invocation pattern the repo has relied on for
+      # reliability) but in parallel across runners. See
+      # docs/ci-perf-retry-notes.md for why fully consolidating multiple
+      # classes into one invocation has flaked in the past.
+      fail-fast: false
+      matrix:
+        include:
+          - name: mock-settings
+            run: |
+              xcodebuild test -scheme SuperPicky -destination 'platform=macOS' \
+                -only-testing:SuperPickyUITests/MockUITests
+              xcodebuild test -scheme SuperPicky -destination 'platform=macOS' \
+                -only-testing:SuperPickyUITests/SettingsUITests
+          - name: calibrator
+            run: |
+              xcodebuild test -scheme SuperPicky -destination 'platform=macOS' \
+                -only-testing:SuperPickyUITests/CalibratorUITests
+          - name: kbdhelp
+            run: |
+              xcodebuild test -scheme SuperPicky -destination 'platform=macOS' \
+                -only-testing:SuperPickyUITests/KeyboardHelpUITests
+          - name: proc-compare
+            run: |
+              xcodebuild test -scheme SuperPicky -destination 'platform=macOS' \
+                -only-testing:SuperPickyUITests/ProcessingFlowUITests
+              xcodebuild test -scheme SuperPicky -destination 'platform=macOS' \
+                -only-testing:SuperPickyUITests/CompareViewUITests
+          - name: culling
+            run: |
+              xcodebuild test -scheme SuperPicky -destination 'platform=macOS' \
+                -only-testing:SuperPickyUITests/CullingWorkflowUITests
+          - name: species-a
+            run: |
+              xcodebuild test -scheme SuperPicky -destination 'platform=macOS' \
+                -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test41_ToggleOpensPanelWithAssignedSpecies \
+                -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test43_CandidatesListShowsNonAssignedTop5 \
+                -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test44_AddCandidateMovesToAssigned \
+                -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test45_RemoveSecondarySpecies \
+                -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test46_SearchFieldAcceptsInput \
+                -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test47_UnmatchedSearchReturnIsIgnored \
+                -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test48_EmptyAssignedStateShown
+          - name: species-b
+            run: |
+              xcodebuild test -scheme SuperPicky -destination 'platform=macOS' \
+                -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test49_PhotoChangeClearsSearch \
+                -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test50_RemovePrimaryPromotesNext \
+                -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test51_MakePrimaryReordersAssigned \
+                -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test52_CandidateRowsShowLevelAndConfidence \
+                -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test53_SpeciesEditWritesToXMPSidecar \
+                -only-testing:SuperPickyUITests/SpeciesEditPanelUITests/test54_InfoPanelRefreshesKeywordsOnSpeciesEdit
     steps:
       - uses: actions/checkout@v4
 
-      # Each UI test class runs in its own xcodebuild invocation — a
-      # fresh process + fresh app launch every class, which is the only
-      # reliable way to avoid window-state bleed (UserDefaults-restored
-      # size, toolbar offsets) between shared-app classes.
-      - name: MockUITests
+      - name: ${{ matrix.name }}
         working-directory: apps/mac-client
-        run: |
-          xcodebuild test \
-            -scheme SuperPicky \
-            -destination 'platform=macOS' \
-            -only-testing:SuperPickyUITests/MockUITests
-
-      - name: ProcessingFlowUITests
-        working-directory: apps/mac-client
-        run: |
-          xcodebuild test \
-            -scheme SuperPicky \
-            -destination 'platform=macOS' \
-            -only-testing:SuperPickyUITests/ProcessingFlowUITests
-
-      - name: SettingsUITests
-        working-directory: apps/mac-client
-        run: |
-          xcodebuild test \
-            -scheme SuperPicky \
-            -destination 'platform=macOS' \
-            -only-testing:SuperPickyUITests/SettingsUITests
-
-      - name: CompareViewUITests
-        working-directory: apps/mac-client
-        run: |
-          xcodebuild test \
-            -scheme SuperPicky \
-            -destination 'platform=macOS' \
-            -only-testing:SuperPickyUITests/CompareViewUITests
-
-      - name: CalibratorUITests
-        working-directory: apps/mac-client
-        run: |
-          xcodebuild test \
-            -scheme SuperPicky \
-            -destination 'platform=macOS' \
-            -only-testing:SuperPickyUITests/CalibratorUITests
-
-      - name: KeyboardHelpUITests
-        working-directory: apps/mac-client
-        run: |
-          xcodebuild test \
-            -scheme SuperPicky \
-            -destination 'platform=macOS' \
-            -only-testing:SuperPickyUITests/KeyboardHelpUITests
-
-      - name: CullingWorkflowUITests
-        working-directory: apps/mac-client
-        run: |
-          xcodebuild test \
-            -scheme SuperPicky \
-            -destination 'platform=macOS' \
-            -only-testing:SuperPickyUITests/CullingWorkflowUITests
-
-      - name: SpeciesEditPanelUITests
-        working-directory: apps/mac-client
-        run: |
-          xcodebuild test \
-            -scheme SuperPicky \
-            -destination 'platform=macOS' \
-            -only-testing:SuperPickyUITests/SpeciesEditPanelUITests
+        run: ${{ matrix.run }}

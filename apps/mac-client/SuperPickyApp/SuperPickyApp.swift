@@ -4,8 +4,24 @@ import SuperPickyInference
 @main
 struct SuperPickyApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @State private var config = CullingConfig()
-    @State private var modelState = ModelDownloadState()
+    @State private var config: CullingConfig
+    @State private var modelState: ModelDownloadState
+
+    init() {
+        // Under TEST_MODE, wipe the entire persistent prefs domain
+        // before CullingConfig reads it and before SwiftUI restores
+        // any NSWindow Frame / NSSplitView Subview Frames state.
+        // Dev-time prefs (appLanguage=zh-Hans, appTheme=dark) and
+        // prior-class window geometry would otherwise leak into the
+        // test and flake sidebar / toolbar assertions.
+        // See docs/ci-perf-retry-notes.md.
+        if ProcessInfo.processInfo.environment["TEST_MODE"] == "1",
+           let bundleID = Bundle.main.bundleIdentifier {
+            UserDefaults.standard.removePersistentDomain(forName: bundleID)
+        }
+        _config = State(wrappedValue: CullingConfig())
+        _modelState = State(wrappedValue: ModelDownloadState())
+    }
 
     var body: some Scene {
         WindowGroup {
