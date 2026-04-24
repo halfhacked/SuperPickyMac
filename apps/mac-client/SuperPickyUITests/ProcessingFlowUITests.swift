@@ -126,19 +126,10 @@ final class ProcessingFlowUITests: XCTestCase {
 
     /// 10: Click Excellent to filter — app doesn't crash, selection works
     func test10_FilterByExcellent() throws {
-        let excellent = Self.app.staticTexts["Excellent"]
-        XCTAssertTrue(excellent.waitForExistence(timeout: 3))
-        // SwiftUI NavigationSplitView's sidebar can momentarily render at
-        // negative x while settling on a cold launch — the element is in
-        // the a11y tree but not hittable yet. Wait up to 3 s for it to
-        // finish sliding in before clicking.
-        let deadline = Date().addingTimeInterval(3)
-        while !excellent.isHittable && Date() < deadline {
-            Thread.sleep(forTimeInterval: 0.1)
-        }
-        excellent.click()
+        Self.app.staticTexts["Excellent"].click()
         sleep(1)
-        XCTAssertTrue(excellent.exists)
+        // Still running, sidebar still visible
+        XCTAssertTrue(Self.app.staticTexts["Excellent"].exists)
     }
 
     /// 11: Click folder again to show all photos
