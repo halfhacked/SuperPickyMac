@@ -58,6 +58,13 @@ Adding a new `.swift` file requires registering it in `SuperPicky.xcodeproj/proj
 
 ## Retrospective
 
+- **XCUITest gotchas on the shared-app UI tests** (Calibrator/CompareView/CullingWorkflow/KeyboardHelp):
+  - **LazyHStack items past the viewport aren't in the a11y tree.** `ThumbnailStripView` lazy-renders; `app.images["Thumbnail_DSC0XXXX.jpg"]` returns "no matches" for photos not currently visible, even if the photo exists in the folder. Use `selectThumbnail`'s `arrowStripUntil` to arrow-key through the strip and force lazy instantiation before asserting existence.
+  - **Fixture decode time varies CI vs local by 5–10×.** CI's macOS runner lags heavily on full-res JPG/ARW decode; a test that's snappy locally can time out a 15 s `waitForExistence` in CI. Don't use `_ = element.waitForExistence(timeout:)` in setUp — always `XCTAssertTrue(...)` on the return so silent timeouts become loud failures at the real source instead of cryptic downstream "no matches" errors.
+  - **`PhotoPreview` only enters the a11y tree once the auto-selected photo has finished its full-res decode** — wait for it specifically in setUp (see `XCUIApplication.waitUntilProcessed`), not for `images.firstMatch` (which matches any thumbnail and fires early).
+  - **When clicking an element to clear text-field focus, tolerate its absence.** `arrowStripUntil` falls back to `typeKey(.escape)` when PhotoPreview isn't in the tree — the NSEvent global monitor picks up arrow keys regardless, so the click is a focus-clearing hint, not a hard dependency.
+  - **Accessibility identifiers live in `A11y.swift`** (UI test target). Mirror any new `.accessibilityIdentifier(...)` in app code there; drift between app and tests silently produces "no matches" failures.
+
 - **xcodebuild silently uses stale binaries after edits**: When editing Swift files via automation tools, xcodebuild's incremental build sometimes doesn't detect changes. → The Edit tool's atomic writes may not update mtime reliably from Xcode's dependency tracker perspective. → Always `touch` changed files or delete `Build/Intermediates.noindex/SuperPicky.build/` before `xcodebuild build`.
 
 - **SwiftUI .onKeyPress requires view focus, which is fragile**: After clicking a thumbnail, sidebar, or any other view, keyboard focus moves away from ContentView and .onKeyPress stops working. → Use `NSEvent.addLocalMonitorForEvents(matching: .keyDown)` for global keyboard shortcuts that should work regardless of focus. Check `firstResponder is NSTextView` to skip text fields.

@@ -80,7 +80,7 @@ final class ScreenshotAuditTests: XCTestCase {
 
     func test03_ExifPanelScreenshots() {
         // Open EXIF panel
-        let toggle = Self.app.buttons["ExifToggle"]
+        let toggle = Self.app.buttons[A11y.exifToggle]
         if toggle.waitForExistence(timeout: 5) {
             toggle.click()
             sleep(1)
