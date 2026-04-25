@@ -96,7 +96,6 @@ struct SourceListView: View {
                         Spacer()
                         Text("\(flyingCount)")
                             .foregroundStyle(.secondary)
-                            .font(.caption)
                     }
                 } icon: {
                     Image(systemName: "bird")
@@ -109,7 +108,6 @@ struct SourceListView: View {
                         Spacer()
                         Text("\(picksCount)")
                             .foregroundStyle(.secondary)
-                            .font(.caption)
                     }
                 } icon: {
                     Image(systemName: "flag.fill")
