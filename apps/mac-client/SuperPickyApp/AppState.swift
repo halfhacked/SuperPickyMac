@@ -65,7 +65,7 @@ struct BurstGroupEntry: Identifiable {
 
 @Observable
 final class AppState {
-    private let logger = Logger(subsystem: "com.superpicky.mac", category: "AppState")
+    private let logger = Logger(subsystem: "com.halfhacked.superpicky", category: "AppState")
 
     var sidebarSelection: SidebarSelection?
     var selectedPhotoID: UUID?
