@@ -27,7 +27,7 @@ public final class AestheticsModel: @unchecked Sendable {
     private static let outputName = "dist_score"
 
     private let model: MLModel
-    private let logger = Logger(subsystem: "com.superpicky.mac", category: "AestheticsModel")
+    private let logger = Logger(subsystem: "com.halfhacked.superpicky", category: "AestheticsModel")
 
     public init(url: URL, configuration: MLModelConfiguration = .init()) throws {
         // CFANet/TOPIQ uses transformer attention layers — GPU beats ANE

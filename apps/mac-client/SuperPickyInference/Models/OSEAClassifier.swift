@@ -35,7 +35,7 @@ public final class OSEAClassifier: @unchecked Sendable {
 
     // MARK: - State
     private let model: MLModel
-    private let logger = Logger(subsystem: "com.superpicky.mac", category: "OSEAClassifier")
+    private let logger = Logger(subsystem: "com.halfhacked.superpicky", category: "OSEAClassifier")
 
     // MARK: - Init
 

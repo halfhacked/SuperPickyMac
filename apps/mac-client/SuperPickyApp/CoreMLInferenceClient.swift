@@ -23,7 +23,7 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
     private let speciesDB: SpeciesDatabase?
     private let aestheticsModel: AestheticsModel?
     private let speciesFilter: SpeciesFilter?
-    private let logger = Logger(subsystem: "com.superpicky.mac", category: "CoreMLInference")
+    private let logger = Logger(subsystem: "com.halfhacked.superpicky", category: "CoreMLInference")
 
     private static let oseaTemperature = InferenceConstants.oseaTemperature
     // Match preen: drop only near-zero noise; the user's birdIdConfidence

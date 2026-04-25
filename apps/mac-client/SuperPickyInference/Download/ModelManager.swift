@@ -45,7 +45,7 @@ public actor ModelManager {
     private let rootDir: URL
     private let bundle: Bundle
     private var observers: [AsyncStream<State>.Continuation] = []
-    private let logger = Logger(subsystem: "com.superpicky.mac", category: "ModelManager")
+    private let logger = Logger(subsystem: "com.halfhacked.superpicky", category: "ModelManager")
 
     // MARK: - Init
 

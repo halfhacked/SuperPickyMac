@@ -351,7 +351,7 @@ struct MainView: View {
         startProcessing(folder: url)
     }
 
-    private let logger = Logger(subsystem: "com.superpicky.mac", category: "MainView")
+    private let logger = Logger(subsystem: "com.halfhacked.superpicky", category: "MainView")
 
     /// Auto-resume if the folder has more files than the DB has rows
     /// (crash-interrupted run or user dropped in new photos).

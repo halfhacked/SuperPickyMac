@@ -14,7 +14,7 @@ final class PipelineCoordinator: @unchecked Sendable {
     private let rawConverter = RAWConverter()
     private let scanner = DirectoryScanner()
     private let reverseGeocoder = ReverseGeocoder()
-    private let logger = Logger(subsystem: "com.superpicky.mac", category: "Pipeline")
+    private let logger = Logger(subsystem: "com.halfhacked.superpicky", category: "Pipeline")
 
     var totalCount = 0
     var processedCount = 0

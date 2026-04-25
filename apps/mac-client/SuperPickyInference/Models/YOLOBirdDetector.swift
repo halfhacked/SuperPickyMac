@@ -54,7 +54,7 @@ public final class YOLOBirdDetector: @unchecked Sendable {
     // MARK: - State
 
     private let model: MLModel
-    private let logger = Logger(subsystem: "com.superpicky.mac", category: "YOLODetector")
+    private let logger = Logger(subsystem: "com.halfhacked.superpicky", category: "YOLODetector")
 
     // MARK: - Init
 
