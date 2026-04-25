@@ -37,7 +37,7 @@ public final class SpeciesFilter: @unchecked Sendable {
         for (code, id) in classIDByEbirdCode { out[id] = code }
         return out
     }
-    private let logger = Logger(subsystem: "com.superpicky.mac", category: "SpeciesFilter")
+    private let logger = Logger(subsystem: "com.halfhacked.superpicky", category: "SpeciesFilter")
 
     /// Long-lived SQLite handle. nil if the DB file wasn't present at init
     /// (offline first-launch). SQLITE_OPEN_FULLMUTEX makes the connection

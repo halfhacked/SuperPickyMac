@@ -1608,7 +1608,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.0.3;
-				PRODUCT_BUNDLE_IDENTIFIER = com.superpicky.SuperPicky;
+				PRODUCT_BUNDLE_IDENTIFIER = com.halfhacked.superpicky;
 				SDKROOT = macosx;
 			};
 			name = Release;
@@ -1624,7 +1624,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.superpicky.SuperPickyTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.halfhacked.superpicky.tests;
 				SDKROOT = macosx;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SuperPicky.app/Contents/MacOS/SuperPicky";
 			};
@@ -1641,7 +1641,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.superpicky.SuperPickyUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.halfhacked.superpicky.uitests;
 				SDKROOT = macosx;
 				TEST_TARGET_NAME = SuperPicky;
 			};
@@ -1665,7 +1665,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.superpicky.SuperPickyInference;
+				PRODUCT_BUNDLE_IDENTIFIER = com.halfhacked.superpicky.inference;
 				SDKROOT = macosx;
 				SKIP_INSTALL = NO;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -1682,12 +1682,13 @@
 				CURRENT_PROJECT_VERSION = 3;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDevelopmentRegion = en;
+				INFOPLIST_KEY_CFBundleDisplayName = "SuperPicky Debug";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.0.3;
-				PRODUCT_BUNDLE_IDENTIFIER = com.superpicky.SuperPicky;
+				PRODUCT_BUNDLE_IDENTIFIER = com.halfhacked.superpicky.debug;
 				SDKROOT = macosx;
 			};
 			name = Debug;
@@ -1710,7 +1711,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.superpicky.SuperPickyInference;
+				PRODUCT_BUNDLE_IDENTIFIER = com.halfhacked.superpicky.inference;
 				SDKROOT = macosx;
 				SKIP_INSTALL = NO;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -1796,7 +1797,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.superpicky.SuperPickyTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.halfhacked.superpicky.tests;
 				SDKROOT = macosx;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SuperPicky.app/Contents/MacOS/SuperPicky";
 			};
@@ -1874,7 +1875,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.superpicky.SuperPickyUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.halfhacked.superpicky.uitests;
 				SDKROOT = macosx;
 				TEST_TARGET_NAME = SuperPicky;
 			};

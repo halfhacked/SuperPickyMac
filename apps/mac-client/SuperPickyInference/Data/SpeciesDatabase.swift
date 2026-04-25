@@ -26,7 +26,7 @@ public final class SpeciesDatabase: Sendable {
     /// `byClassID` but in a form that's cheap to iterate without materializing
     /// the dictionary's values on each search call.
     private let all: [SpeciesEntry]
-    private let logger = Logger(subsystem: "com.superpicky.mac", category: "SpeciesDB")
+    private let logger = Logger(subsystem: "com.halfhacked.superpicky", category: "SpeciesDB")
 
     public init(url: URL, ebirdByClassID: [Int: String] = [:]) throws {
         var db: OpaquePointer?
