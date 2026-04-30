@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		3513BB0AA55EE108E66D713F /* PhotoSelectionEditorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF23B27AE8094FFACE79A86D /* PhotoSelectionEditorTests.swift */; };
+		FDCE822BEAC01E690DFB6DFD /* PhotoSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E583D57D413B25E288BDA31 /* PhotoSelection.swift */; };
 		006CBFEF3CA361B2F60615AB /* species_list_US-WY.json in Resources */ = {isa = PBXBuildFile; fileRef = B079855D4EA6D7FE445B24D9 /* species_list_US-WY.json */; };
 		0106105613F1068C39E464B4 /* species_list_CN-50.json in Resources */ = {isa = PBXBuildFile; fileRef = FF7BC47F186D13ED11279144 /* species_list_CN-50.json */; };
 		013134A36705408051D6EB93 /* GeneralTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = E283097C3245E4C2533065B6 /* GeneralTab.swift */; };
@@ -354,6 +356,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		BF23B27AE8094FFACE79A86D /* PhotoSelectionEditorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoSelectionEditorTests.swift; sourceTree = "<group>"; };
+		0E583D57D413B25E288BDA31 /* PhotoSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoSelection.swift; sourceTree = "<group>"; };
 		007143E831325DD4E910840C /* XMPWriterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XMPWriterTests.swift; sourceTree = "<group>"; };
 		00DE23C46649098A49F28568 /* species_list_AU-WA.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_AU-WA.json"; sourceTree = "<group>"; };
 		018DA129CF19A052B9B26009 /* species_list_US-RI.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-RI.json"; sourceTree = "<group>"; };
@@ -682,7 +686,8 @@
 			children = (
 				53490B87D12E17877E5E5830 /* ModelManager.swift */,
 				477A9B13ED9208BC9D444B7D /* ModelManifest.swift */,
-			);
+							BF23B27AE8094FFACE79A86D /* PhotoSelectionEditorTests.swift */,
+);
 			path = Download;
 			sourceTree = "<group>";
 		};
@@ -791,7 +796,8 @@
 				9287FBC69300612F56401CD6 /* ZoomableImageView.swift */,
 				BF41AD1430AE0514A5578240 /* Localizable.strings */,
 				CCF190E7339337C11AEC235D /* TestSupport */,
-			);
+							0E583D57D413B25E288BDA31 /* PhotoSelection.swift */,
+);
 			path = SuperPickyApp;
 			sourceTree = "<group>";
 		};
@@ -1384,7 +1390,9 @@
 				F849FFECDD60F6D1D3F1D0BE /* species_list_VE.json in Resources */,
 				8F46A9ABBB9BF467139BDD85 /* species_list_VN.json in Resources */,
 				E35151E7C480D8AA62F668A2 /* species_list_ZA.json in Resources */,
-			);
+							FDCE822BEAC01E690DFB6DFD /* PhotoSelection.swift in Sources */,
+				3513BB0AA55EE108E66D713F /* PhotoSelectionEditorTests.swift in Sources */,
+);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		7A0423185E20D806CD9C65F4 /* Resources */ = {
