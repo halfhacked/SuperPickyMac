@@ -23,7 +23,6 @@ struct ContentView: View {
     var onExportAllVisible: (([Photo]) -> Void)?
     var onDeletePhoto: ((UUID) -> Void)?
     var onCorrectSpecies: ((UUID, String) -> Void)?
-    var onAssignedSpeciesChanged: ((UUID, [SpeciesMatch]) -> Void)?
     var searchSpecies: ((String) -> [SpeciesMatch])?
     @Environment(CullingConfig.self) private var config
     @State private var minimumStars: Int = 0
