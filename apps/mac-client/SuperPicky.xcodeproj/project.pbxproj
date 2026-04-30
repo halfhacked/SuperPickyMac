@@ -698,10 +698,6 @@
 			children = (
 				53490B87D12E17877E5E5830 /* ModelManager.swift */,
 				477A9B13ED9208BC9D444B7D /* ModelManifest.swift */,
-							BF23B27AE8094FFACE79A86D /* PhotoSelectionEditorTests.swift */,
-				CC5850EDCEDC4A0C9E67CBF6 /* PhotoSelectionTests.swift */,
-				202681079E6005B71EA8FE5B /* BatchSpeciesAggregatorTests.swift */,
-				ADAEDF1D9D0ECD64A880CF4C /* AppStateBatchMutationTests.swift */,
 );
 			path = Download;
 			sourceTree = "<group>";
@@ -738,6 +734,10 @@
 				FE1788F929C2EE7791DCBDFA /* ThumbnailDimTests.swift */,
 				007143E831325DD4E910840C /* XMPWriterTests.swift */,
 				9A5220B2A07CE5136A004F40 /* ZoomStateTests.swift */,
+				BF23B27AE8094FFACE79A86D /* PhotoSelectionEditorTests.swift */,
+				CC5850EDCEDC4A0C9E67CBF6 /* PhotoSelectionTests.swift */,
+				202681079E6005B71EA8FE5B /* BatchSpeciesAggregatorTests.swift */,
+				ADAEDF1D9D0ECD64A880CF4C /* AppStateBatchMutationTests.swift */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -858,7 +858,6 @@
 				C249ECD5A8E7D02960210EA5 /* ExifPanelTests.swift */,
 				A98F3BB70D3CF55D89A9E02D /* ProcessingFlowTests.swift */,
 				A2EF4053556C87B2DBBAF1C1 /* SpeciesKeywordTests.swift */,
-							8D660D2C3EE22E79E79831D3 /* BatchSelectionUITests.swift */,
 );
 			path = BDD;
 			sourceTree = "<group>";
@@ -949,6 +948,7 @@
 				A116EA5C6473F4DDDF1E4CFB /* ProcessingFlowUITests.swift */,
 				79C2F63B6B529E331DFC29AB /* ScreenshotAuditTests.swift */,
 				F0FEA77B7EA580CB52BFD7C1 /* SettingsUITests.swift */,
+				8D660D2C3EE22E79E79831D3 /* BatchSelectionUITests.swift */,
 			);
 			path = SuperPickyUITests;
 			sourceTree = "<group>";
@@ -1408,14 +1408,6 @@
 				F849FFECDD60F6D1D3F1D0BE /* species_list_VE.json in Resources */,
 				8F46A9ABBB9BF467139BDD85 /* species_list_VN.json in Resources */,
 				E35151E7C480D8AA62F668A2 /* species_list_ZA.json in Resources */,
-							FDCE822BEAC01E690DFB6DFD /* PhotoSelection.swift in Sources */,
-				3513BB0AA55EE108E66D713F /* PhotoSelectionEditorTests.swift in Sources */,
-				45F0B3CD8D896393C89A226C /* PhotoSelectionTests.swift in Sources */,
-				4E732FFBF1901F6E9AD718F9 /* BatchSpeciesAggregator.swift in Sources */,
-				8CD9C7C1B0A8CCFEAB2154D4 /* BatchSpeciesAggregatorTests.swift in Sources */,
-				4FC90F0101C16E3E13263CA1 /* AppStateBatchMutationTests.swift in Sources */,
-				0CD8EE6AD4DA16841CE43B4F /* MouseClickRedirector.swift in Sources */,
-				552702ED1C0AC98BD9B9AA04 /* BatchSelectionUITests.swift in Sources */,
 );
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1447,6 +1439,7 @@
 				0A6A3CA41751F6A2A9EDA02F /* ProcessingFlowUITests.swift in Sources */,
 				BE4F93B4BD74DD899C66590E /* ScreenshotAuditTests.swift in Sources */,
 				5EB7DC526D950902A30771DD /* SettingsUITests.swift in Sources */,
+				552702ED1C0AC98BD9B9AA04 /* BatchSelectionUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1523,6 +1516,10 @@
 				BF1F623CB9139EECF00CF7BB /* XMPWriterTests.swift in Sources */,
 				58036F925FA7C04F65EAAC7C /* YOLOBirdDetectorTests.swift in Sources */,
 				38BDD7274FBEA3E39AF190C2 /* ZoomStateTests.swift in Sources */,
+				3513BB0AA55EE108E66D713F /* PhotoSelectionEditorTests.swift in Sources */,
+				45F0B3CD8D896393C89A226C /* PhotoSelectionTests.swift in Sources */,
+				8CD9C7C1B0A8CCFEAB2154D4 /* BatchSpeciesAggregatorTests.swift in Sources */,
+				4FC90F0101C16E3E13263CA1 /* AppStateBatchMutationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1584,6 +1581,9 @@
 				628781342964039FC54E5D63 /* ThumbnailStripView.swift in Sources */,
 				B6B76A0E59A2F4F0E8C9F653 /* XMPWriter.swift in Sources */,
 				41CE16FF85A6D10B7356C792 /* ZoomableImageView.swift in Sources */,
+				FDCE822BEAC01E690DFB6DFD /* PhotoSelection.swift in Sources */,
+				4E732FFBF1901F6E9AD718F9 /* BatchSpeciesAggregator.swift in Sources */,
+				0CD8EE6AD4DA16841CE43B4F /* MouseClickRedirector.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
