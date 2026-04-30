@@ -88,9 +88,11 @@ jobs:
               xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/ProcessingFlowUITests
               xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/CompareViewUITests
           - name: culling
-            # Main culling workflow — sidebar, toolbar, keyboard shortcuts.
+            # Main culling workflow — sidebar, toolbar, keyboard shortcuts,
+            # filmstrip multi-select.
             run: |
               xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/CullingWorkflowUITests
+              xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/BatchSelectionUITests
           - name: species
             # Species edit panel feature as one logical unit.
             run: |

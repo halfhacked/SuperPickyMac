@@ -5,10 +5,8 @@ import SwiftUI
 /// scrollable surface toggled by one toolbar button.
 struct ExifPanelView: View {
     @Environment(CullingConfig.self) private var config
+    let appState: AppState
     let photo: Photo
-    /// Called with the new full assigned-species list whenever the user
-    /// makes a change. Parent persists via `AppState.setAssignedSpecies`.
-    var onAssignedChanged: ([SpeciesMatch]) -> Void = { _ in }
     /// Autocomplete backend — defaults to "no matches" so previews and
     /// unit tests don't need the CoreML species database wired up.
     var searchSpecies: (_ query: String) -> [SpeciesMatch] = { _ in [] }
@@ -20,11 +18,38 @@ struct ExifPanelView: View {
 
     private let labelWidth: CGFloat = 100
 
-    private var assigned: [SpeciesMatch] { photo.assignedSpecies }
-    private var candidates: [SpeciesMatch] {
-        SpeciesAssignmentEditor.decodeCandidates(fromJSON: photo.speciesTop5JSON)
+    private var selection: PhotoSelection { appState.selection }
+    private var isMulti: Bool { selection.isMulti }
+    private var selectedPhotos: [Photo] {
+        let ids = selection.selectedIDs
+        if ids.isEmpty { return [photo] }
+        return appState.photos.filter { ids.contains($0.id) }
     }
-    private var assignedIDs: Set<String> { Set(assigned.map(\.speciesID)) }
+    private var targetIDs: Set<UUID> {
+        isMulti ? selection.selectedIDs : [photo.id]
+    }
+    private var assignedRows: [BatchSpeciesAggregator.AssignedRow] {
+        if isMulti {
+            return BatchSpeciesAggregator.unionAssigned(selectedPhotos)
+        } else {
+            return photo.assignedSpecies.map { BatchSpeciesAggregator.AssignedRow(species: $0, photoCount: 1) }
+        }
+    }
+    private var availableCandidates: [SpeciesMatch] {
+        if isMulti {
+            let assignedIDsLocal = Set(assignedRows.map(\.species.speciesID))
+            return BatchSpeciesAggregator.topCandidates(selectedPhotos, limit: 10)
+                .filter { !assignedIDsLocal.contains($0.speciesID) }
+        } else {
+            let assignedIDsLocal = Set(photo.assignedSpecies.map(\.speciesID))
+            return SpeciesAssignmentEditor
+                .decodeCandidates(fromJSON: photo.speciesTop5JSON)
+                .filter { !assignedIDsLocal.contains($0.speciesID) }
+        }
+    }
+    private var assignedIDs: Set<String> {
+        Set(assignedRows.map(\.species.speciesID))
+    }
 
     var body: some View {
         ScrollView {
@@ -180,11 +205,16 @@ struct ExifPanelView: View {
 
     @ViewBuilder
     private var assignedSection: some View {
-        // First species header shows a divider when any EXIF content is
-        // rendered above; otherwise it's the very first row in the panel.
         let needsDivider = exifData?.isEmpty == false
-        sectionHeader(config.localized("Assigned"), showDivider: needsDivider)
-        if assigned.isEmpty {
+        if isMulti {
+            sectionHeader(
+                String(format: config.localized("Editing %lld photos"), selection.count),
+                showDivider: needsDivider
+            )
+        } else {
+            sectionHeader(config.localized("Assigned"), showDivider: needsDivider)
+        }
+        if assignedRows.isEmpty {
             Text(config.localized("No species assigned"))
                 .font(.system(size: 12))
                 .foregroundStyle(.tertiary)
@@ -193,8 +223,8 @@ struct ExifPanelView: View {
                 .accessibilityIdentifier("SpeciesEditPanel_EmptyAssigned")
         } else {
             VStack(alignment: .leading, spacing: 4) {
-                ForEach(assigned.indices, id: \.self) { index in
-                    assignedRow(match: assigned[index], isPrimary: index == 0, index: index)
+                ForEach(Array(assignedRows.enumerated()), id: \.element.species.speciesID) { index, row in
+                    assignedRow(row: row, isPrimary: !isMulti && index == 0)
                 }
             }
             .padding(.horizontal, 12)
@@ -204,7 +234,7 @@ struct ExifPanelView: View {
 
     @ViewBuilder
     private var candidatesSection: some View {
-        let available = SpeciesAssignmentEditor.unassignedCandidates(from: candidates, excluding: assigned)
+        let available = availableCandidates
         if !available.isEmpty {
             sectionHeader(config.localized("OSEA Candidates"))
             VStack(alignment: .leading, spacing: 2) {
@@ -277,16 +307,24 @@ struct ExifPanelView: View {
 
     // MARK: - Species row builders
 
-    private func assignedRow(match: SpeciesMatch, isPrimary: Bool, index: Int) -> some View {
-        HStack(spacing: 6) {
+    private func assignedRow(row: BatchSpeciesAggregator.AssignedRow, isPrimary: Bool) -> some View {
+        let match = row.species
+        return HStack(spacing: 6) {
             Image(systemName: isPrimary ? "crown.fill" : "bird.fill")
                 .font(.system(size: 10))
                 .foregroundStyle(isPrimary ? .yellow : .secondary)
                 .frame(width: 14)
             VStack(alignment: .leading, spacing: 1) {
-                Text(speciesDisplayLabel(for: match))
-                    .font(.system(size: 12, weight: isPrimary ? .semibold : .regular))
-                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    Text(speciesDisplayLabel(for: match))
+                        .font(.system(size: 12, weight: isPrimary ? .semibold : .regular))
+                        .lineLimit(1)
+                    if isMulti, row.photoCount < selectedPhotos.count {
+                        Text("(\(row.photoCount)/\(selectedPhotos.count))")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
                 Text(match.scientificName)
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
@@ -296,7 +334,7 @@ struct ExifPanelView: View {
             Spacer()
             if !isPrimary {
                 Button {
-                    onAssignedChanged(SpeciesAssignmentEditor.makePrimary(at: index, in: assigned))
+                    appState.setPrimarySpecies(ids: targetIDs, species: match)
                 } label: {
                     Image(systemName: "arrow.up.circle")
                         .font(.system(size: 12))
@@ -309,7 +347,7 @@ struct ExifPanelView: View {
                 .help(config.localized("Make primary"))
             }
             Button {
-                onAssignedChanged(SpeciesAssignmentEditor.remove(at: index, from: assigned))
+                appState.removeSpecies(ids: targetIDs, species: match)
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 12))
@@ -346,9 +384,7 @@ struct ExifPanelView: View {
             }
             Spacer()
             Button {
-                if let updated = SpeciesAssignmentEditor.add(match, to: assigned) {
-                    onAssignedChanged(updated)
-                }
+                appState.addSpecies(ids: targetIDs, species: match)
             } label: {
                 Image(systemName: "plus.circle.fill")
                     .font(.system(size: 13))
@@ -363,9 +399,7 @@ struct ExifPanelView: View {
 
     private func searchResultRow(match: SpeciesMatch) -> some View {
         Button {
-            if let updated = SpeciesAssignmentEditor.add(match, to: assigned) {
-                onAssignedChanged(updated)
-            }
+            appState.addSpecies(ids: targetIDs, species: match)
             searchQuery = ""
             searchResults = []
         } label: {
@@ -465,13 +499,9 @@ struct ExifPanelView: View {
     }
 
     private func commitSearchQuery() {
-        // Unmatched text is ignored — only SpeciesDatabase entries are allowed
-        // to avoid typos/unlisted names polluting the sidebar and XMP keywords.
         let trimmed = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, let match = searchResults.first else { return }
-        if let updated = SpeciesAssignmentEditor.add(match, to: assigned) {
-            onAssignedChanged(updated)
-        }
+        appState.addSpecies(ids: targetIDs, species: match)
         searchQuery = ""
         searchResults = []
     }

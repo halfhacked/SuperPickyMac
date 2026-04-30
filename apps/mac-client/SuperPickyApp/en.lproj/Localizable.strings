@@ -194,3 +194,12 @@
 "Region" = "Region";
 "Global" = "Global";
 "Manual" = "Manual";
+"Extend selection" = "Extend selection";
+"Select all" = "Select all";
+"Collapse selection" = "Collapse selection";
+"Pick / unpick selection" = "Pick / unpick selection";
+"Rate selection" = "Rate selection";
+"Reject selection" = "Reject selection";
+"Editing %lld photos" = "Editing %lld photos";
+"%lld selected" = "%lld selected";
+"(%lld selected)" = "(%lld selected)";

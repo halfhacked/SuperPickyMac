@@ -3,9 +3,32 @@ import Foundation
 @testable import SuperPicky
 
 /// Covers the multi-species assignment behaviour on `Photo` and the
-/// `AppState` mutation APIs (`setAssignedSpecies`, `correctSpecies`)
-/// that back the new species edit panel.
+/// `AppState` mutation APIs (`setPrimarySpecies` / `addSpecies` /
+/// `removeSpecies` / `correctSpecies`) that back the new species edit
+/// panel.
 @Suite(.serialized) struct AssignedSpeciesTests {
+
+    /// Wraps the legacy "set the full list" semantics in terms of the new
+    /// set-based API: promote the head as primary, add the rest, then
+    /// remove anything from the photo's prior list that isn't in `species`.
+    /// Empty `species` removes every existing entry.
+    private func setSpeciesList(_ appState: AppState, id: UUID, species: [SpeciesMatch]) {
+        let existing = appState.photos.first(where: { $0.id == id })?.assignedSpecies ?? []
+        if let primary = species.first {
+            appState.setPrimarySpecies(ids: [id], species: primary)
+            for sp in species.dropFirst() {
+                appState.addSpecies(ids: [id], species: sp)
+            }
+            let newIDs = Set(species.map(\.speciesID))
+            for sp in existing where !newIDs.contains(sp.speciesID) {
+                appState.removeSpecies(ids: [id], species: sp)
+            }
+        } else {
+            for sp in existing {
+                appState.removeSpecies(ids: [id], species: sp)
+            }
+        }
+    }
 
     // MARK: - Helpers
 
@@ -202,7 +225,7 @@ import Foundation
         appState.loadPhotos(for: folder)
 
         let hawk = match(sci: "Accipiter", common: "Hawk", ebird: "hawk")
-        appState.setAssignedSpecies(id: photo.id, species: [
+        setSpeciesList(appState, id: photo.id, species: [
             match(sci: "Aquila", common: "Eagle", ebird: "eagle"),
             hawk,
         ])
@@ -229,7 +252,7 @@ import Foundation
         #expect(appState.speciesEntries.contains { $0.speciesID == "eagle" })
         #expect(!appState.speciesEntries.contains { $0.speciesID == "hawk" })
 
-        appState.setAssignedSpecies(id: photo.id, species: [
+        setSpeciesList(appState, id: photo.id, species: [
             match(sci: "Aquila", common: "Eagle", ebird: "eagle"),
             match(sci: "Accipiter", common: "Hawk", ebird: "hawk"),
         ])
@@ -249,7 +272,7 @@ import Foundation
 
         let appState = AppState()
         appState.loadPhotos(for: folder)
-        appState.setAssignedSpecies(id: photo.id, species: [])
+        setSpeciesList(appState, id: photo.id, species: [])
 
         appState.sidebarSelection = .species(nil) // Unidentified bucket
         appState.applyFilter()
@@ -275,7 +298,7 @@ import Foundation
 
         let appState = AppState()
         appState.loadPhotos(for: folder)
-        appState.correctSpecies(id: photo.id, commonName: "Golden Eagle")
+        appState.correctSpecies(ids: [photo.id], commonName: "Golden Eagle")
 
         let db2 = try ReportDatabase(folderPath: folder)
         let fetched = try db2.fetchPhoto(id: photo.id)
@@ -296,7 +319,7 @@ import Foundation
 
         let appState = AppState()
         appState.loadPhotos(for: folder)
-        appState.correctSpecies(id: photo.id, commonName: "Mystery Bird")
+        appState.correctSpecies(ids: [photo.id], commonName: "Mystery Bird")
 
         let db2 = try ReportDatabase(folderPath: folder)
         let fetched = try db2.fetchPhoto(id: photo.id)
@@ -355,7 +378,7 @@ import Foundation
             match(sci: "Accipiter", common: "Hawk", ebird: "hawk"),
             match(sci: "Buteo", common: "Buzzard", ebird: "buzzard"),
         ]
-        appState.setAssignedSpecies(id: seeded.burstIDs[0], species: newList)
+        setSpeciesList(appState, id: seeded.burstIDs[0], species: newList)
 
         let db = try ReportDatabase(folderPath: seeded.folder)
         for id in seeded.burstIDs {
@@ -377,7 +400,7 @@ import Foundation
         let appState = AppState()
         appState.loadPhotos(for: seeded.folder)
 
-        appState.correctSpecies(id: seeded.burstIDs[0], commonName: "Golden Eagle")
+        appState.correctSpecies(ids: [seeded.burstIDs[0]], commonName: "Golden Eagle")
 
         let db = try ReportDatabase(folderPath: seeded.folder)
         for id in seeded.burstIDs {
@@ -411,7 +434,7 @@ import Foundation
         appState.loadPhotos(for: folder)
 
         let hawk = match(sci: "Accipiter", common: "Hawk", ebird: "hawk")
-        appState.setAssignedSpecies(id: solo.id, species: [hawk])
+        setSpeciesList(appState, id: solo.id, species: [hawk])
 
         let db2 = try ReportDatabase(folderPath: folder)
         let soloAfter = try #require(try db2.fetchPhoto(id: solo.id))
@@ -445,7 +468,7 @@ import Foundation
         appState.loadPhotos(for: folder)
 
         let hawk = match(sci: "Accipiter", common: "Hawk", ebird: "hawk")
-        appState.setAssignedSpecies(id: burstIDs[0], species: [eagle, hawk])
+        setSpeciesList(appState, id: burstIDs[0], species: [eagle, hawk])
 
         let eagleEntry = appState.speciesEntries.first { $0.speciesID == "eagle" }
         let hawkEntry = appState.speciesEntries.first { $0.speciesID == "hawk" }

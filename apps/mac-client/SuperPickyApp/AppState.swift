@@ -68,7 +68,20 @@ final class AppState {
     private let logger = Logger(subsystem: "com.halfhacked.superpicky", category: "AppState")
 
     var sidebarSelection: SidebarSelection?
-    var selectedPhotoID: UUID?
+    let selection = PhotoSelection()
+
+    /// Back-compat accessor. Reads/writes `selection.activeID`. New code
+    /// should use `selection` directly.
+    var selectedPhotoID: UUID? {
+        get { selection.activeID }
+        set {
+            if let id = newValue {
+                selection.click(id, photos: photos)
+            } else {
+                selection.clear()
+            }
+        }
+    }
     var folders: [URL] = []
     var speciesEntries: [SpeciesEntry] = []
     var speciesSortOrder: SpeciesSortOrder = .name
@@ -96,11 +109,15 @@ final class AppState {
     var picksCount: Int { allPhotos.lazy.filter(\.isPick).count }
 
     struct UndoAction {
-        let photoID: UUID
-        let previousRating: Int
-        let previousIsPick: Bool
-        let previousIsManualRating: Bool
-        let wasHidden: Bool
+        struct Entry {
+            let photoID: UUID
+            let previousRating: Int
+            let previousIsPick: Bool
+            let previousIsManualRating: Bool
+            let previousAssignedSpecies: [SpeciesMatch]
+            let wasHidden: Bool
+        }
+        let entries: [Entry]
     }
 
     // All photos from the current folder (unfiltered)
@@ -142,7 +159,7 @@ final class AppState {
     var isProcessing: Bool { processingFolder != nil }
 
     var selectedPhoto: Photo? {
-        guard let id = selectedPhotoID else { return nil }
+        guard let id = selection.activeID else { return nil }
         return photos.first { $0.id == id }
     }
 
@@ -162,10 +179,11 @@ final class AppState {
     /// Preserves current filter and selection when possible.
     /// Pass `skipHierarchy: true` during incremental processing to avoid O(n²) rebuilds.
     func loadPhotos(for folder: URL, skipHierarchy: Bool = false) {
+        let isFolderSwitch = (currentFolder != folder)
         currentFolder = folder
         cachedDB = nil
         undoStack = []
-        let previousSelection = selectedPhotoID
+        if isFolderSwitch { selection.clear() }
         do {
             let database = try ReportDatabase(folderPath: folder)
             cachedDB = database
@@ -178,11 +196,11 @@ final class AppState {
             // Re-apply current filter instead of resetting to all
             applyFilter()
 
-            // Preserve selection if the photo still exists in filtered list
-            if let prev = previousSelection, photos.contains(where: { $0.id == prev }) {
-                selectedPhotoID = prev
-            } else if selectedPhotoID == nil {
-                selectedPhotoID = photos.first?.id
+            // Reconcile selection against the filtered list. Active falls
+            // back per PhotoSelection.reconcile invariants.
+            selection.reconcile(with: photos)
+            if selection.activeID == nil, let first = photos.first {
+                selection.click(first.id, photos: photos)
             }
         } catch {
             logger.error("loadPhotos failed: \(error)")
@@ -303,7 +321,7 @@ final class AppState {
         allPhotoIndex = [:]
         filteredPhotoIndex = [:]
         speciesEntries = []
-        selectedPhotoID = nil
+        selection.clear()
         currentFolder = nil
         undoStack = []
     }
@@ -324,62 +342,96 @@ final class AppState {
         return allPhotos.filter { $0.burstGroupID == groupID }.map(\.id)
     }
 
-    /// Mutate a photo, persist to DB + XMP, and update in-memory arrays.
-    /// Saves undo state before mutation. The `updateView` closure handles
-    /// how the filtered `photos` array should change (update in-place vs remove).
-    private func mutatePhoto(
-        id: UUID, wasHidden: Bool = false,
+
+    // MARK: - Test-only accessors
+
+    #if DEBUG
+    func allPhotosForTesting() -> [Photo] { allPhotos }
+    func undoStackSizeForTesting() -> Int { undoStack.count }
+    #endif
+
+    // MARK: - Set-based mutation: pick / rate / reject
+
+    /// Pick semantics across `ids`: if any photo in `ids` is unpicked, pick
+    /// all of them; else unpick all. Explicit-only — does NOT fan out to
+    /// burst members.
+    func setPick(ids: Set<UUID>) {
+        let targets = ids.compactMap { allPhotoIndex[$0].map { allPhotos[$0] } }
+        guard !targets.isEmpty else { return }
+        let anyUnpicked = targets.contains(where: { !$0.isPick })
+        let newPick = anyUnpicked
+        applyBatch(ids: targets.map(\.id)) { photo in
+            photo.isPick = newPick
+        } afterEach: { [weak self] photo in
+            guard let self else { return }
+            self.speciesEntries = SpeciesHierarchyBuilder.applyPickToggle(
+                entries: self.speciesEntries, photo: photo, newIsPick: photo.isPick
+            )
+        }
+    }
+
+    func setRating(ids: Set<UUID>, rating: Int, manual: Bool = true) {
+        applyBatch(ids: Array(ids)) { photo in
+            photo.starRating = rating
+            photo.isManualRating = manual
+        }
+    }
+
+    func reject(ids: Set<UUID>) {
+        applyBatch(ids: Array(ids), wasHidden: true) { photo in
+            photo.starRating = 0
+            photo.isManualRating = true
+        } afterAll: { [weak self] _ in
+            guard let self else { return }
+            self.photos.removeAll { ids.contains($0.id) }
+            self.rebuildFilteredPhotoIndex()
+        }
+    }
+
+    // MARK: - Batch primitive
+
+    /// Apply `mutate` to every id in `ids` against the DB and XMP, snapshot
+    /// previous state into ONE `UndoAction`, update in-memory arrays, and
+    /// optionally invoke per-photo and end-of-batch hooks. Photos missing
+    /// from the DB are skipped.
+    private func applyBatch(
+        ids: [UUID],
+        wasHidden: Bool = false,
         _ mutate: (inout Photo) -> Void,
-        updateView: ((_ photo: Photo) -> Void)? = nil
+        afterEach: ((Photo) -> Void)? = nil,
+        afterAll: ((_ mutated: [Photo]) -> Void)? = nil
     ) {
+        guard !ids.isEmpty else { return }
         do {
             let database = try db()
-            guard var photo = try database.fetchPhoto(id: id) else { return }
-            undoStack.append(UndoAction(
-                photoID: id, previousRating: photo.starRating,
-                previousIsPick: photo.isPick, previousIsManualRating: photo.isManualRating,
-                wasHidden: wasHidden
-            ))
-            if undoStack.count > Self.maxUndoDepth {
-                undoStack.removeFirst()
+            var entries: [UndoAction.Entry] = []
+            var mutated: [Photo] = []
+            for id in ids {
+                guard var photo = try database.fetchPhoto(id: id) else { continue }
+                entries.append(UndoAction.Entry(
+                    photoID: id,
+                    previousRating: photo.starRating,
+                    previousIsPick: photo.isPick,
+                    previousIsManualRating: photo.isManualRating,
+                    previousAssignedSpecies: photo.assignedSpecies,
+                    wasHidden: wasHidden
+                ))
+                mutate(&photo)
+                try database.save(&photo)
+                _ = try? XMPWriter.write(photo: photo)
+                if let idx = allPhotoIndex[id] { allPhotos[idx] = photo }
+                if let fIdx = filteredPhotoIndex[id] { photos[fIdx] = photo }
+                mutated.append(photo)
+                afterEach?(photo)
             }
-            mutate(&photo)
-            try database.save(&photo)      // DB write FIRST
-            _ = try? XMPWriter.write(photo: photo)
-            // Only update in-memory state after successful DB write:
-            if let idx = allPhotoIndex[id] {
-                allPhotos[idx] = photo
+            if !entries.isEmpty {
+                undoStack.append(UndoAction(entries: entries))
+                if undoStack.count > Self.maxUndoDepth { undoStack.removeFirst() }
             }
-            if let update = updateView {
-                update(photo)
-            } else if let idx = filteredPhotoIndex[id] {
-                photos[idx] = photo
-            }
+            afterAll?(mutated)
         } catch {
-            logger.error("mutatePhoto failed: \(error)")
+            logger.error("applyBatch failed: \(error)")
         }
-    }
-
-    func ratePhoto(id: UUID, rating: Int) {
-        mutatePhoto(id: id) { photo in
-            photo.starRating = rating
-            photo.isManualRating = true
-        }
-    }
-
-    func togglePick(id: UUID) {
-        var newIsPick: Bool?
-        mutatePhoto(id: id) { photo in
-            photo.isPick.toggle()
-            newIsPick = photo.isPick
-        }
-        guard let newIsPick,
-              let idx = allPhotoIndex[id] else { return }
-        speciesEntries = SpeciesHierarchyBuilder.applyPickToggle(
-            entries: speciesEntries,
-            photo: allPhotos[idx],
-            newIsPick: newIsPick
-        )
     }
 
     func deletePhoto(id: UUID) throws {
@@ -398,37 +450,21 @@ final class AppState {
         photos.removeAll { $0.id == id }
         rebuildAllPhotoIndex()
         rebuildFilteredPhotoIndex()
-        undoStack.removeAll { $0.photoID == id }
+        undoStack.removeAll { $0.entries.contains(where: { $0.photoID == id }) }
 
         logger.info("Deleted photo: \(photo.filename)")
     }
 
-    /// Inline-rename hook for the info bar: rewrite the primary (first)
-    /// entry's common name without touching its stable `speciesID`. This
-    /// preserves sidebar bucketing — a cosmetic rename doesn't jump the
-    /// photo between buckets. Persists to DB and XMP sidecar.
-    func correctSpecies(id: UUID, commonName: String) {
+    // MARK: - Set-based mutation: species
+
+    /// Inline rename of primary across `ids`. Each id's burst members are
+    /// included (per-photo species edits fan out to the whole burst).
+    /// Empty `commonName` is preserved as today.
+    func correctSpecies(ids: Set<UUID>, commonName: String) {
         let trimmed = commonName.trimmingCharacters(in: .whitespaces)
-        for memberID in burstMemberIDs(for: id) {
-            mutatePhoto(id: memberID) { photo in
-                var list = photo.assignedSpecies
-                guard var first = list.first else {
-                    // No existing species — treat the rename as assigning a
-                    // new custom entry with `trimmed` as both scientific and
-                    // common name, so the photo leaves the Unidentified bucket.
-                    if !trimmed.isEmpty {
-                        photo.assignedSpecies = [SpeciesMatch(
-                            scientificName: trimmed,
-                            commonName: trimmed,
-                            confidence: 0,
-                            cnName: nil,
-                            pinyin: nil,
-                            thresholdUsed: "manual",
-                            ebirdCode: nil
-                        )]
-                    }
-                    return
-                }
+        applySpeciesBatch(ids: ids) { photo in
+            var list = photo.assignedSpecies
+            if var first = list.first {
                 first = SpeciesMatch(
                     scientificName: first.scientificName,
                     commonName: trimmed.isEmpty ? nil : trimmed,
@@ -441,65 +477,134 @@ final class AppState {
                 )
                 list[0] = first
                 photo.assignedSpecies = list
+            } else if !trimmed.isEmpty {
+                photo.assignedSpecies = [SpeciesMatch(
+                    scientificName: trimmed,
+                    commonName: trimmed,
+                    confidence: 0,
+                    cnName: nil, pinyin: nil,
+                    thresholdUsed: "manual", ebirdCode: nil
+                )]
             }
         }
-        buildSpeciesHierarchy()
     }
 
-    /// Replace the full assigned-species list for a photo. Used by the
-    /// species edit panel. `species.first` becomes the primary (which the
-    /// accessor mirrors into the scalar columns), every entry appears in
-    /// the sidebar hierarchy, and the XMP sidecar picks up all of them.
-    func setAssignedSpecies(id: UUID, species: [SpeciesMatch]) {
-        for memberID in burstMemberIDs(for: id) {
-            mutatePhoto(id: memberID) { photo in
-                photo.assignedSpecies = species
+    /// Set `species` as primary across `ids` (with burst fan-out). For each
+    /// target photo: if `species` isn't already assigned, ADD it then
+    /// promote to slot 0; else move existing entry to slot 0.
+    func setPrimarySpecies(ids: Set<UUID>, species: SpeciesMatch) {
+        applySpeciesBatch(ids: ids) { photo in
+            var list = photo.assignedSpecies
+            if let idx = list.firstIndex(where: { $0.speciesID == species.speciesID }) {
+                list = SpeciesAssignmentEditor.makePrimary(at: idx, in: list)
+            } else {
+                list.insert(species, at: 0)
+            }
+            photo.assignedSpecies = list
+        }
+    }
+
+    /// Add `species` to every target photo (with burst fan-out) that doesn't
+    /// already have it. No-op for photos that already carry the species.
+    func addSpecies(ids: Set<UUID>, species: SpeciesMatch) {
+        applySpeciesBatch(ids: ids) { photo in
+            if let updated = SpeciesAssignmentEditor.add(species, to: photo.assignedSpecies) {
+                photo.assignedSpecies = updated
             }
         }
-        buildSpeciesHierarchy()
     }
 
-    func rejectPhoto(id: UUID) {
-        mutatePhoto(id: id, wasHidden: true, { photo in
-            photo.starRating = 0
-            photo.isManualRating = true
-        }, updateView: { [self] _ in
-            self.photos.removeAll { $0.id == id }
-            self.rebuildFilteredPhotoIndex()
+    /// Remove `species` from every target photo (with burst fan-out) that
+    /// has it.
+    func removeSpecies(ids: Set<UUID>, species: SpeciesMatch) {
+        applySpeciesBatch(ids: ids) { photo in
+            if let idx = photo.assignedSpecies.firstIndex(where: { $0.speciesID == species.speciesID }) {
+                photo.assignedSpecies = SpeciesAssignmentEditor.remove(at: idx, from: photo.assignedSpecies)
+            }
+        }
+    }
+
+    /// Common shape for every species mutation: expand burst membership,
+    /// run the batch, rebuild the sidebar hierarchy once afterwards.
+    private func applySpeciesBatch(ids: Set<UUID>, mutate: (inout Photo) -> Void) {
+        let targets = expandBurstMembers(of: ids)
+        applyBatch(ids: targets, mutate, afterAll: { [weak self] _ in
+            self?.buildSpeciesHierarchy()
         })
+    }
+
+    /// Expand `ids` to include every burst member of every selected photo.
+    /// Expand `ids` to include every burst member of every selected photo.
+    /// Order: `ids` first (de-duped), then burst-member-only IDs in
+    /// `allPhotos` order. The `applyBatch` body is order-independent for
+    /// these methods, so this just keeps undo-entry order deterministic.
+    private func expandBurstMembers(of ids: Set<UUID>) -> [UUID] {
+        // Collect the burst groups touched by `ids` first so we can do one
+        // O(N) pass over allPhotos instead of one filter per id.
+        var groups: Set<UUID> = []
+        for id in ids {
+            if let idx = allPhotoIndex[id], let g = allPhotos[idx].burstGroupID {
+                groups.insert(g)
+            }
+        }
+        var result: [UUID] = []
+        var seen: Set<UUID> = []
+        for id in ids {
+            if seen.insert(id).inserted { result.append(id) }
+        }
+        if groups.isEmpty { return result }
+        for photo in allPhotos {
+            guard let g = photo.burstGroupID, groups.contains(g) else { continue }
+            if seen.insert(photo.id).inserted { result.append(photo.id) }
+        }
+        return result
     }
 
     func undoLastAction() {
         guard let action = undoStack.popLast() else { return }
         do {
             let database = try db()
-            guard var photo = try database.fetchPhoto(id: action.photoID) else { return }
-            let pickChanged = photo.isPick != action.previousIsPick
-            photo.starRating = action.previousRating
-            photo.isPick = action.previousIsPick
-            photo.isManualRating = action.previousIsManualRating
-            try database.save(&photo)
-            _ = try? XMPWriter.write(photo: photo)
+            var lastID: UUID?
+            var anySpeciesChanged = false
+            for entry in action.entries {
+                guard var photo = try database.fetchPhoto(id: entry.photoID) else { continue }
+                let pickChanged = photo.isPick != entry.previousIsPick
+                let speciesChanged = photo.assignedSpecies.map(\.speciesID) != entry.previousAssignedSpecies.map(\.speciesID)
+                photo.starRating = entry.previousRating
+                photo.isPick = entry.previousIsPick
+                photo.isManualRating = entry.previousIsManualRating
+                photo.assignedSpecies = entry.previousAssignedSpecies
+                try database.save(&photo)
+                _ = try? XMPWriter.write(photo: photo)
 
-            if let idx = allPhotoIndex[action.photoID] {
-                allPhotos[idx] = photo
-            }
-            if pickChanged {
-                speciesEntries = SpeciesHierarchyBuilder.applyPickToggle(
-                    entries: speciesEntries,
-                    photo: photo,
-                    newIsPick: photo.isPick
-                )
-            }
+                if let idx = allPhotoIndex[entry.photoID] {
+                    allPhotos[idx] = photo
+                }
+                if pickChanged {
+                    speciesEntries = SpeciesHierarchyBuilder.applyPickToggle(
+                        entries: speciesEntries,
+                        photo: photo,
+                        newIsPick: photo.isPick
+                    )
+                }
+                if speciesChanged { anySpeciesChanged = true }
 
-            if action.wasHidden {
-                filteredPhotoIndex[photo.id] = photos.count
-                photos.append(photo)
-            } else if let idx = filteredPhotoIndex[action.photoID] {
-                photos[idx] = photo
+                if entry.wasHidden {
+                    if filteredPhotoIndex[photo.id] == nil {
+                        filteredPhotoIndex[photo.id] = photos.count
+                        photos.append(photo)
+                    }
+                } else if let idx = filteredPhotoIndex[entry.photoID] {
+                    photos[idx] = photo
+                }
+                lastID = photo.id
             }
-
-            selectedPhotoID = action.photoID
+            if anySpeciesChanged {
+                buildSpeciesHierarchy()
+            }
+            if let id = lastID, photos.contains(where: { $0.id == id }) {
+                selection.click(id, photos: photos)
+            }
         } catch {
             logger.error("undoLastAction failed: \(error)")
         }
@@ -528,9 +633,6 @@ final class AppState {
             photos = allPhotos
         }
         rebuildFilteredPhotoIndex()
-        // Update selection
-        if let id = selectedPhotoID, filteredPhotoIndex[id] == nil {
-            selectedPhotoID = photos.first?.id
-        }
+        selection.reconcile(with: photos)
     }
 }
