@@ -68,7 +68,20 @@ final class AppState {
     private let logger = Logger(subsystem: "com.halfhacked.superpicky", category: "AppState")
 
     var sidebarSelection: SidebarSelection?
-    var selectedPhotoID: UUID?
+    let selection = PhotoSelection()
+
+    /// Back-compat accessor. Reads/writes `selection.activeID`. New code
+    /// should use `selection` directly.
+    var selectedPhotoID: UUID? {
+        get { selection.activeID }
+        set {
+            if let id = newValue {
+                selection.click(id, photos: photos)
+            } else {
+                selection.clear()
+            }
+        }
+    }
     var folders: [URL] = []
     var speciesEntries: [SpeciesEntry] = []
     var speciesSortOrder: SpeciesSortOrder = .name
@@ -146,7 +159,7 @@ final class AppState {
     var isProcessing: Bool { processingFolder != nil }
 
     var selectedPhoto: Photo? {
-        guard let id = selectedPhotoID else { return nil }
+        guard let id = selection.activeID else { return nil }
         return photos.first { $0.id == id }
     }
 
@@ -166,10 +179,11 @@ final class AppState {
     /// Preserves current filter and selection when possible.
     /// Pass `skipHierarchy: true` during incremental processing to avoid O(n²) rebuilds.
     func loadPhotos(for folder: URL, skipHierarchy: Bool = false) {
+        let isFolderSwitch = (currentFolder != folder)
         currentFolder = folder
         cachedDB = nil
         undoStack = []
-        let previousSelection = selectedPhotoID
+        if isFolderSwitch { selection.clear() }
         do {
             let database = try ReportDatabase(folderPath: folder)
             cachedDB = database
@@ -182,11 +196,11 @@ final class AppState {
             // Re-apply current filter instead of resetting to all
             applyFilter()
 
-            // Preserve selection if the photo still exists in filtered list
-            if let prev = previousSelection, photos.contains(where: { $0.id == prev }) {
-                selectedPhotoID = prev
-            } else if selectedPhotoID == nil {
-                selectedPhotoID = photos.first?.id
+            // Reconcile selection against the filtered list. Active falls
+            // back per PhotoSelection.reconcile invariants.
+            selection.reconcile(with: photos)
+            if selection.activeID == nil, let first = photos.first {
+                selection.click(first.id, photos: photos)
             }
         } catch {
             logger.error("loadPhotos failed: \(error)")
@@ -307,7 +321,7 @@ final class AppState {
         allPhotoIndex = [:]
         filteredPhotoIndex = [:]
         speciesEntries = []
-        selectedPhotoID = nil
+        selection.clear()
         currentFolder = nil
         undoStack = []
     }
@@ -583,8 +597,8 @@ final class AppState {
             if anySpeciesChanged {
                 buildSpeciesHierarchy()
             }
-            if let id = lastID {
-                selectedPhotoID = id
+            if let id = lastID, photos.contains(where: { $0.id == id }) {
+                selection.click(id, photos: photos)
             }
         } catch {
             logger.error("undoLastAction failed: \(error)")
@@ -614,9 +628,6 @@ final class AppState {
             photos = allPhotos
         }
         rebuildFilteredPhotoIndex()
-        // Update selection
-        if let id = selectedPhotoID, filteredPhotoIndex[id] == nil {
-            selectedPhotoID = photos.first?.id
-        }
+        selection.reconcile(with: photos)
     }
 }
