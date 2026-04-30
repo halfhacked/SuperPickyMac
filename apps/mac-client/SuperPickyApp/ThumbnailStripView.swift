@@ -1,12 +1,13 @@
 import SwiftUI
+import AppKit
 
 struct ThumbnailStripView: View {
     let photos: [Photo]
-    @Binding var selectedPhotoID: UUID?
+    let selection: PhotoSelection
 
     var body: some View {
         let selectedBurstGroupID: UUID? = {
-            guard let id = selectedPhotoID else { return nil }
+            guard let id = selection.activeID else { return nil }
             return photos.first(where: { $0.id == id })?.burstGroupID
         }()
         ScrollViewReader { proxy in
@@ -15,16 +16,17 @@ struct ThumbnailStripView: View {
                     ForEach(photos) { photo in
                         ThumbnailCell(
                             photo: photo,
-                            isSelected: photo.id == selectedPhotoID,
+                            isActive: photo.id == selection.activeID,
+                            isSelected: selection.contains(photo.id),
                             isDimmed: ThumbnailCell.shouldDim(
                                 photoBurstGroupID: photo.burstGroupID,
                                 selectedBurstGroupID: selectedBurstGroupID
                             )
                         )
-                            .id(photo.id)
-                            .onTapGesture {
-                                selectedPhotoID = photo.id
-                            }
+                        .id(photo.id)
+                        .onTapGesture {
+                            handleClick(photoID: photo.id)
+                        }
                     }
                 }
                 .padding(.horizontal, 4)
@@ -32,7 +34,7 @@ struct ThumbnailStripView: View {
             }
             .background(ScrollWheelRedirector())
             .background(.bar)
-            .onChange(of: selectedPhotoID) { _, newValue in
+            .onChange(of: selection.activeID) { _, newValue in
                 if let id = newValue {
                     withAnimation {
                         proxy.scrollTo(id, anchor: .center)
@@ -41,25 +43,51 @@ struct ThumbnailStripView: View {
             }
         }
     }
+
+    /// Dispatch the tap to the right selection method based on modifier
+    /// keys held at the moment of the click. `NSEvent.modifierFlags` is the
+    /// AppKit-global current state — sampling it inside `.onTapGesture`
+    /// gives us shift/cmd-aware clicks without an NSEvent monitor.
+    private func handleClick(photoID: UUID) {
+        let flags = NSEvent.modifierFlags
+        if flags.contains(.shift) {
+            selection.shiftClick(photoID, photos: photos)
+        } else if flags.contains(.command) {
+            selection.cmdClick(photoID, photos: photos)
+        } else {
+            selection.click(photoID, photos: photos)
+        }
+    }
 }
 
 struct ThumbnailCell: View {
     let photo: Photo
+    let isActive: Bool
     let isSelected: Bool
     let isDimmed: Bool
 
-    /// A thumbnail is dimmed only when the selected photo is part of a burst
-    /// and this thumbnail belongs to a different burst (or to no burst at all).
-    /// Singletons (selected photo has no burst) leave every thumbnail at full opacity.
+    static let accessibilityIDPrefix = "Thumbnail_"
+
+    static func accessibilityID(for photo: Photo) -> String {
+        accessibilityIDPrefix + photo.filename
+    }
+
     static func shouldDim(photoBurstGroupID: UUID?, selectedBurstGroupID: UUID?) -> Bool {
         guard let selected = selectedBurstGroupID else { return false }
         return photoBurstGroupID != selected
     }
 
     private var borderColor: Color {
-        if isSelected { return .accentColor }
+        if isActive { return .accentColor }
+        if isSelected { return .accentColor.opacity(0.5) }
         if photo.isPick { return .orange.opacity(0.6) }
         return .clear
+    }
+
+    private var a11ySelectionValue: String {
+        if isActive { return "active" }
+        if isSelected { return "selected" }
+        return "none"
     }
 
     var body: some View {
@@ -109,7 +137,8 @@ struct ThumbnailCell: View {
         )
         .opacity(isDimmed ? 0.4 : 1.0)
         .animation(.easeInOut(duration: 0.15), value: isDimmed)
-        .accessibilityIdentifier("Thumbnail_\(photo.filename)")
+        .accessibilityIdentifier(Self.accessibilityID(for: photo))
+        .accessibilityValue(a11ySelectionValue)
     }
 }
 

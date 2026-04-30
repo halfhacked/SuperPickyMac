@@ -11,6 +11,15 @@ enum A11y {
     static let photoCounter = "PhotoCounter"
     static let speciesEditPanelSearchField = "SpeciesEditPanel_SearchField"
     static let speciesEditPanelEmptyAssigned = "SpeciesEditPanel_EmptyAssigned"
+    static let selectionCounter = "SelectionCounter"
+
+    /// Accessibility values used by ThumbnailCell — match
+    /// `ThumbnailCell.a11ySelectionValue`.
+    enum ThumbnailSelection: String {
+        case active
+        case selected
+        case none
+    }
 
     static func thumbnail(_ filename: String) -> String {
         "Thumbnail_\(filename)"

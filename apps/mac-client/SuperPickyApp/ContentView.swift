@@ -10,6 +10,7 @@ struct ContentView: View {
         case aesthetics = "Aesthetics"
     }
 
+    let appState: AppState
     let photos: [Photo]
     @Binding var selectedPhotoID: UUID?
     let selectedPhoto: Photo?
@@ -22,7 +23,6 @@ struct ContentView: View {
     var onExportAllVisible: (([Photo]) -> Void)?
     var onDeletePhoto: ((UUID) -> Void)?
     var onCorrectSpecies: ((UUID, String) -> Void)?
-    var onAssignedSpeciesChanged: ((UUID, [SpeciesMatch]) -> Void)?
     var searchSpecies: ((String) -> [SpeciesMatch])?
     @Environment(CullingConfig.self) private var config
     @State private var minimumStars: Int = 0
@@ -79,16 +79,15 @@ struct ContentView: View {
                 PreviewView(photo: selectedPhoto, zoomState: zoomState,
                             brightnessAdjustment: brightnessAdj,
                             mouseInView: $mouseInPreview, viewSize: $previewSize,
+                            appState: appState,
                             onCorrectSpecies: onCorrectSpecies)
 
                 HStack(alignment: .top, spacing: 0) {
                     Spacer(minLength: 0)
                     if showExifPanel, let photo = selectedPhoto {
                         ExifPanelView(
+                            appState: appState,
                             photo: photo,
-                            onAssignedChanged: { species in
-                                onAssignedSpeciesChanged?(photo.id, species)
-                            },
                             searchSpecies: searchSpecies ?? { _ in [] }
                         )
                         .transition(.move(edge: .trailing))
@@ -180,6 +179,13 @@ struct ContentView: View {
                             .accessibilityIdentifier("BrightnessIndicator")
                     }
 
+                    if appState.selection.isMulti {
+                        Text(String(format: config.localized("%lld selected"), appState.selection.count))
+                            .font(.caption)
+                            .foregroundStyle(.tint)
+                            .accessibilityIdentifier("SelectionCounter")
+                    }
+
                     Text("\(filteredPhotos.count) of \(photos.count)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -192,7 +198,7 @@ struct ContentView: View {
 
                 ThumbnailStripView(
                     photos: filteredPhotos,
-                    selectedPhotoID: $selectedPhotoID
+                    selection: appState.selection
                 )
             }
             .frame(minHeight: 80, idealHeight: 100, maxHeight: 140)
@@ -291,36 +297,48 @@ struct ContentView: View {
     }
 
     private func handleKey(_ key: KeyboardMonitor.KeyEvent) -> Bool {
-        // Dismiss keyboard help on any key
-        if showKeyboardHelp {
-            showKeyboardHelp = false
+        if showKeyboardHelp { showKeyboardHelp = false; return true }
+
+        let selection = appState.selection
+        let filtered = filteredPhotos
+
+        // Arrow keys: shift extends, plain collapses-and-moves.
+        if key.isLeftArrow || key.isRightArrow {
+            let dir = key.isLeftArrow ? -1 : 1
+            if key.modifiers.contains(.shift) {
+                selection.shiftArrow(direction: dir, photos: filtered)
+            } else {
+                selection.arrow(direction: dir, photos: filtered)
+            }
             return true
         }
 
-        // Arrow keys navigate photos
-        if key.isLeftArrow { navigatePhoto(direction: -1); return true }
-        if key.isRightArrow { navigatePhoto(direction: 1); return true }
-
-        // Escape exits fullscreen
-        if key.isEscape && showFullscreen { showFullscreen = false; return true }
-
-        // Cmd+Z: undo
-        if key.modifiers.contains(.command), key.characters == "z" {
-            if canUndo { onUndo?() }
-            return canUndo  // only consume the key event if we actually undid something
+        // Esc: exit fullscreen, else collapse selection.
+        if key.isEscape {
+            if showFullscreen { showFullscreen = false; return true }
+            if selection.isMulti { selection.collapseToActive(); return true }
+            return false
         }
 
-        // Cmd+E: export picks. The matching Button lives inside the toolbar
-        // Menu (for mouse-driven access via the menu item), but SwiftUI does
-        // not reliably register `.keyboardShortcut` on a Menu-nested Button
-        // when the menu is closed — so the canonical app-wide NSEvent
-        // monitor is the reliable path.
+        // Cmd+A: select all in filteredPhotos.
+        if key.modifiers.contains(.command), key.characters == "a" {
+            selection.selectAll(photos: filtered)
+            return true
+        }
+
+        // Cmd+Z: undo (single-photo or batch transparently).
+        if key.modifiers.contains(.command), key.characters == "z" {
+            if canUndo { onUndo?() }
+            return canUndo
+        }
+
+        // Cmd+E: export picks.
         if key.modifiers.contains(.command), key.characters == "e" {
             onExportPicks?()
             return onExportPicks != nil
         }
 
-        // Cmd+0-5: set minimum star filter
+        // Cmd+0-5: minimum-stars filter.
         if key.modifiers.contains(.command),
            let char = key.characters.first,
            let digit = char.wholeNumberValue,
@@ -328,6 +346,9 @@ struct ContentView: View {
             minimumStars = digit
             return true
         }
+
+        let ids = selection.selectedIDs
+        let isMulti = selection.isMulti
 
         switch key.characters {
         case "i":
@@ -337,23 +358,23 @@ struct ContentView: View {
             showFullscreen.toggle()
             return true
         case "c":
-            if filteredPhotos.count >= 2 { showCompare.toggle() }
+            if filtered.count >= 2 { showCompare.toggle() }
             return true
         case "p":
-            guard let id = selectedPhoto?.id else { return false }
-            onTogglePick?(id)
-            if config.autoAdvance { navigatePhoto(direction: 1) }
+            guard !ids.isEmpty else { return false }
+            appState.setPick(ids: ids)
+            if !isMulti, config.autoAdvance { navigatePhoto(direction: 1) }
             return true
         case "x":
-            guard let id = selectedPhoto?.id else { return false }
-            navigatePhoto(direction: 1, fallbackToPrevious: true)
-            onRejectPhoto?(id)
+            guard !ids.isEmpty else { return false }
+            if !isMulti { navigatePhoto(direction: 1, fallbackToPrevious: true) }
+            appState.reject(ids: ids)
             return true
         case "0", "1", "2", "3", "4", "5":
-            if let digit = key.characters.first?.wholeNumberValue {
-                rateSelectedPhoto(digit)
-                if config.autoAdvance { navigatePhoto(direction: 1) }
-            }
+            guard !ids.isEmpty,
+                  let digit = key.characters.first?.wholeNumberValue else { return true }
+            appState.setRating(ids: ids, rating: digit)
+            if !isMulti, config.autoAdvance { navigatePhoto(direction: 1) }
             return true
         case "z":
             guard let photo = selectedPhoto else { return false }

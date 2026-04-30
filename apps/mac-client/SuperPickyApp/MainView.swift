@@ -100,17 +100,18 @@ struct MainView: View {
                 EmptyStateView { pickAndProcess() }
             } else {
                 ContentView(
+                    appState: appState,
                     photos: appState.photos,
                     selectedPhotoID: $appState.selectedPhotoID,
                     selectedPhoto: appState.selectedPhoto,
                     onRatePhoto: { id, rating in
-                        appState.ratePhoto(id: id, rating: rating)
+                        appState.setRating(ids: [id], rating: rating)
                     },
                     onTogglePick: { id in
-                        appState.togglePick(id: id)
+                        appState.setPick(ids: [id])
                     },
                     onRejectPhoto: { id in
-                        appState.rejectPhoto(id: id)
+                        appState.reject(ids: [id])
                     },
                     onUndo: {
                         appState.undoLastAction()
@@ -126,10 +127,10 @@ struct MainView: View {
                         try? appState.deletePhoto(id: id)
                     },
                     onCorrectSpecies: { id, name in
-                        appState.correctSpecies(id: id, commonName: name)
-                    },
-                    onAssignedSpeciesChanged: { id, species in
-                        appState.setAssignedSpecies(id: id, species: species)
+                        let ids: Set<UUID> = appState.selection.isMulti
+                            ? appState.selection.selectedIDs
+                            : [id]
+                        appState.correctSpecies(ids: ids, commonName: name)
                     },
                     searchSpecies: { query in
                         speciesDB?.search(query: query).map { entry in

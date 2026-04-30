@@ -6,6 +6,7 @@ struct PreviewView: View {
     var brightnessAdjustment: Double = 0
     @Binding var mouseInView: CGPoint
     @Binding var viewSize: CGSize
+    var appState: AppState? = nil
     var onCorrectSpecies: ((UUID, String) -> Void)?
     @Environment(CullingConfig.self) private var config
     @State private var previousPhotoID: UUID?
@@ -22,7 +23,7 @@ struct PreviewView: View {
                         Color.clear.onAppear { viewSize = geo.size }
                             .onChange(of: geo.size) { _, s in viewSize = s }
                     })
-                InfoBarView(photo: photo, onCorrectSpecies: { name in
+                InfoBarView(photo: photo, appState: appState, onCorrectSpecies: { name in
                     onCorrectSpecies?(photo.id, name)
                 })
             } else {
@@ -142,10 +143,17 @@ struct AsyncPreviewImage: View {
 struct InfoBarView: View {
     let photo: Photo
     @Environment(CullingConfig.self) private var config
+    /// Optional appState — when set, inline rename applies to the current
+    /// selection (1 or N photos) and the species label gets a "N selected"
+    /// suffix when multi.
+    var appState: AppState? = nil
     var onCorrectSpecies: ((String) -> Void)?
 
     @State private var isEditingSpecies = false
     @State private var editingSpeciesName = ""
+
+    private var isMulti: Bool { (appState?.selection.isMulti) ?? false }
+    private var selectionCount: Int { appState?.selection.count ?? 1 }
 
     var body: some View {
         HStack(spacing: 16) {
@@ -216,6 +224,11 @@ struct InfoBarView: View {
                             .background(.quaternary)
                             .clipShape(Capsule())
                             .accessibilityIdentifier("InfoBarExtraSpeciesCount")
+                    }
+                    if isMulti {
+                        Text(String(format: config.localized("(%lld selected)"), selectionCount))
+                            .font(.caption2)
+                            .foregroundStyle(.tint)
                     }
                 } icon: {
                     Image(systemName: "bird.fill")
