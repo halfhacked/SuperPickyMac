@@ -194,3 +194,12 @@
 "Region" = "区域";
 "Global" = "全球";
 "Manual" = "手动";
+"Extend selection" = "扩展选择";
+"Select all" = "全选";
+"Collapse selection" = "折叠选择";
+"Pick / unpick selection" = "选择/取消选择";
+"Rate selection" = "评分选择";
+"Reject selection" = "拒绝选择";
+"Editing %lld photos" = "正在编辑 %lld 张照片";
+"%lld selected" = "已选 %lld 张";
+"(%lld selected)" = "(已选 %lld 张)";
