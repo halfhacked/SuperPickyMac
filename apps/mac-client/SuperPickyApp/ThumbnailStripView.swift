@@ -24,15 +24,15 @@ struct ThumbnailStripView: View {
                             )
                         )
                         .id(photo.id)
+                        .onTapGesture {
+                            handleClick(photoID: photo.id)
+                        }
                     }
                 }
                 .padding(.horizontal, 4)
                 .padding(.vertical, 6)
             }
             .background(ScrollWheelRedirector())
-            .background(MouseClickRedirector { pointInWindow, modifiers in
-                handleClick(pointInWindow: pointInWindow, modifiers: modifiers)
-            })
             .background(.bar)
             .onChange(of: selection.activeID) { _, newValue in
                 if let id = newValue {
@@ -44,24 +44,19 @@ struct ThumbnailStripView: View {
         }
     }
 
-    /// Hit-test the click point against thumbnail accessibility-identified
-    /// NSViews. Returns true if a thumbnail was hit (and a selection
-    /// mutation happened); the caller consumes the event.
-    private func handleClick(pointInWindow: NSPoint, modifiers: NSEvent.ModifierFlags) -> Bool {
-        guard let window = NSApp.keyWindow else { return false }
-        guard let view = window.contentView?.hitTest(pointInWindow) else { return false }
-        guard let id = ThumbnailCell.findThumbnailIdentifier(from: view) else { return false }
-        guard let photo = photos.first(where: { ThumbnailCell.accessibilityID(for: $0) == id }) else {
-            return false
-        }
-        if modifiers.contains(.shift) {
-            selection.shiftClick(photo.id, photos: photos)
-        } else if modifiers.contains(.command) {
-            selection.cmdClick(photo.id, photos: photos)
+    /// Dispatch the tap to the right selection method based on modifier
+    /// keys held at the moment of the click. `NSEvent.modifierFlags` is the
+    /// AppKit-global current state — sampling it inside `.onTapGesture`
+    /// gives us shift/cmd-aware clicks without an NSEvent monitor.
+    private func handleClick(photoID: UUID) {
+        let flags = NSEvent.modifierFlags
+        if flags.contains(.shift) {
+            selection.shiftClick(photoID, photos: photos)
+        } else if flags.contains(.command) {
+            selection.cmdClick(photoID, photos: photos)
         } else {
-            selection.click(photo.id, photos: photos)
+            selection.click(photoID, photos: photos)
         }
-        return true
     }
 }
 
@@ -80,20 +75,6 @@ struct ThumbnailCell: View {
     static func shouldDim(photoBurstGroupID: UUID?, selectedBurstGroupID: UUID?) -> Bool {
         guard let selected = selectedBurstGroupID else { return false }
         return photoBurstGroupID != selected
-    }
-
-    /// Walk an NSView ancestry chain looking for a SwiftUI-exposed
-    /// accessibility identifier prefixed with `accessibilityIDPrefix`.
-    static func findThumbnailIdentifier(from view: NSView) -> String? {
-        var current: NSView? = view
-        while let v = current {
-            let id = v.accessibilityIdentifier()
-            if id.hasPrefix(accessibilityIDPrefix) {
-                return id
-            }
-            current = v.superview
-        }
-        return nil
     }
 
     private var borderColor: Color {

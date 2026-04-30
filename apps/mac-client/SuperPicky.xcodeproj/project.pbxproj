@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		552702ED1C0AC98BD9B9AA04 /* BatchSelectionUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D660D2C3EE22E79E79831D3 /* BatchSelectionUITests.swift */; };
-		0CD8EE6AD4DA16841CE43B4F /* MouseClickRedirector.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAF4254B91F8A1E4E1A16B5A /* MouseClickRedirector.swift */; };
 		4FC90F0101C16E3E13263CA1 /* AppStateBatchMutationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADAEDF1D9D0ECD64A880CF4C /* AppStateBatchMutationTests.swift */; };
 		8CD9C7C1B0A8CCFEAB2154D4 /* BatchSpeciesAggregatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 202681079E6005B71EA8FE5B /* BatchSpeciesAggregatorTests.swift */; };
 		4E732FFBF1901F6E9AD718F9 /* BatchSpeciesAggregator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36E0ECE9DFB0B40608BF1543 /* BatchSpeciesAggregator.swift */; };
@@ -363,7 +362,6 @@
 
 /* Begin PBXFileReference section */
 		8D660D2C3EE22E79E79831D3 /* BatchSelectionUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchSelectionUITests.swift; sourceTree = "<group>"; };
-		CAF4254B91F8A1E4E1A16B5A /* MouseClickRedirector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseClickRedirector.swift; sourceTree = "<group>"; };
 		ADAEDF1D9D0ECD64A880CF4C /* AppStateBatchMutationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStateBatchMutationTests.swift; sourceTree = "<group>"; };
 		202681079E6005B71EA8FE5B /* BatchSpeciesAggregatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchSpeciesAggregatorTests.swift; sourceTree = "<group>"; };
 		36E0ECE9DFB0B40608BF1543 /* BatchSpeciesAggregator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchSpeciesAggregator.swift; sourceTree = "<group>"; };
@@ -813,7 +811,6 @@
 				CCF190E7339337C11AEC235D /* TestSupport */,
 							0E583D57D413B25E288BDA31 /* PhotoSelection.swift */,
 				36E0ECE9DFB0B40608BF1543 /* BatchSpeciesAggregator.swift */,
-				CAF4254B91F8A1E4E1A16B5A /* MouseClickRedirector.swift */,
 );
 			path = SuperPickyApp;
 			sourceTree = "<group>";
@@ -1583,7 +1580,6 @@
 				41CE16FF85A6D10B7356C792 /* ZoomableImageView.swift in Sources */,
 				FDCE822BEAC01E690DFB6DFD /* PhotoSelection.swift in Sources */,
 				4E732FFBF1901F6E9AD718F9 /* BatchSpeciesAggregator.swift in Sources */,
-				0CD8EE6AD4DA16841CE43B4F /* MouseClickRedirector.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
