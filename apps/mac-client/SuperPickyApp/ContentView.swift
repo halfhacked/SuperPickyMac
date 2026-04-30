@@ -80,6 +80,7 @@ struct ContentView: View {
                 PreviewView(photo: selectedPhoto, zoomState: zoomState,
                             brightnessAdjustment: brightnessAdj,
                             mouseInView: $mouseInPreview, viewSize: $previewSize,
+                            appState: appState,
                             onCorrectSpecies: onCorrectSpecies)
 
                 HStack(alignment: .top, spacing: 0) {

@@ -127,7 +127,10 @@ struct MainView: View {
                         try? appState.deletePhoto(id: id)
                     },
                     onCorrectSpecies: { id, name in
-                        appState.correctSpecies(ids: [id], commonName: name)
+                        let ids: Set<UUID> = appState.selection.isMulti
+                            ? appState.selection.selectedIDs
+                            : [id]
+                        appState.correctSpecies(ids: ids, commonName: name)
                     },
                     onAssignedSpeciesChanged: { id, species in
                         let existing = appState.photos.first(where: { $0.id == id })?.assignedSpecies ?? []
