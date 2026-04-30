@@ -87,8 +87,8 @@ struct ThumbnailCell: View {
     static func findThumbnailIdentifier(from view: NSView) -> String? {
         var current: NSView? = view
         while let v = current {
-            if let id = v.accessibilityIdentifier(),
-               id.hasPrefix(accessibilityIDPrefix) {
+            let id = v.accessibilityIdentifier()
+            if id.hasPrefix(accessibilityIDPrefix) {
                 return id
             }
             current = v.superview
