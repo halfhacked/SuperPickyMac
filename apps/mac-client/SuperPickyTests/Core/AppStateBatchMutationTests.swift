@@ -138,4 +138,152 @@ import Foundation
         #expect(app.photos.count == 2)
         #expect(!app.photos.contains(where: { $0.id == ids[0] }))
     }
+
+    // MARK: - correctSpecies(ids:commonName:)
+
+    @Test func correctSpeciesAppliesPrimaryRenameAcrossSelection() throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let ids = try seedPhotos(3, into: folder)
+        let app = AppState()
+        app.loadPhotos(for: folder)
+
+        for id in ids {
+            app.setPrimarySpecies(ids: [id], species: match("eagle"))
+        }
+        app.correctSpecies(ids: Set(ids), commonName: "Bald Eagle")
+
+        let db = try ReportDatabase(folderPath: folder)
+        for id in ids {
+            let p = try db.fetchPhoto(id: id)!
+            #expect(p.assignedSpecies.first?.commonName == "Bald Eagle")
+        }
+    }
+
+    // MARK: - setPrimarySpecies(ids:species:)
+
+    @Test func setPrimarySpeciesAddsWhenMissingAndPromotesWhenPresent() throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let ids = try seedPhotos(3, into: folder)
+        let app = AppState()
+        app.loadPhotos(for: folder)
+
+        app.addSpecies(ids: [ids[1]], species: match("hawk"))
+        app.addSpecies(ids: [ids[1]], species: match("eagle"))
+
+        app.setPrimarySpecies(ids: Set(ids), species: match("eagle"))
+
+        let db = try ReportDatabase(folderPath: folder)
+        let p0 = try db.fetchPhoto(id: ids[0])!
+        let p1 = try db.fetchPhoto(id: ids[1])!
+        let p2 = try db.fetchPhoto(id: ids[2])!
+        #expect(p0.assignedSpecies.first?.speciesID == "eagle")
+        #expect(p1.assignedSpecies.first?.speciesID == "eagle")
+        #expect(p2.assignedSpecies.first?.speciesID == "eagle")
+    }
+
+    // MARK: - addSpecies(ids:species:)
+
+    @Test func addSpeciesIsIdempotentForExistingSpecies() throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let ids = try seedPhotos(2, into: folder)
+        let app = AppState()
+        app.loadPhotos(for: folder)
+
+        app.addSpecies(ids: Set(ids), species: match("eagle"))
+        app.addSpecies(ids: Set(ids), species: match("eagle"))
+
+        let db = try ReportDatabase(folderPath: folder)
+        for id in ids {
+            let p = try db.fetchPhoto(id: id)!
+            #expect(p.assignedSpecies.count == 1)
+            #expect(p.assignedSpecies.first?.speciesID == "eagle")
+        }
+    }
+
+    // MARK: - removeSpecies(ids:species:)
+
+    @Test func removeSpeciesNoOpsWhenAbsent() throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let ids = try seedPhotos(2, into: folder)
+        let app = AppState()
+        app.loadPhotos(for: folder)
+
+        app.addSpecies(ids: [ids[0]], species: match("eagle"))
+        app.removeSpecies(ids: Set(ids), species: match("hawk"))
+
+        let db = try ReportDatabase(folderPath: folder)
+        let p0 = try db.fetchPhoto(id: ids[0])!
+        let p1 = try db.fetchPhoto(id: ids[1])!
+        #expect(p0.assignedSpecies.map(\.speciesID) == ["eagle"])
+        #expect(p1.assignedSpecies.isEmpty)
+    }
+
+    @Test func removeSpeciesDropsFromEveryPhotoThatHasIt() throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let ids = try seedPhotos(3, into: folder)
+        let app = AppState()
+        app.loadPhotos(for: folder)
+        app.addSpecies(ids: Set(ids), species: match("eagle"))
+
+        app.removeSpecies(ids: Set(ids), species: match("eagle"))
+
+        let db = try ReportDatabase(folderPath: folder)
+        for id in ids {
+            #expect(try db.fetchPhoto(id: id)!.assignedSpecies.isEmpty)
+        }
+    }
+
+    // MARK: - Burst fan-out
+
+    @Test func setPrimarySpeciesFansOutToBurstMembers() throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let db = try ReportDatabase(folderPath: folder)
+
+        let burstID = UUID()
+        var burstIDs: [UUID] = []
+        for i in 0..<3 {
+            var p = Photo(filename: "burst_\(i).CR3",
+                          filePath: folder.appendingPathComponent("burst_\(i).CR3").path,
+                          folderPath: folder.path)
+            p.burstGroupID = burstID
+            try db.save(&p)
+            burstIDs.append(p.id)
+        }
+
+        let app = AppState()
+        app.loadPhotos(for: folder)
+
+        app.setPrimarySpecies(ids: [burstIDs[0]], species: match("eagle"))
+
+        for id in burstIDs {
+            let p = try db.fetchPhoto(id: id)!
+            #expect(p.assignedSpecies.first?.speciesID == "eagle")
+        }
+    }
+
+    // MARK: - Undo restores species
+
+    @Test func undoRestoresAssignedSpeciesAfterBatchEdit() throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let ids = try seedPhotos(3, into: folder)
+        let app = AppState()
+        app.loadPhotos(for: folder)
+        app.addSpecies(ids: Set(ids), species: match("eagle"))
+
+        app.setPrimarySpecies(ids: Set(ids), species: match("hawk"))
+        app.undoLastAction()
+
+        let db = try ReportDatabase(folderPath: folder)
+        for id in ids {
+            let p = try db.fetchPhoto(id: id)!
+            #expect(p.assignedSpecies.map(\.speciesID) == ["eagle"])
+        }
+    }
 }

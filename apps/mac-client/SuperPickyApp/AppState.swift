@@ -328,45 +328,6 @@ final class AppState {
         return allPhotos.filter { $0.burstGroupID == groupID }.map(\.id)
     }
 
-    /// Mutate a photo, persist to DB + XMP, and update in-memory arrays.
-    /// Saves undo state before mutation. The `updateView` closure handles
-    /// how the filtered `photos` array should change (update in-place vs remove).
-    private func mutatePhoto(
-        id: UUID, wasHidden: Bool = false,
-        _ mutate: (inout Photo) -> Void,
-        updateView: ((_ photo: Photo) -> Void)? = nil
-    ) {
-        do {
-            let database = try db()
-            guard var photo = try database.fetchPhoto(id: id) else { return }
-            let entry = UndoAction.Entry(
-                photoID: id,
-                previousRating: photo.starRating,
-                previousIsPick: photo.isPick,
-                previousIsManualRating: photo.isManualRating,
-                previousAssignedSpecies: photo.assignedSpecies,
-                wasHidden: wasHidden
-            )
-            undoStack.append(UndoAction(entries: [entry]))
-            if undoStack.count > Self.maxUndoDepth {
-                undoStack.removeFirst()
-            }
-            mutate(&photo)
-            try database.save(&photo)      // DB write FIRST
-            _ = try? XMPWriter.write(photo: photo)
-            // Only update in-memory state after successful DB write:
-            if let idx = allPhotoIndex[id] {
-                allPhotos[idx] = photo
-            }
-            if let update = updateView {
-                update(photo)
-            } else if let idx = filteredPhotoIndex[id] {
-                photos[idx] = photo
-            }
-        } catch {
-            logger.error("mutatePhoto failed: \(error)")
-        }
-    }
 
     // MARK: - Test-only accessors
 
@@ -480,32 +441,17 @@ final class AppState {
         logger.info("Deleted photo: \(photo.filename)")
     }
 
-    /// Inline-rename hook for the info bar: rewrite the primary (first)
-    /// entry's common name without touching its stable `speciesID`. This
-    /// preserves sidebar bucketing — a cosmetic rename doesn't jump the
-    /// photo between buckets. Persists to DB and XMP sidecar.
-    func correctSpecies(id: UUID, commonName: String) {
+    // MARK: - Set-based mutation: species
+
+    /// Inline rename of primary across `ids`. Each id's burst members are
+    /// included (per-photo species edits fan out to the whole burst).
+    /// Empty `commonName` is preserved as today.
+    func correctSpecies(ids: Set<UUID>, commonName: String) {
         let trimmed = commonName.trimmingCharacters(in: .whitespaces)
-        for memberID in burstMemberIDs(for: id) {
-            mutatePhoto(id: memberID) { photo in
-                var list = photo.assignedSpecies
-                guard var first = list.first else {
-                    // No existing species — treat the rename as assigning a
-                    // new custom entry with `trimmed` as both scientific and
-                    // common name, so the photo leaves the Unidentified bucket.
-                    if !trimmed.isEmpty {
-                        photo.assignedSpecies = [SpeciesMatch(
-                            scientificName: trimmed,
-                            commonName: trimmed,
-                            confidence: 0,
-                            cnName: nil,
-                            pinyin: nil,
-                            thresholdUsed: "manual",
-                            ebirdCode: nil
-                        )]
-                    }
-                    return
-                }
+        let targets = expandBurstMembers(of: ids)
+        applyBatch(ids: targets) { photo in
+            var list = photo.assignedSpecies
+            if var first = list.first {
                 first = SpeciesMatch(
                     scientificName: first.scientificName,
                     commonName: trimmed.isEmpty ? nil : trimmed,
@@ -518,22 +464,81 @@ final class AppState {
                 )
                 list[0] = first
                 photo.assignedSpecies = list
+            } else if !trimmed.isEmpty {
+                photo.assignedSpecies = [SpeciesMatch(
+                    scientificName: trimmed,
+                    commonName: trimmed,
+                    confidence: 0,
+                    cnName: nil, pinyin: nil,
+                    thresholdUsed: "manual", ebirdCode: nil
+                )]
             }
+        } afterAll: { [weak self] _ in
+            self?.buildSpeciesHierarchy()
         }
-        buildSpeciesHierarchy()
     }
 
-    /// Replace the full assigned-species list for a photo. Used by the
-    /// species edit panel. `species.first` becomes the primary (which the
-    /// accessor mirrors into the scalar columns), every entry appears in
-    /// the sidebar hierarchy, and the XMP sidecar picks up all of them.
-    func setAssignedSpecies(id: UUID, species: [SpeciesMatch]) {
-        for memberID in burstMemberIDs(for: id) {
-            mutatePhoto(id: memberID) { photo in
-                photo.assignedSpecies = species
+    /// Set `species` as primary across `ids` (with burst fan-out). For each
+    /// target photo: if `species` isn't already assigned, ADD it then
+    /// promote to slot 0; else move existing entry to slot 0.
+    func setPrimarySpecies(ids: Set<UUID>, species: SpeciesMatch) {
+        let targets = expandBurstMembers(of: ids)
+        applyBatch(ids: targets) { photo in
+            var list = photo.assignedSpecies
+            if let idx = list.firstIndex(where: { $0.speciesID == species.speciesID }) {
+                list = SpeciesAssignmentEditor.makePrimary(at: idx, in: list)
+            } else {
+                list.insert(species, at: 0)
+            }
+            photo.assignedSpecies = list
+        } afterAll: { [weak self] _ in
+            self?.buildSpeciesHierarchy()
+        }
+    }
+
+    /// Add `species` to every target photo (with burst fan-out) that doesn't
+    /// already have it. No-op for photos that already carry the species.
+    func addSpecies(ids: Set<UUID>, species: SpeciesMatch) {
+        let targets = expandBurstMembers(of: ids)
+        applyBatch(ids: targets) { photo in
+            if let updated = SpeciesAssignmentEditor.add(species, to: photo.assignedSpecies) {
+                photo.assignedSpecies = updated
+            }
+        } afterAll: { [weak self] _ in
+            self?.buildSpeciesHierarchy()
+        }
+    }
+
+    /// Remove `species` from every target photo (with burst fan-out) that
+    /// has it.
+    func removeSpecies(ids: Set<UUID>, species: SpeciesMatch) {
+        let targets = expandBurstMembers(of: ids)
+        applyBatch(ids: targets) { photo in
+            if let idx = photo.assignedSpecies.firstIndex(where: { $0.speciesID == species.speciesID }) {
+                photo.assignedSpecies = SpeciesAssignmentEditor.remove(at: idx, from: photo.assignedSpecies)
+            }
+        } afterAll: { [weak self] _ in
+            self?.buildSpeciesHierarchy()
+        }
+    }
+
+    /// Expand `ids` to include every burst member of every selected photo.
+    /// Order: `ids` first (de-duped), then burst-member-only IDs in
+    /// `allPhotos` order. The `applyBatch` body is order-independent for
+    /// these methods, so this just keeps undo-entry order deterministic.
+    private func expandBurstMembers(of ids: Set<UUID>) -> [UUID] {
+        var result: [UUID] = []
+        var seen: Set<UUID> = []
+        func add(_ id: UUID) {
+            if seen.insert(id).inserted { result.append(id) }
+        }
+        for id in ids { add(id) }
+        for id in ids {
+            for member in burstMemberIDs(for: id) where member != id {
+                add(member)
             }
         }
-        buildSpeciesHierarchy()
+        return result
     }
 
     func undoLastAction() {

@@ -126,10 +126,24 @@ struct MainView: View {
                         try? appState.deletePhoto(id: id)
                     },
                     onCorrectSpecies: { id, name in
-                        appState.correctSpecies(id: id, commonName: name)
+                        appState.correctSpecies(ids: [id], commonName: name)
                     },
                     onAssignedSpeciesChanged: { id, species in
-                        appState.setAssignedSpecies(id: id, species: species)
+                        let existing = appState.photos.first(where: { $0.id == id })?.assignedSpecies ?? []
+                        if let primary = species.first {
+                            appState.setPrimarySpecies(ids: [id], species: primary)
+                            for sp in species.dropFirst() {
+                                appState.addSpecies(ids: [id], species: sp)
+                            }
+                            let newIDs = Set(species.map(\.speciesID))
+                            for sp in existing where !newIDs.contains(sp.speciesID) {
+                                appState.removeSpecies(ids: [id], species: sp)
+                            }
+                        } else {
+                            for sp in existing {
+                                appState.removeSpecies(ids: [id], species: sp)
+                            }
+                        }
                     },
                     searchSpecies: { query in
                         speciesDB?.search(query: query).map { entry in
