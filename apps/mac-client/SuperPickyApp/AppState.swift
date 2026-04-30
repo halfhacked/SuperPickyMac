@@ -368,26 +368,95 @@ final class AppState {
         }
     }
 
-    func ratePhoto(id: UUID, rating: Int) {
-        mutatePhoto(id: id) { photo in
-            photo.starRating = rating
-            photo.isManualRating = true
+    // MARK: - Test-only accessors
+
+    #if DEBUG
+    func allPhotosForTesting() -> [Photo] { allPhotos }
+    func undoStackSizeForTesting() -> Int { undoStack.count }
+    #endif
+
+    // MARK: - Set-based mutation: pick / rate / reject
+
+    /// Pick semantics across `ids`: if any photo in `ids` is unpicked, pick
+    /// all of them; else unpick all. Explicit-only — does NOT fan out to
+    /// burst members.
+    func setPick(ids: Set<UUID>) {
+        let targets = ids.compactMap { allPhotoIndex[$0].map { allPhotos[$0] } }
+        guard !targets.isEmpty else { return }
+        let anyUnpicked = targets.contains(where: { !$0.isPick })
+        let newPick = anyUnpicked
+        applyBatch(ids: targets.map(\.id)) { photo in
+            photo.isPick = newPick
+        } afterEach: { [weak self] photo in
+            guard let self else { return }
+            self.speciesEntries = SpeciesHierarchyBuilder.applyPickToggle(
+                entries: self.speciesEntries, photo: photo, newIsPick: photo.isPick
+            )
         }
     }
 
-    func togglePick(id: UUID) {
-        var newIsPick: Bool?
-        mutatePhoto(id: id) { photo in
-            photo.isPick.toggle()
-            newIsPick = photo.isPick
+    func setRating(ids: Set<UUID>, rating: Int, manual: Bool = true) {
+        applyBatch(ids: Array(ids)) { photo in
+            photo.starRating = rating
+            photo.isManualRating = manual
         }
-        guard let newIsPick,
-              let idx = allPhotoIndex[id] else { return }
-        speciesEntries = SpeciesHierarchyBuilder.applyPickToggle(
-            entries: speciesEntries,
-            photo: allPhotos[idx],
-            newIsPick: newIsPick
-        )
+    }
+
+    func reject(ids: Set<UUID>) {
+        applyBatch(ids: Array(ids), wasHidden: true) { photo in
+            photo.starRating = 0
+            photo.isManualRating = true
+        } afterAll: { [weak self] _ in
+            guard let self else { return }
+            self.photos.removeAll { ids.contains($0.id) }
+            self.rebuildFilteredPhotoIndex()
+        }
+    }
+
+    // MARK: - Batch primitive
+
+    /// Apply `mutate` to every id in `ids` against the DB and XMP, snapshot
+    /// previous state into ONE `UndoAction`, update in-memory arrays, and
+    /// optionally invoke per-photo and end-of-batch hooks. Photos missing
+    /// from the DB are skipped.
+    private func applyBatch(
+        ids: [UUID],
+        wasHidden: Bool = false,
+        _ mutate: (inout Photo) -> Void,
+        afterEach: ((Photo) -> Void)? = nil,
+        afterAll: ((_ mutated: [Photo]) -> Void)? = nil
+    ) {
+        guard !ids.isEmpty else { return }
+        do {
+            let database = try db()
+            var entries: [UndoAction.Entry] = []
+            var mutated: [Photo] = []
+            for id in ids {
+                guard var photo = try database.fetchPhoto(id: id) else { continue }
+                entries.append(UndoAction.Entry(
+                    photoID: id,
+                    previousRating: photo.starRating,
+                    previousIsPick: photo.isPick,
+                    previousIsManualRating: photo.isManualRating,
+                    previousAssignedSpecies: photo.assignedSpecies,
+                    wasHidden: wasHidden
+                ))
+                mutate(&photo)
+                try database.save(&photo)
+                _ = try? XMPWriter.write(photo: photo)
+                if let idx = allPhotoIndex[id] { allPhotos[idx] = photo }
+                if let fIdx = filteredPhotoIndex[id] { photos[fIdx] = photo }
+                mutated.append(photo)
+                afterEach?(photo)
+            }
+            if !entries.isEmpty {
+                undoStack.append(UndoAction(entries: entries))
+                if undoStack.count > Self.maxUndoDepth { undoStack.removeFirst() }
+            }
+            afterAll?(mutated)
+        } catch {
+            logger.error("applyBatch failed: \(error)")
+        }
     }
 
     func deletePhoto(id: UUID) throws {
@@ -465,16 +534,6 @@ final class AppState {
             }
         }
         buildSpeciesHierarchy()
-    }
-
-    func rejectPhoto(id: UUID) {
-        mutatePhoto(id: id, wasHidden: true, { photo in
-            photo.starRating = 0
-            photo.isManualRating = true
-        }, updateView: { [self] _ in
-            self.photos.removeAll { $0.id == id }
-            self.rebuildFilteredPhotoIndex()
-        })
     }
 
     func undoLastAction() {

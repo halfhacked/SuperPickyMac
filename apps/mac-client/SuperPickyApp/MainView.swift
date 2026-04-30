@@ -104,13 +104,13 @@ struct MainView: View {
                     selectedPhotoID: $appState.selectedPhotoID,
                     selectedPhoto: appState.selectedPhoto,
                     onRatePhoto: { id, rating in
-                        appState.ratePhoto(id: id, rating: rating)
+                        appState.setRating(ids: [id], rating: rating)
                     },
                     onTogglePick: { id in
-                        appState.togglePick(id: id)
+                        appState.setPick(ids: [id])
                     },
                     onRejectPhoto: { id in
-                        appState.rejectPhoto(id: id)
+                        appState.reject(ids: [id])
                     },
                     onUndo: {
                         appState.undoLastAction()
