@@ -96,11 +96,15 @@ final class AppState {
     var picksCount: Int { allPhotos.lazy.filter(\.isPick).count }
 
     struct UndoAction {
-        let photoID: UUID
-        let previousRating: Int
-        let previousIsPick: Bool
-        let previousIsManualRating: Bool
-        let wasHidden: Bool
+        struct Entry {
+            let photoID: UUID
+            let previousRating: Int
+            let previousIsPick: Bool
+            let previousIsManualRating: Bool
+            let previousAssignedSpecies: [SpeciesMatch]
+            let wasHidden: Bool
+        }
+        let entries: [Entry]
     }
 
     // All photos from the current folder (unfiltered)
@@ -335,11 +339,15 @@ final class AppState {
         do {
             let database = try db()
             guard var photo = try database.fetchPhoto(id: id) else { return }
-            undoStack.append(UndoAction(
-                photoID: id, previousRating: photo.starRating,
-                previousIsPick: photo.isPick, previousIsManualRating: photo.isManualRating,
+            let entry = UndoAction.Entry(
+                photoID: id,
+                previousRating: photo.starRating,
+                previousIsPick: photo.isPick,
+                previousIsManualRating: photo.isManualRating,
+                previousAssignedSpecies: photo.assignedSpecies,
                 wasHidden: wasHidden
-            ))
+            )
+            undoStack.append(UndoAction(entries: [entry]))
             if undoStack.count > Self.maxUndoDepth {
                 undoStack.removeFirst()
             }
@@ -398,7 +406,7 @@ final class AppState {
         photos.removeAll { $0.id == id }
         rebuildAllPhotoIndex()
         rebuildFilteredPhotoIndex()
-        undoStack.removeAll { $0.photoID == id }
+        undoStack.removeAll { $0.entries.contains(where: { $0.photoID == id }) }
 
         logger.info("Deleted photo: \(photo.filename)")
     }
@@ -473,33 +481,47 @@ final class AppState {
         guard let action = undoStack.popLast() else { return }
         do {
             let database = try db()
-            guard var photo = try database.fetchPhoto(id: action.photoID) else { return }
-            let pickChanged = photo.isPick != action.previousIsPick
-            photo.starRating = action.previousRating
-            photo.isPick = action.previousIsPick
-            photo.isManualRating = action.previousIsManualRating
-            try database.save(&photo)
-            _ = try? XMPWriter.write(photo: photo)
+            var lastID: UUID?
+            var anySpeciesChanged = false
+            for entry in action.entries {
+                guard var photo = try database.fetchPhoto(id: entry.photoID) else { continue }
+                let pickChanged = photo.isPick != entry.previousIsPick
+                let speciesChanged = photo.assignedSpecies.map(\.speciesID) != entry.previousAssignedSpecies.map(\.speciesID)
+                photo.starRating = entry.previousRating
+                photo.isPick = entry.previousIsPick
+                photo.isManualRating = entry.previousIsManualRating
+                photo.assignedSpecies = entry.previousAssignedSpecies
+                try database.save(&photo)
+                _ = try? XMPWriter.write(photo: photo)
 
-            if let idx = allPhotoIndex[action.photoID] {
-                allPhotos[idx] = photo
-            }
-            if pickChanged {
-                speciesEntries = SpeciesHierarchyBuilder.applyPickToggle(
-                    entries: speciesEntries,
-                    photo: photo,
-                    newIsPick: photo.isPick
-                )
-            }
+                if let idx = allPhotoIndex[entry.photoID] {
+                    allPhotos[idx] = photo
+                }
+                if pickChanged {
+                    speciesEntries = SpeciesHierarchyBuilder.applyPickToggle(
+                        entries: speciesEntries,
+                        photo: photo,
+                        newIsPick: photo.isPick
+                    )
+                }
+                if speciesChanged { anySpeciesChanged = true }
 
-            if action.wasHidden {
-                filteredPhotoIndex[photo.id] = photos.count
-                photos.append(photo)
-            } else if let idx = filteredPhotoIndex[action.photoID] {
-                photos[idx] = photo
+                if entry.wasHidden {
+                    if filteredPhotoIndex[photo.id] == nil {
+                        filteredPhotoIndex[photo.id] = photos.count
+                        photos.append(photo)
+                    }
+                } else if let idx = filteredPhotoIndex[entry.photoID] {
+                    photos[idx] = photo
+                }
+                lastID = photo.id
             }
-
-            selectedPhotoID = action.photoID
+            if anySpeciesChanged {
+                buildSpeciesHierarchy()
+            }
+            if let id = lastID {
+                selectedPhotoID = id
+            }
         } catch {
             logger.error("undoLastAction failed: \(error)")
         }
