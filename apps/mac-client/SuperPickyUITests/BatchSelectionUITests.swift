@@ -19,9 +19,17 @@ final class BatchSelectionUITests: SuperPickyUITestCase {
 
     // MARK: - Helpers
 
+    /// SwiftUI exposes the thumbnail cell to the a11y tree under multiple
+    /// nested elements that all carry the cell's `accessibilityIdentifier`,
+    /// so `app.images[id]` raises "multiple matching elements". Use the
+    /// query + firstMatch idiom (same as `SpeciesEditPanelUITests`).
+    private func thumbnail(_ filename: String) -> XCUIElement {
+        app.images.matching(identifier: A11y.thumbnail(filename)).firstMatch
+    }
+
     private func clickThumbnail(_ filename: String,
                                 modifiers: XCUIElement.KeyModifierFlags = []) {
-        let thumb = app.images[A11y.thumbnail(filename)]
+        let thumb = thumbnail(filename)
         XCTAssertTrue(thumb.waitForExistence(timeout: 5),
                       "Thumbnail \(filename) never appeared")
         if modifiers.isEmpty {
@@ -35,7 +43,7 @@ final class BatchSelectionUITests: SuperPickyUITestCase {
     }
 
     private func a11ySelection(of filename: String) -> String? {
-        app.images[A11y.thumbnail(filename)].value as? String
+        thumbnail(filename).value as? String
     }
 
     private func selectionCounterText() -> String? {
