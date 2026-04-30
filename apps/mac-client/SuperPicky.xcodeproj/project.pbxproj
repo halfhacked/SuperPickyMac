@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		552702ED1C0AC98BD9B9AA04 /* BatchSelectionUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D660D2C3EE22E79E79831D3 /* BatchSelectionUITests.swift */; };
 		0CD8EE6AD4DA16841CE43B4F /* MouseClickRedirector.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAF4254B91F8A1E4E1A16B5A /* MouseClickRedirector.swift */; };
 		4FC90F0101C16E3E13263CA1 /* AppStateBatchMutationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADAEDF1D9D0ECD64A880CF4C /* AppStateBatchMutationTests.swift */; };
 		8CD9C7C1B0A8CCFEAB2154D4 /* BatchSpeciesAggregatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 202681079E6005B71EA8FE5B /* BatchSpeciesAggregatorTests.swift */; };
@@ -361,6 +362,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		8D660D2C3EE22E79E79831D3 /* BatchSelectionUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchSelectionUITests.swift; sourceTree = "<group>"; };
 		CAF4254B91F8A1E4E1A16B5A /* MouseClickRedirector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseClickRedirector.swift; sourceTree = "<group>"; };
 		ADAEDF1D9D0ECD64A880CF4C /* AppStateBatchMutationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStateBatchMutationTests.swift; sourceTree = "<group>"; };
 		202681079E6005B71EA8FE5B /* BatchSpeciesAggregatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchSpeciesAggregatorTests.swift; sourceTree = "<group>"; };
@@ -856,7 +858,8 @@
 				C249ECD5A8E7D02960210EA5 /* ExifPanelTests.swift */,
 				A98F3BB70D3CF55D89A9E02D /* ProcessingFlowTests.swift */,
 				A2EF4053556C87B2DBBAF1C1 /* SpeciesKeywordTests.swift */,
-			);
+							8D660D2C3EE22E79E79831D3 /* BatchSelectionUITests.swift */,
+);
 			path = BDD;
 			sourceTree = "<group>";
 		};
@@ -1412,6 +1415,7 @@
 				8CD9C7C1B0A8CCFEAB2154D4 /* BatchSpeciesAggregatorTests.swift in Sources */,
 				4FC90F0101C16E3E13263CA1 /* AppStateBatchMutationTests.swift in Sources */,
 				0CD8EE6AD4DA16841CE43B4F /* MouseClickRedirector.swift in Sources */,
+				552702ED1C0AC98BD9B9AA04 /* BatchSelectionUITests.swift in Sources */,
 );
 			runOnlyForDeploymentPostprocessing = 0;
 		};
