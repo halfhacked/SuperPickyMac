@@ -10,6 +10,7 @@ struct ContentView: View {
         case aesthetics = "Aesthetics"
     }
 
+    let appState: AppState
     let photos: [Photo]
     @Binding var selectedPhotoID: UUID?
     let selectedPhoto: Photo?
@@ -180,6 +181,13 @@ struct ContentView: View {
                             .accessibilityIdentifier("BrightnessIndicator")
                     }
 
+                    if appState.selection.isMulti {
+                        Text(String(format: config.localized("%lld selected"), appState.selection.count))
+                            .font(.caption)
+                            .foregroundStyle(.tint)
+                            .accessibilityIdentifier("SelectionCounter")
+                    }
+
                     Text("\(filteredPhotos.count) of \(photos.count)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -192,7 +200,7 @@ struct ContentView: View {
 
                 ThumbnailStripView(
                     photos: filteredPhotos,
-                    selectedPhotoID: $selectedPhotoID
+                    selection: appState.selection
                 )
             }
             .frame(minHeight: 80, idealHeight: 100, maxHeight: 140)

@@ -100,6 +100,7 @@ struct MainView: View {
                 EmptyStateView { pickAndProcess() }
             } else {
                 ContentView(
+                    appState: appState,
                     photos: appState.photos,
                     selectedPhotoID: $appState.selectedPhotoID,
                     selectedPhoto: appState.selectedPhoto,
