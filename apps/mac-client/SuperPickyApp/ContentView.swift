@@ -86,10 +86,8 @@ struct ContentView: View {
                     Spacer(minLength: 0)
                     if showExifPanel, let photo = selectedPhoto {
                         ExifPanelView(
+                            appState: appState,
                             photo: photo,
-                            onAssignedChanged: { species in
-                                onAssignedSpeciesChanged?(photo.id, species)
-                            },
                             searchSpecies: searchSpecies ?? { _ in [] }
                         )
                         .transition(.move(edge: .trailing))
