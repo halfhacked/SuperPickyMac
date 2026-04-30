@@ -462,8 +462,7 @@ final class AppState {
     /// Empty `commonName` is preserved as today.
     func correctSpecies(ids: Set<UUID>, commonName: String) {
         let trimmed = commonName.trimmingCharacters(in: .whitespaces)
-        let targets = expandBurstMembers(of: ids)
-        applyBatch(ids: targets) { photo in
+        applySpeciesBatch(ids: ids) { photo in
             var list = photo.assignedSpecies
             if var first = list.first {
                 first = SpeciesMatch(
@@ -487,8 +486,6 @@ final class AppState {
                     thresholdUsed: "manual", ebirdCode: nil
                 )]
             }
-        } afterAll: { [weak self] _ in
-            self?.buildSpeciesHierarchy()
         }
     }
 
@@ -496,8 +493,7 @@ final class AppState {
     /// target photo: if `species` isn't already assigned, ADD it then
     /// promote to slot 0; else move existing entry to slot 0.
     func setPrimarySpecies(ids: Set<UUID>, species: SpeciesMatch) {
-        let targets = expandBurstMembers(of: ids)
-        applyBatch(ids: targets) { photo in
+        applySpeciesBatch(ids: ids) { photo in
             var list = photo.assignedSpecies
             if let idx = list.firstIndex(where: { $0.speciesID == species.speciesID }) {
                 list = SpeciesAssignmentEditor.makePrimary(at: idx, in: list)
@@ -505,52 +501,61 @@ final class AppState {
                 list.insert(species, at: 0)
             }
             photo.assignedSpecies = list
-        } afterAll: { [weak self] _ in
-            self?.buildSpeciesHierarchy()
         }
     }
 
     /// Add `species` to every target photo (with burst fan-out) that doesn't
     /// already have it. No-op for photos that already carry the species.
     func addSpecies(ids: Set<UUID>, species: SpeciesMatch) {
-        let targets = expandBurstMembers(of: ids)
-        applyBatch(ids: targets) { photo in
+        applySpeciesBatch(ids: ids) { photo in
             if let updated = SpeciesAssignmentEditor.add(species, to: photo.assignedSpecies) {
                 photo.assignedSpecies = updated
             }
-        } afterAll: { [weak self] _ in
-            self?.buildSpeciesHierarchy()
         }
     }
 
     /// Remove `species` from every target photo (with burst fan-out) that
     /// has it.
     func removeSpecies(ids: Set<UUID>, species: SpeciesMatch) {
-        let targets = expandBurstMembers(of: ids)
-        applyBatch(ids: targets) { photo in
+        applySpeciesBatch(ids: ids) { photo in
             if let idx = photo.assignedSpecies.firstIndex(where: { $0.speciesID == species.speciesID }) {
                 photo.assignedSpecies = SpeciesAssignmentEditor.remove(at: idx, from: photo.assignedSpecies)
             }
-        } afterAll: { [weak self] _ in
-            self?.buildSpeciesHierarchy()
         }
     }
 
+    /// Common shape for every species mutation: expand burst membership,
+    /// run the batch, rebuild the sidebar hierarchy once afterwards.
+    private func applySpeciesBatch(ids: Set<UUID>, mutate: (inout Photo) -> Void) {
+        let targets = expandBurstMembers(of: ids)
+        applyBatch(ids: targets, mutate, afterAll: { [weak self] _ in
+            self?.buildSpeciesHierarchy()
+        })
+    }
+
+    /// Expand `ids` to include every burst member of every selected photo.
     /// Expand `ids` to include every burst member of every selected photo.
     /// Order: `ids` first (de-duped), then burst-member-only IDs in
     /// `allPhotos` order. The `applyBatch` body is order-independent for
     /// these methods, so this just keeps undo-entry order deterministic.
     private func expandBurstMembers(of ids: Set<UUID>) -> [UUID] {
+        // Collect the burst groups touched by `ids` first so we can do one
+        // O(N) pass over allPhotos instead of one filter per id.
+        var groups: Set<UUID> = []
+        for id in ids {
+            if let idx = allPhotoIndex[id], let g = allPhotos[idx].burstGroupID {
+                groups.insert(g)
+            }
+        }
         var result: [UUID] = []
         var seen: Set<UUID> = []
-        func add(_ id: UUID) {
+        for id in ids {
             if seen.insert(id).inserted { result.append(id) }
         }
-        for id in ids { add(id) }
-        for id in ids {
-            for member in burstMemberIDs(for: id) where member != id {
-                add(member)
-            }
+        if groups.isEmpty { return result }
+        for photo in allPhotos {
+            guard let g = photo.burstGroupID, groups.contains(g) else { continue }
+            if seen.insert(photo.id).inserted { result.append(photo.id) }
         }
         return result
     }

@@ -32,9 +32,7 @@ enum BatchSpeciesAggregator {
             if lhs.photoCount != rhs.photoCount {
                 return lhs.photoCount > rhs.photoCount
             }
-            let l = lhs.species.commonName ?? lhs.species.scientificName
-            let r = rhs.species.commonName ?? rhs.species.scientificName
-            return l.localizedCaseInsensitiveCompare(r) == .orderedAscending
+            return nameLessThan(lhs.species, rhs.species)
         }
     }
 
@@ -61,9 +59,13 @@ enum BatchSpeciesAggregator {
             if lhs.confidence != rhs.confidence {
                 return lhs.confidence > rhs.confidence
             }
-            let l = lhs.commonName ?? lhs.scientificName
-            let r = rhs.commonName ?? rhs.scientificName
-            return l.localizedCaseInsensitiveCompare(r) == .orderedAscending
+            return nameLessThan(lhs, rhs)
         }.prefix(limit).map { $0 }
+    }
+
+    private static func nameLessThan(_ lhs: SpeciesMatch, _ rhs: SpeciesMatch) -> Bool {
+        let l = lhs.commonName ?? lhs.scientificName
+        let r = rhs.commonName ?? rhs.scientificName
+        return l.localizedCaseInsensitiveCompare(r) == .orderedAscending
     }
 }

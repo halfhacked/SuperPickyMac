@@ -51,7 +51,7 @@ struct ThumbnailStripView: View {
         guard let window = NSApp.keyWindow else { return false }
         guard let view = window.contentView?.hitTest(pointInWindow) else { return false }
         guard let id = ThumbnailCell.findThumbnailIdentifier(from: view) else { return false }
-        guard let photo = photos.first(where: { "Thumbnail_\($0.filename)" == id }) else {
+        guard let photo = photos.first(where: { ThumbnailCell.accessibilityID(for: $0) == id }) else {
             return false
         }
         if modifiers.contains(.shift) {
@@ -71,18 +71,24 @@ struct ThumbnailCell: View {
     let isSelected: Bool
     let isDimmed: Bool
 
+    static let accessibilityIDPrefix = "Thumbnail_"
+
+    static func accessibilityID(for photo: Photo) -> String {
+        accessibilityIDPrefix + photo.filename
+    }
+
     static func shouldDim(photoBurstGroupID: UUID?, selectedBurstGroupID: UUID?) -> Bool {
         guard let selected = selectedBurstGroupID else { return false }
         return photoBurstGroupID != selected
     }
 
     /// Walk an NSView ancestry chain looking for a SwiftUI-exposed
-    /// accessibility identifier of the form "Thumbnail_<filename>".
+    /// accessibility identifier prefixed with `accessibilityIDPrefix`.
     static func findThumbnailIdentifier(from view: NSView) -> String? {
         var current: NSView? = view
         while let v = current {
             if let id = v.accessibilityIdentifier(),
-               id.hasPrefix("Thumbnail_") {
+               id.hasPrefix(accessibilityIDPrefix) {
                 return id
             }
             current = v.superview
@@ -150,7 +156,7 @@ struct ThumbnailCell: View {
         )
         .opacity(isDimmed ? 0.4 : 1.0)
         .animation(.easeInOut(duration: 0.15), value: isDimmed)
-        .accessibilityIdentifier("Thumbnail_\(photo.filename)")
+        .accessibilityIdentifier(Self.accessibilityID(for: photo))
         .accessibilityValue(a11ySelectionValue)
     }
 }
