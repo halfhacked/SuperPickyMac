@@ -151,34 +151,36 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
         let app = Self.app!
         let preview = app.images[A11y.photoPreview]
         XCTAssertTrue(preview.waitForExistence(timeout: 10))
+        let counter = app.staticTexts[A11y.photoCounter]
         let emptyText = app.staticTexts["Select a photo to preview"]
 
-        // SwiftUI Label composes its HStack children — species rows render
-        // in the a11y tree as "Bald Eagle 0/11" rather than a standalone
-        // "Bald Eagle" static text, so match by substring.
-        func clickSidebarRow(containing text: String) {
-            let row = app.staticTexts.matching(
-                NSPredicate(format: "label CONTAINS %@", text)
-            ).firstMatch
-            XCTAssertTrue(row.waitForExistence(timeout: 5),
-                          "Sidebar row containing \"\(text)\" should exist")
-            row.click()
-            Thread.sleep(forTimeInterval: 0.5)
+        // Use Rating rows — they're at the top of the sidebar and always
+        // rendered, unlike Species rows which lazy-render below the fold
+        // on the CI runner's narrow sidebar viewport.
+        func currentFilteredCount() -> Int {
+            let raw = (counter.value as? String) ?? ""
+            return Int(raw.split(separator: " ").first ?? "0") ?? 0
         }
 
-        // Two species filters with deterministic non-empty counts via the
-        // mock fixtures: 11 Bald Eagle photos and 11 Anna's Hummingbird
-        // photos. Switching between the two guarantees reconcile clears
-        // the active each time, exercising the auto-select-first path.
-        clickSidebarRow(containing: "Bald Eagle")
-        XCTAssertFalse(emptyText.exists,
-                       "Empty state must not appear after entering Bald Eagle filter")
-        XCTAssertTrue(preview.waitForExistence(timeout: 3))
-
-        clickSidebarRow(containing: "Anna's Hummingbird")
-        XCTAssertFalse(emptyText.exists,
-                       "Empty state must not appear after switching to Anna's Hummingbird filter")
-        XCTAssertTrue(preview.waitForExistence(timeout: 3))
+        // Spec: switching to a rating filter clears active when the prior
+        // active photo isn't in that bucket. If the new filter is non-empty,
+        // auto-select-first must repopulate the active and the preview must
+        // stay visible. If the new filter is empty, the empty state is the
+        // correct rendering — there's nothing to auto-select.
+        for label in ["Excellent", "Reject"] {
+            app.staticTexts[label].click()
+            Thread.sleep(forTimeInterval: 0.5)
+            let count = currentFilteredCount()
+            if count > 0 {
+                XCTAssertFalse(emptyText.exists,
+                               "Empty state must not appear in \(label) filter with \(count) photos")
+                XCTAssertTrue(preview.waitForExistence(timeout: 3),
+                              "Preview should be visible in \(label) filter with \(count) photos")
+            } else {
+                XCTAssertTrue(emptyText.exists,
+                              "Empty state should appear when \(label) filter is empty")
+            }
+        }
 
         // Restore default filter so later tests start from "all photos".
         let folderName = (Self.testDir! as NSString).lastPathComponent
