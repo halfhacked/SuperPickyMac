@@ -60,7 +60,6 @@ final class CullingConfig {
     var appTheme: AppTheme { didSet { save() } }
     var minConfidence: Float { didSet { save() } }
     var minAesthetics: Float { didSet { save() } }
-    var pickedTopPercentage: Int { didSet { save() } }
     var burstFps: Int { didSet { save() } }
     var burstMinCount: Int { didSet { save() } }
     /// Max pHash hamming distance (0–64) between consecutive frames still
@@ -85,7 +84,6 @@ final class CullingConfig {
         self.appTheme = AppTheme(rawValue: defaults.string(forKey: "appTheme") ?? "") ?? .dark
         self.minConfidence = defaults.object(forKey: "minConfidence") as? Float ?? 0.5
         self.minAesthetics = defaults.object(forKey: "minAesthetics") as? Float ?? 3.5
-        self.pickedTopPercentage = defaults.object(forKey: "pickedTopPercentage") as? Int ?? 25
         self.burstFps = defaults.object(forKey: "burstFps") as? Int ?? 10
         self.burstMinCount = defaults.object(forKey: "burstMinCount") as? Int ?? 4
         self.burstHashTolerance = defaults.object(forKey: "burstHashTolerance") as? Int ?? 12
@@ -107,7 +105,6 @@ final class CullingConfig {
         defaults.set(appTheme.rawValue, forKey: "appTheme")
         defaults.set(minConfidence, forKey: "minConfidence")
         defaults.set(minAesthetics, forKey: "minAesthetics")
-        defaults.set(pickedTopPercentage, forKey: "pickedTopPercentage")
         defaults.set(burstFps, forKey: "burstFps")
         defaults.set(burstMinCount, forKey: "burstMinCount")
         defaults.set(burstHashTolerance, forKey: "burstHashTolerance")

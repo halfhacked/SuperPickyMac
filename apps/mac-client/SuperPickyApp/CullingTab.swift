@@ -19,19 +19,6 @@ struct CullingTab: View {
                 }
                 Toggle(config.localized("Enable flight detection"), isOn: $config.flightDetectionEnabled)
             }
-
-            Section(config.localized("Picks")) {
-                SliderRow(label: config.localized("Top percentage"),
-                          value: Binding(
-                              get: { Double(config.pickedTopPercentage) },
-                              set: { config.pickedTopPercentage = (Int(($0 / 5).rounded()) * 5) }
-                          ),
-                          range: 10...50,
-                          display: "\(config.pickedTopPercentage)%")
-                Text(config.localized("Percentage of top-rated photos to flag as picks."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
         }
         .formStyle(.grouped)
     }

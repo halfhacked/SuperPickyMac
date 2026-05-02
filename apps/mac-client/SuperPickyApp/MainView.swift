@@ -425,7 +425,6 @@ struct MainView: View {
                 burstFps: config.burstFps,
                 burstMinCount: config.burstMinCount,
                 burstHashTolerance: config.burstHashTolerance,
-                pickedTopPercentage: config.pickedTopPercentage,
                 onPhotoProcessed: { photo in
                     await batcher.enqueue(photo)
                 }
