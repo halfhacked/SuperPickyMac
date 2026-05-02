@@ -81,6 +81,17 @@ struct ContentView: View {
                             mouseInView: $mouseInPreview, viewSize: $previewSize,
                             appState: appState,
                             onCorrectSpecies: onCorrectSpecies)
+                    .onChange(of: selectedPhotoID) { _, newID in
+                        guard let newID,
+                              let idx = filteredPhotos.firstIndex(where: { $0.id == newID }) else {
+                            return
+                        }
+                        PrefetchCoordinator.shared.update(
+                            currentIndex: idx,
+                            photos: filteredPhotos,
+                            zoomActive: zoomState.scale > 1.0
+                        )
+                    }
 
                 HStack(alignment: .top, spacing: 0) {
                     Spacer(minLength: 0)
