@@ -32,31 +32,30 @@ enum ImageLoader {
     /// Sendable-friendly decode. Useful for `async let` / `TaskGroup`
     /// concurrency where NSImage's non-Sendable result would error.
     /// Call sites wrap in NSImage on their own actor.
+    ///
+    /// All decodes are serialized through `ImageDecodeQueue.shared` so that
+    /// holding an arrow key in zoom mode doesn't pile up N concurrent RAW
+    /// decodes — only one runs at a time, and cancelled callers drop their
+    /// turn at the front of the queue without doing any work.
     static func loadCGImage(path: String, maxPixelSize: Int? = nil) async -> CGImage? {
-        let url = URL(fileURLWithPath: path)
-        return await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                if maxPixelSize == nil, let cached = loadCachedFullRes(path: path) {
-                    continuation.resume(returning: cached)
-                    return
-                }
-                guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
-                    continuation.resume(returning: nil)
-                    return
-                }
-                if let maxPixelSize {
-                    continuation.resume(returning: decodePreview(source: source, maxPixelSize: maxPixelSize))
-                } else {
-                    // Full-res: actual image decode
-                    let cgImage = CGImageSourceCreateImageAtIndex(source, 0, [
-                        kCGImageSourceCreateThumbnailWithTransform: true,
-                    ] as CFDictionary)
-                    if let cgImage, generatePreviewCache {
-                        writePreviewCacheAsync(image: cgImage, rawPath: path)
-                    }
-                    continuation.resume(returning: cgImage)
-                }
+        return await ImageDecodeQueue.shared.decode {
+            if maxPixelSize == nil, let cached = loadCachedFullRes(path: path) {
+                return cached
             }
+            let url = URL(fileURLWithPath: path)
+            guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
+                return nil
+            }
+            if let maxPixelSize {
+                return decodePreview(source: source, maxPixelSize: maxPixelSize)
+            }
+            let cgImage = CGImageSourceCreateImageAtIndex(source, 0, [
+                kCGImageSourceCreateThumbnailWithTransform: true,
+            ] as CFDictionary)
+            if let cgImage, generatePreviewCache {
+                writePreviewCacheAsync(image: cgImage, rawPath: path)
+            }
+            return cgImage
         }
     }
 
@@ -137,6 +136,25 @@ enum ImageLoader {
     /// Larger than any plausible embedded-thumbnail side so the probe
     /// returns the thumb at its native dimensions.
     private static let embeddedThumbnailProbeCap = 99_999
+
+    /// Serializes ImageIO decodes so superseded work (e.g. arrow-key
+    /// scrubbing in zoom mode) drops at the front of the queue instead of
+    /// piling up on a concurrent dispatch queue and saturating CPU.
+    ///
+    /// Each `decode` call awaits its turn on the actor; when its turn comes
+    /// the closure runs synchronously on the actor's executor (one decode
+    /// in flight at a time), and cancelled callers short-circuit before
+    /// touching ImageIO. ImageIO has no abort API, so a started decode
+    /// always runs to completion — we only prevent the queue itself from
+    /// fan-out.
+    actor ImageDecodeQueue {
+        static let shared = ImageDecodeQueue()
+
+        func decode(_ work: @Sendable () -> CGImage?) -> CGImage? {
+            if Task.isCancelled { return nil }
+            return work()
+        }
+    }
 
     /// Source dimensions in pixels (no decode — metadata only).
     static func pixelSize(path: String) -> CGSize? {
