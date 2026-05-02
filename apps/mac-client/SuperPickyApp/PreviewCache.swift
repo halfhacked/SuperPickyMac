@@ -13,10 +13,36 @@ import os
 enum PreviewCache {
     private static let log = Logger(subsystem: "com.halfhacked.superpicky", category: "PreviewCache")
 
-    static let rootURL: URL = {
+    /// Default cache root under `~/Library/Caches/`. Tests override
+    /// `rootURLOverride` to redirect to a temp directory so they don't
+    /// touch the developer's real cache.
+    static var rootURL: URL { rootURLOverride ?? defaultRootURL }
+
+    private static let defaultRootURL: URL = {
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
         return caches.appendingPathComponent("com.halfhacked.superpicky/preview", isDirectory: true)
     }()
+
+    /// Test-only redirect. Set in test setup, restore in teardown. Never
+    /// set this from production code.
+    nonisolated(unsafe) static var rootURLOverride: URL?
+
+    /// Thread-safe runtime settings shared between the MainActor writer
+    /// (`CullingConfig`) and the decode-queue reader (`ImageLoader`). Wrapping
+    /// in OSAllocatedUnfairLock removes the data race that two raw
+    /// `nonisolated(unsafe)` statics would have under strict concurrency.
+    struct Settings: Sendable {
+        var generate: Bool = true
+        var capBytes: Int64 = 20 * 1024 * 1024 * 1024
+    }
+
+    private static let settingsLock = OSAllocatedUnfairLock<Settings>(initialState: Settings())
+
+    static var settings: Settings { settingsLock.withLock { $0 } }
+
+    static func updateSettings(_ mutate: (inout Settings) -> Void) {
+        settingsLock.withLock { mutate(&$0) }
+    }
 
     /// Maps a RAW path to its cache file URL. Same-folder photos share a
     /// hash dir so eviction and FS lookups stay localized.

@@ -5,14 +5,9 @@ import AppKit
 
 /// Shared image loading utility — used by PreviewView, FullscreenViewer, and ThumbnailStripView.
 enum ImageLoader {
-    /// Disk-cache full-res decodes as JPEG sidecars under
-    /// `~/Library/Caches/com.halfhacked.superpicky/preview/`. Set to false
-    /// to read existing cache entries but skip writing new ones.
-    nonisolated(unsafe) static var generatePreviewCache: Bool = true
-
-    /// LRU cap in bytes; 0 means unlimited. Mirrored from
-    /// `CullingConfig.previewCacheSizeGB` at app boot and on changes.
-    nonisolated(unsafe) static var previewCacheCapBytes: Int64 = 20 * 1024 * 1024 * 1024
+    /// Convenience accessor used by sweep/sweep-coordinator to short-circuit
+    /// when the cache is disabled.
+    static var generatePreviewCache: Bool { PreviewCache.settings.generate }
 
     /// Load an image at a given max pixel size, or full resolution if nil.
     /// Uses the embedded preview when it's large enough (fast path for RAW),
@@ -29,34 +24,51 @@ enum ImageLoader {
         return NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
     }
 
-    /// Sendable-friendly decode. Useful for `async let` / `TaskGroup`
-    /// concurrency where NSImage's non-Sendable result would error.
-    /// Call sites wrap in NSImage on their own actor.
-    ///
-    /// All decodes are serialized through `ImageDecodeQueue.shared` so that
-    /// holding an arrow key in zoom mode doesn't pile up N concurrent RAW
-    /// decodes — only one runs at a time, and cancelled callers drop their
-    /// turn at the front of the queue without doing any work.
+    /// Sendable-friendly decode for the foreground hot path. All foreground
+    /// decodes are serialized through `ImageDecodeQueue.shared` so holding
+    /// an arrow key doesn't pile up N concurrent RAW decodes; superseded
+    /// callers drop at the front of the queue.
     static func loadCGImage(path: String, maxPixelSize: Int? = nil) async -> CGImage? {
-        return await ImageDecodeQueue.shared.decode {
-            if maxPixelSize == nil, let cached = loadCachedFullRes(path: path) {
-                return cached
-            }
-            let url = URL(fileURLWithPath: path)
-            guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
-                return nil
-            }
-            if let maxPixelSize {
-                return decodePreview(source: source, maxPixelSize: maxPixelSize)
-            }
-            let cgImage = CGImageSourceCreateImageAtIndex(source, 0, [
-                kCGImageSourceCreateThumbnailWithTransform: true,
-            ] as CFDictionary)
-            if let cgImage, generatePreviewCache {
-                writePreviewCacheAsync(image: cgImage, rawPath: path)
-            }
-            return cgImage
+        await ImageDecodeQueue.shared.decode {
+            decodeCore(path: path, maxPixelSize: maxPixelSize)
         }
+    }
+
+    /// Background decode for warm-up tasks (sweep, prefetch). Runs on a
+    /// utility-QoS dispatch queue without going through the foreground
+    /// `ImageDecodeQueue`, so a slow sweep RAW decode never blocks the
+    /// next keypress's foreground decode. macOS QoS demotes this work
+    /// when the foreground is busy.
+    static func loadCGImageBackground(path: String, maxPixelSize: Int? = nil) async -> CGImage? {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async {
+                continuation.resume(returning: decodeCore(path: path, maxPixelSize: maxPixelSize))
+            }
+        }
+    }
+
+    /// Shared decode body. Returns the cached full-res JPEG when present,
+    /// otherwise decodes from source and (for full-res, when enabled)
+    /// schedules a background JPEG write.
+    private static func decodeCore(path: String, maxPixelSize: Int?) -> CGImage? {
+        if maxPixelSize == nil, let cached = loadCachedFullRes(path: path) {
+            return cached
+        }
+        let url = URL(fileURLWithPath: path)
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
+            return nil
+        }
+        if let maxPixelSize {
+            return decodePreview(source: source, maxPixelSize: maxPixelSize)
+        }
+        let cgImage = CGImageSourceCreateImageAtIndex(source, 0, [
+            kCGImageSourceCreateThumbnailWithTransform: true,
+        ] as CFDictionary)
+        let s = PreviewCache.settings
+        if let cgImage, s.generate {
+            writePreviewCacheAsync(image: cgImage, rawPath: path, capBytes: s.capBytes)
+        }
+        return cgImage
     }
 
     /// Returns a decoded CGImage from the on-disk JPEG cache when available
@@ -73,12 +85,11 @@ enum ImageLoader {
     }
 
     /// Encode + write the cache off the decode thread; LRU eviction follows.
-    private static func writePreviewCacheAsync(image: CGImage, rawPath: String) {
+    private static func writePreviewCacheAsync(image: CGImage, rawPath: String, capBytes: Int64) {
         let url = PreviewCache.cachedURL(for: rawPath)
-        let cap = previewCacheCapBytes
         Task.detached(priority: .background) {
             PreviewCache.write(image, to: url)
-            if cap > 0 { PreviewCache.evictIfOverCap(maxBytes: cap) }
+            if capBytes > 0 { PreviewCache.evictIfOverCap(maxBytes: capBytes) }
         }
     }
 

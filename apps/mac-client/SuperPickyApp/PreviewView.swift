@@ -125,10 +125,12 @@ struct AsyncPreviewImage: View {
                 image = cached
                 return
             }
+            let pinnedPath = filePath
             Task {
-                if let full = await loadFullRes(filePath) {
+                if let full = await loadFullRes(pinnedPath) {
+                    guard !Task.isCancelled, filePath == pinnedPath else { return }
                     image = full
-                } else {
+                } else if filePath == pinnedPath {
                     isFullRes = false  // allow retry on next zoom
                 }
             }

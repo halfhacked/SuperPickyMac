@@ -6,6 +6,14 @@ import CoreGraphics
 
 @Suite(.serialized) struct PreviewCacheTests {
 
+    init() {
+        // Redirect the cache root to a per-suite temp directory so tests
+        // don't touch ~/Library/Caches/com.halfhacked.superpicky/preview/
+        // (the developer's real cache from running the app).
+        PreviewCache.rootURLOverride = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PreviewCacheTests/\(UUID().uuidString)/cache")
+    }
+
     // MARK: - Fixtures
 
     private func makeTempFolder() throws -> URL {

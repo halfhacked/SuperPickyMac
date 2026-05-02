@@ -102,14 +102,17 @@ final class CullingConfig {
         applyPreviewCacheSettings()
     }
 
-    /// Push the current preview-cache settings into the static slots on
-    /// `ImageLoader` that the decode path reads. Called from init and on
-    /// every Settings change.
+    /// Push the current preview-cache settings into the lock-guarded slot
+    /// the decode path reads. Called from init and on every Settings change.
     private func applyPreviewCacheSettings() {
-        ImageLoader.generatePreviewCache = generatePreviewCache
-        ImageLoader.previewCacheCapBytes = previewCacheSizeGB == 0
+        let cap: Int64 = previewCacheSizeGB == 0
             ? 0
             : Int64(previewCacheSizeGB) * 1024 * 1024 * 1024
+        let generate = generatePreviewCache
+        PreviewCache.updateSettings { s in
+            s.generate = generate
+            s.capBytes = cap
+        }
     }
 
     private func save() {

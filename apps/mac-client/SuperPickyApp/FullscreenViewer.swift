@@ -71,12 +71,14 @@ struct FullscreenViewer: View {
                 image = cached
                 return
             }
+            let pinnedID = photo.id
             Task {
                 guard let full = await ImageLoader.load(path: photo.filePath) else {
-                    isFullRes = false
+                    if !Task.isCancelled, selectedPhotoID == pinnedID { isFullRes = false }
                     return
                 }
                 ImageCache.fullRes.set(photo.filePath, image: full)
+                guard !Task.isCancelled, selectedPhotoID == pinnedID else { return }
                 image = full
             }
         }

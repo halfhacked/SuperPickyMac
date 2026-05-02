@@ -49,7 +49,7 @@ final class PreviewSweepCoordinator {
         let started = Date()
         var written = 0
         var skipped = 0
-        let cap = ImageLoader.previewCacheCapBytes
+        let cap = PreviewCache.settings.capBytes
         for path in paths {
             if Task.isCancelled { break }
 
@@ -62,7 +62,7 @@ final class PreviewSweepCoordinator {
             if PreviewCache.freshURL(for: path) != nil { skipped += 1; continue }
 
             processing.insert(path)
-            _ = await ImageLoader.loadCGImage(path: path, maxPixelSize: nil)
+            _ = await ImageLoader.loadCGImageBackground(path: path, maxPixelSize: nil)
             processing.remove(path)
             written += 1
 

@@ -198,7 +198,7 @@ final class AppState {
 
             if isFolderSwitch {
                 let paths = allPhotos.map(\.filePath)
-                MainActor.assumeIsolated {
+                Task { @MainActor in
                     PreviewSweepCoordinator.shared.start(folder: folder, paths: paths)
                     PrefetchCoordinator.shared.reset()
                 }
