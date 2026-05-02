@@ -46,6 +46,12 @@ enum PreviewCache {
 
     /// Maps a RAW path to its cache file URL. Same-folder photos share a
     /// hash dir so eviction and FS lookups stay localized.
+    ///
+    /// Cache key is folder-path + basename, validated by mtime in
+    /// `freshURL`. A rename-then-reuse-same-name within the same mtime
+    /// granularity could in theory return the prior photo's cache, but the
+    /// mtime check covers anything that touches the source file. Folder
+    /// moves orphan the old cache (acceptable — it's just disk waste).
     static func cachedURL(for rawPath: String) -> URL {
         let folder = (rawPath as NSString).deletingLastPathComponent
         let basename = ((rawPath as NSString).lastPathComponent as NSString).deletingPathExtension
