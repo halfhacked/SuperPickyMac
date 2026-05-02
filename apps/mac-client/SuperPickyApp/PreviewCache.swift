@@ -34,6 +34,10 @@ enum PreviewCache {
     struct Settings: Sendable {
         var generate: Bool = true
         var capBytes: Int64 = 20 * 1024 * 1024 * 1024
+        /// When true, ImageCache.fullRes uses 50 % of physical RAM instead
+        /// of the default 25 %. Only meaningful when the user is willing
+        /// to dedicate the machine to SuperPicky.
+        var aggressiveCache: Bool = false
     }
 
     private static let settingsLock = OSAllocatedUnfairLock<Settings>(initialState: Settings())

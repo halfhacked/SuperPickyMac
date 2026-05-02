@@ -88,8 +88,7 @@ struct ContentView: View {
                         }
                         PrefetchCoordinator.shared.update(
                             currentIndex: idx,
-                            photos: filteredPhotos,
-                            zoomActive: zoomState.scale > 1.0
+                            photos: filteredPhotos
                         )
                     }
 

@@ -198,9 +198,16 @@ final class AppState {
 
             if isFolderSwitch {
                 let paths = allPhotos.map(\.filePath)
+                let prefillPhotos = allPhotos
                 Task { @MainActor in
                     PreviewSweepCoordinator.shared.start(folder: folder, paths: paths)
                     PrefetchCoordinator.shared.reset()
+                    // Start filling the in-RAM working set right after the
+                    // folder loads, before the user navigates. Centred on
+                    // photo 0 (the auto-selected one).
+                    if !prefillPhotos.isEmpty {
+                        PrefetchCoordinator.shared.prefill(photos: prefillPhotos, around: 0)
+                    }
                 }
             }
         } catch {

@@ -86,12 +86,35 @@ struct PreviewCacheSettings: View {
             : "\(config.previewCacheSizeGB) GB"
     }
 
+    /// Snapshot of `ImageCache.fullRes` usage. Recomputed on each render
+    /// (re-rendering happens whenever the user types in Settings, so it's
+    /// effectively live).
+    private var memoryCacheLabel: String {
+        let count = ImageCache.fullRes.approximateCount()
+        let bytes = ImageCache.fullRes.approximateBytes()
+        let budget = ImageCache.computeFullResBudget()
+        return "\(count) / \(budget.count) photos, \(formatBytes(Int64(bytes))) / \(formatBytes(Int64(budget.bytes)))"
+    }
+
     var body: some View {
         @Bindable var config = config
         Toggle(config.localized("Generate preview cache for faster zoom"),
                isOn: $config.generatePreviewCache)
 
-        Picker(config.localized("Cache size"),
+        Toggle(config.localized("Use aggressive in-memory cache (50% of RAM)"),
+               isOn: $config.aggressiveCache)
+            .accessibilityIdentifier("PreviewCache_AggressiveToggle")
+
+        HStack {
+            Text(config.localized("In-memory cache"))
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(memoryCacheLabel)
+                .monospacedDigit()
+                .accessibilityIdentifier("PreviewCache_MemoryUsage")
+        }
+
+        Picker(config.localized("Disk cache size"),
                selection: $config.previewCacheSizeGB) {
             ForEach(Self.sizeOptions, id: \.self) { gb in
                 Text(gb == 0 ? config.localized("Unlimited") : "\(gb) GB").tag(gb)

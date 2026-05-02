@@ -2,122 +2,192 @@ import Foundation
 import AppKit
 import os
 
-/// Pre-warms `ImageCache.fullRes` for the photos the user is most likely
-/// to view next in zoom mode.
+/// Maintains a working set of full-resolution decodes in `ImageCache.fullRes`
+/// optimised for culling: the user's current burst stays warm, plus a few of
+/// the next bursts in their navigation direction. Direction is detected from
+/// a "streak" of consecutive same-direction moves; longer streaks reach
+/// further ahead.
 ///
-/// Priority order (matches the user's typical zoom-mode workflow of
-/// comparing similar shots within a burst, then moving to the next):
-///   1. Same-burst photos (excluding the current photo) — chronological.
-///   2. The next-or-previous burst in display order, taking nav direction
-///      from the prior-vs-current index.
-///
-/// Each call cancels the prior prefetch tasks before scheduling new ones.
+/// Anti-thrash discipline: every update diffs the desired target set against
+/// in-flight tasks. Already-cached or already-in-flight paths are not
+/// re-scheduled, and only tasks whose paths fell out of the new target set
+/// get cancelled. Walking from photo N to N+1 in a 10-photo burst keeps the
+/// other 9 prefetches running unchanged.
 @MainActor
 final class PrefetchCoordinator {
     static let shared = PrefetchCoordinator()
     fileprivate static let log = Logger(subsystem: "com.halfhacked.superpicky", category: "Prefetch")
 
-    /// Cap how many prefetches we schedule per update so we don't blow past
-    /// `ImageCache.fullRes` (countLimit=8) and evict the freshly-warmed entries.
-    private static let budget = 6
+    /// Baseline number of photos to prefetch from bursts beyond the current
+    /// one. Grows with the user's direction streak.
+    private static let baseNextBurstDepth = 6
+    /// Hard ceiling so a long streak doesn't blow past the in-RAM cache.
+    private static let maxNextBurstDepth = 30
 
-    /// How many photos from the next burst to prefetch. Same-burst photos
-    /// already get unlimited prefetch — the next burst is a smaller bet.
-    private static let nextBurstDepth = 3
-
+    /// Streak counter: positive = consecutive forward moves, negative =
+    /// backward. Magnitude reaches further into next bursts in that
+    /// direction; reversal resets to ±1.
+    private var streak: Int = 0
     private var lastIndex: Int?
-    private var inflight: [Task<Void, Never>] = []
 
-    /// Call from the view that owns the selection, on selection change.
-    /// `zoomActive` should be `true` only when the view is currently
-    /// rendering at scale > 1.0 — at fit scale, the working set is the
-    /// 2000-px preview cache, which is much cheaper.
-    func update(currentIndex: Int, photos: [Photo], zoomActive: Bool) {
-        cancelAll()
-        defer { lastIndex = currentIndex }
+    /// In-flight prefetch tasks keyed by file path. Diffed against the
+    /// newest target set on each update so we don't churn through cancel /
+    /// reschedule cycles for paths that are still wanted.
+    private var inflight: [String: Task<Void, Never>] = [:]
 
-        guard zoomActive, photos.indices.contains(currentIndex) else { return }
+    /// Kick off the initial RAM-cache fill right after a folder loads,
+    /// before the user has navigated. Treats the auto-selected photo as
+    /// the centre with no streak.
+    func prefill(photos: [Photo], around index: Int) {
+        guard photos.indices.contains(index) else { return }
+        streak = 0
+        lastIndex = nil
+        update(currentIndex: index, photos: photos)
+    }
+
+    /// Recentre the working set on a new selection. Always runs (no longer
+    /// gated on zoom mode), since culling at fit scale is also faster when
+    /// the next zoomed photo is already decoded in RAM.
+    func update(currentIndex: Int, photos: [Photo]) {
+        guard photos.indices.contains(currentIndex) else { return }
+
+        let step = updateStreak(currentIndex: currentIndex)
+        lastIndex = currentIndex
         let current = photos[currentIndex]
 
-        // Direction defaults to forward when we have no prior selection
-        // (the user just zoomed in cold).
-        let step: Int
-        if let prior = lastIndex, prior != currentIndex {
-            step = currentIndex > prior ? 1 : -1
-        } else {
-            step = 1
+        var targets: [String] = []
+
+        if current.burstGroupID != nil {
+            let same = sameBurstSortedByNavDistance(in: photos, currentIndex: currentIndex, step: step)
+            targets.append(contentsOf: same.map(\.filePath))
         }
 
-        var targets: [Photo] = []
+        // Streak boost: each consecutive same-direction move adds two
+        // photos of next-burst depth, capped at maxNextBurstDepth.
+        let streakMagnitude = abs(streak)
+        let depthBoost = max(0, streakMagnitude - 1) * 2
+        let nextDepth = min(Self.maxNextBurstDepth, Self.baseNextBurstDepth + depthBoost)
+        let nextBurstPhotos = nextBurstsPhotos(from: currentIndex, in: photos, step: step, depth: nextDepth)
+        targets.append(contentsOf: nextBurstPhotos.map(\.filePath))
 
-        if let bid = current.burstGroupID {
-            let same = photos.filter { $0.burstGroupID == bid && $0.id != current.id }
-                .sorted { $0.dateCreated < $1.dateCreated }
-            targets.append(contentsOf: same)
+        let capped = Array(targets.prefix(Self.maxTargets))
+        let desired = Set(capped)
+
+        // Cancel in-flight tasks whose paths are no longer wanted.
+        var cancelled = 0
+        for (path, task) in inflight where !desired.contains(path) {
+            task.cancel()
+            inflight.removeValue(forKey: path)
+            cancelled += 1
         }
 
-        let nextBurst = adjacentBurstPhotos(from: currentIndex, in: photos, step: step)
-        targets.append(contentsOf: nextBurst.prefix(Self.nextBurstDepth))
+        // Schedule new targets we don't already have or aren't already
+        // fetching.
+        var scheduled = 0
+        for path in capped {
+            if inflight[path] != nil { continue }
+            if ImageCache.fullRes.get(path) != nil { continue }
+            scheduleWarm(path: path)
+            scheduled += 1
+        }
 
-        let scheduled = targets.prefix(Self.budget)
         Self.log.info(
-            "update idx=\(currentIndex) step=\(step) burst=\(current.burstGroupID?.uuidString.prefix(4) ?? "—", privacy: .public) targets=\(scheduled.map { ($0.filePath as NSString).lastPathComponent }.joined(separator: ","), privacy: .public)"
+            "update idx=\(currentIndex) step=\(step) streak=\(self.streak) burst=\(current.burstGroupID?.uuidString.prefix(4) ?? "—", privacy: .public) targets=\(capped.count) cancelled=\(cancelled) scheduled=\(scheduled) inflight=\(self.inflight.count)"
         )
-
-        for photo in scheduled {
-            if ImageCache.fullRes.get(photo.filePath) != nil { continue }
-            scheduleWarm(path: photo.filePath)
-        }
     }
 
-    /// Stop all in-flight prefetch tasks (folder change, app quit).
+    /// Stop everything and reset the streak. Folder change, app quit.
     func reset() {
-        cancelAll()
+        for (_, task) in inflight { task.cancel() }
+        inflight.removeAll()
         lastIndex = nil
+        streak = 0
     }
 
-    /// Walk along `photos` from `index` in `step` direction until the
-    /// burstGroupID changes, then collect that next burst's contiguous
-    /// members. Singletons (nil burst) count as a burst of size 1.
-    /// Returned photos are in display order along `step` (so the
-    /// chronologically-nearest one is first).
-    private func adjacentBurstPhotos(from index: Int, in photos: [Photo], step: Int) -> [Photo] {
+    // MARK: - Internals
+
+    /// Updates `streak` based on the move from `lastIndex` to
+    /// `currentIndex` and returns the step direction (+1 / -1) to use for
+    /// target ordering.
+    private func updateStreak(currentIndex: Int) -> Int {
+        guard let prior = lastIndex else {
+            // First call after prefill — no history, default forward.
+            return 1
+        }
+        let delta = currentIndex - prior
+        if delta == 0 {
+            // Same selection (filter change, refresh) — keep prior direction.
+            return streak >= 0 ? 1 : -1
+        }
+        let dir = delta > 0 ? 1 : -1
+        if (streak >= 0) == (dir > 0) {
+            // Continuing in same direction — extend streak.
+            streak += dir
+        } else {
+            // Reversal — restart streak in new direction.
+            streak = dir
+        }
+        return dir
+    }
+
+    /// Cap how many photos we ever queue at once. Above this, churning
+    /// through prefetches costs more than the cache hits save.
+    private static let maxTargets = 40
+
+    /// Photos that share the current burst, ordered by display distance in
+    /// nav direction (ahead first, closer wins; behind as fallback).
+    private func sameBurstSortedByNavDistance(in photos: [Photo], currentIndex: Int, step: Int) -> [Photo] {
+        let bid = photos[currentIndex].burstGroupID
+        let candidates = photos.enumerated()
+            .filter { $0.offset != currentIndex && $0.element.burstGroupID == bid }
+        return candidates.sorted { a, b in
+            let signedA = (a.offset - currentIndex) * step
+            let signedB = (b.offset - currentIndex) * step
+            if (signedA > 0) != (signedB > 0) { return signedA > 0 }
+            return abs(a.offset - currentIndex) < abs(b.offset - currentIndex)
+        }.map(\.element)
+    }
+
+    /// Collect up to `depth` photos from the bursts immediately following
+    /// (or preceding) the current one, in `step` direction. Skips past the
+    /// current burst's tail; gathers contiguous members of each subsequent
+    /// burst until `depth` is filled.
+    private func nextBurstsPhotos(from index: Int, in photos: [Photo], step: Int, depth: Int) -> [Photo] {
         let currentBurst = photos[index].burstGroupID
+        var collected: [Photo] = []
         var i = index + step
-        while photos.indices.contains(i) {
-            if photos[i].burstGroupID == currentBurst, currentBurst != nil {
+        var skippingCurrent = currentBurst != nil
+
+        while photos.indices.contains(i), collected.count < depth {
+            let pBurst = photos[i].burstGroupID
+            if skippingCurrent, pBurst == currentBurst {
                 i += step
                 continue
             }
-            let nbid = photos[i].burstGroupID
-            var collected: [Photo] = [photos[i]]
-            if nbid == nil { return collected }
-            var j = i + step
-            while photos.indices.contains(j) {
-                guard photos[j].burstGroupID == nbid else { break }
-                collected.append(photos[j])
-                j += step
-            }
-            return collected
+            skippingCurrent = false
+            collected.append(photos[i])
+            i += step
         }
-        return []
+        return collected
     }
 
     private func scheduleWarm(path: String) {
         let task = Task.detached(priority: .utility) {
-            guard let cgImage = await ImageLoader.loadCGImagePrefetch(path: path) else { return }
+            let cgImage = await ImageLoader.loadCGImagePrefetch(path: path)
             await MainActor.run {
-                let image = NSImage(cgImage: cgImage,
-                                    size: NSSize(width: cgImage.width, height: cgImage.height))
-                ImageCache.fullRes.set(path, image: image)
-                Self.log.info("warmed RAM \((path as NSString).lastPathComponent, privacy: .public)")
+                if let cgImage {
+                    let image = NSImage(cgImage: cgImage,
+                                        size: NSSize(width: cgImage.width, height: cgImage.height))
+                    ImageCache.fullRes.set(path, image: image)
+                    Self.log.debug("warmed RAM \((path as NSString).lastPathComponent, privacy: .public)")
+                }
+                PrefetchCoordinator.shared.inflightDidComplete(path: path)
             }
         }
-        inflight.append(task)
+        inflight[path] = task
     }
 
-    private func cancelAll() {
-        for t in inflight { t.cancel() }
-        inflight.removeAll()
+    fileprivate func inflightDidComplete(path: String) {
+        inflight.removeValue(forKey: path)
     }
 }
