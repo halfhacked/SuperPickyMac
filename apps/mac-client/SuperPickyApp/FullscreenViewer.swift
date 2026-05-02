@@ -44,24 +44,40 @@ struct FullscreenViewer: View {
         .task(id: selectedPhotoID) {
             isFullRes = false
             guard let photo = selectedPhoto else { image = nil; return }
-            let loaded: NSImage?
             if zoomState.scale > 1.0 {
                 isFullRes = true
-                loaded = await ImageLoader.load(path: photo.filePath)
-            } else {
-                loaded = await ImageLoader.load(path: photo.filePath, maxPixelSize: 2000)
+                if let cached = ImageCache.fullRes.get(photo.filePath) {
+                    image = cached
+                    return
+                }
+                guard let full = await ImageLoader.load(path: photo.filePath) else { return }
+                guard !Task.isCancelled else { return }
+                ImageCache.fullRes.set(photo.filePath, image: full)
+                image = full
+                return
             }
-            guard !Task.isCancelled else { return }
-            image = loaded
+            if let cached = ImageCache.preview.get(photo.filePath) {
+                image = cached
+            } else if let loaded = await ImageLoader.load(path: photo.filePath, maxPixelSize: 2000) {
+                guard !Task.isCancelled else { return }
+                ImageCache.preview.set(photo.filePath, image: loaded)
+                image = loaded
+            }
         }
         .onChange(of: zoomState.scale) { _, newScale in
-            if newScale > 1.0 && !isFullRes, let photo = selectedPhoto {
-                isFullRes = true
-                Task {
-                    if let full = await ImageLoader.load(path: photo.filePath) {
-                        image = full
-                    }
+            guard newScale > 1.0, !isFullRes, let photo = selectedPhoto else { return }
+            isFullRes = true
+            if let cached = ImageCache.fullRes.get(photo.filePath) {
+                image = cached
+                return
+            }
+            Task {
+                guard let full = await ImageLoader.load(path: photo.filePath) else {
+                    isFullRes = false
+                    return
                 }
+                ImageCache.fullRes.set(photo.filePath, image: full)
+                image = full
             }
         }
     }

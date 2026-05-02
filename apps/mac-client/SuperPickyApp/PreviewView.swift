@@ -45,10 +45,13 @@ struct PreviewView: View {
 }
 
 /// NSCache wrapper keyed by file path. Preview holds many small 2000 px
-/// decodes; fullRes holds a few 80 MB decodes to keep zoom instant.
-private final class ImageCache {
+/// decodes; fullRes holds a few 80 MB decodes to keep zoom instant. Both
+/// caches are shared between PreviewView, FullscreenViewer, and the zoom
+/// neighbour-prefetcher so back-arrow nav reuses cached frames regardless
+/// of which surface decoded them.
+final class ImageCache {
     static let preview = ImageCache(countLimit: 5, byteLimit: 200 * 1024 * 1024)
-    static let fullRes = ImageCache(countLimit: 3, byteLimit: 400 * 1024 * 1024)
+    static let fullRes = ImageCache(countLimit: 8, byteLimit: 800 * 1024 * 1024)
 
     private let cache = NSCache<NSString, NSImage>()
 
