@@ -5,6 +5,15 @@ import AppKit
 
 /// Shared image loading utility — used by PreviewView, FullscreenViewer, and ThumbnailStripView.
 enum ImageLoader {
+    /// Disk-cache full-res decodes as JPEG sidecars under
+    /// `~/Library/Caches/com.halfhacked.superpicky/preview/`. Set to false
+    /// to read existing cache entries but skip writing new ones.
+    nonisolated(unsafe) static var generatePreviewCache: Bool = true
+
+    /// LRU cap in bytes; 0 means unlimited. Mirrored from
+    /// `CullingConfig.previewCacheSizeGB` at app boot and on changes.
+    nonisolated(unsafe) static var previewCacheCapBytes: Int64 = 20 * 1024 * 1024 * 1024
+
     /// Load an image at a given max pixel size, or full resolution if nil.
     /// Uses the embedded preview when it's large enough (fast path for RAW),
     /// otherwise decodes the full image and downsamples.
@@ -27,6 +36,10 @@ enum ImageLoader {
         let url = URL(fileURLWithPath: path)
         return await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
+                if maxPixelSize == nil, let cached = loadCachedFullRes(path: path) {
+                    continuation.resume(returning: cached)
+                    return
+                }
                 guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
                     continuation.resume(returning: nil)
                     return
@@ -38,9 +51,35 @@ enum ImageLoader {
                     let cgImage = CGImageSourceCreateImageAtIndex(source, 0, [
                         kCGImageSourceCreateThumbnailWithTransform: true,
                     ] as CFDictionary)
+                    if let cgImage, generatePreviewCache {
+                        writePreviewCacheAsync(image: cgImage, rawPath: path)
+                    }
                     continuation.resume(returning: cgImage)
                 }
             }
+        }
+    }
+
+    /// Returns a decoded CGImage from the on-disk JPEG cache when available
+    /// and fresher than the source. Bumps the cached file's mtime on hit so
+    /// LRU eviction sees recent reads as recently used.
+    private static func loadCachedFullRes(path: String) -> CGImage? {
+        guard let cachedURL = PreviewCache.freshURL(for: path) else { return nil }
+        guard let source = CGImageSourceCreateWithURL(cachedURL as CFURL, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            return nil
+        }
+        PreviewCache.touch(cachedURL)
+        return image
+    }
+
+    /// Encode + write the cache off the decode thread; LRU eviction follows.
+    private static func writePreviewCacheAsync(image: CGImage, rawPath: String) {
+        let url = PreviewCache.cachedURL(for: rawPath)
+        let cap = previewCacheCapBytes
+        Task.detached(priority: .background) {
+            PreviewCache.write(image, to: url)
+            if cap > 0 { PreviewCache.evictIfOverCap(maxBytes: cap) }
         }
     }
 
