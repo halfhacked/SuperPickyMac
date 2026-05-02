@@ -5,7 +5,7 @@ import Foundation
 @Suite struct CullingConfigTests {
     /// Remove test-specific keys from UserDefaults so tests start from clean defaults.
     private static let testKeys = [
-        "minConfidence", "minAesthetics", "pickedTopPercentage",
+        "minConfidence", "minAesthetics",
         "burstFps", "burstMinCount", "birdIdConfidence",
         "sharpnessThreshold", "aestheticsThreshold",
     ]
@@ -25,11 +25,6 @@ import Foundation
     @Test func defaultMinAesthetics() {
         let config = freshConfig()
         #expect(config.minAesthetics == 3.5)
-    }
-
-    @Test func defaultPickedTopPercentage() {
-        let config = freshConfig()
-        #expect(config.pickedTopPercentage == 25)
     }
 
     @Test func defaultBurstFps() {
