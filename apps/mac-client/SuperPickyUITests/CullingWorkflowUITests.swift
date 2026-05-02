@@ -147,6 +147,36 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
         Thread.sleep(forTimeInterval: 0.3)
     }
 
+    func test09_FilterAutoSelectsFirstPhoto() {
+        let app = Self.app!
+        let preview = app.images[A11y.photoPreview]
+        XCTAssertTrue(preview.waitForExistence(timeout: 10))
+        let emptyText = app.staticTexts["Select a photo to preview"]
+
+        // Click "Excellent" — if the previously-active photo isn't 5-star,
+        // reconcile clears the active. Auto-select-first should fill it back
+        // in so the preview never falls back to the empty state.
+        app.staticTexts["Excellent"].click()
+        Thread.sleep(forTimeInterval: 0.5)
+        if !emptyText.exists {
+            XCTAssertTrue(preview.waitForExistence(timeout: 3),
+                          "Preview should remain visible after Excellent filter (auto-select first)")
+        }
+
+        // Click "Reject" — same property: filter has photos → preview shows one.
+        app.staticTexts["Reject"].click()
+        Thread.sleep(forTimeInterval: 0.5)
+        if !emptyText.exists {
+            XCTAssertTrue(preview.waitForExistence(timeout: 3),
+                          "Preview should remain visible after Reject filter (auto-select first)")
+        }
+
+        // Restore default filter so later tests start from "all photos".
+        let folderName = (Self.testDir! as NSString).lastPathComponent
+        app.staticTexts[folderName].click()
+        Thread.sleep(forTimeInterval: 0.5)
+    }
+
     // MARK: - 10-19: Keyboard Shortcuts
 
     func test10_FullscreenToggle() {

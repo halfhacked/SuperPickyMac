@@ -267,6 +267,63 @@ import Foundation
         }
     }
 
+    // MARK: - applyFilter() auto-selects first when nothing remains active
+
+    @Test func applyFilterAutoSelectsFirstWhenSelectionEmpty() throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let db = try ReportDatabase(folderPath: folder)
+
+        var p1 = Photo(filename: "eagle.CR3",
+                       filePath: folder.appendingPathComponent("eagle.CR3").path,
+                       folderPath: folder.path)
+        p1.assignedSpecies = [match("eagle")]
+        try db.save(&p1)
+
+        var p2 = Photo(filename: "hawk.CR3",
+                       filePath: folder.appendingPathComponent("hawk.CR3").path,
+                       folderPath: folder.path)
+        p2.assignedSpecies = [match("hawk")]
+        try db.save(&p2)
+
+        let app = AppState()
+        app.loadPhotos(for: folder)
+        app.selection.clear()
+
+        app.sidebarSelection = .species("hawk")
+        app.applyFilter()
+
+        #expect(app.photos.count == 1)
+        #expect(app.selection.activeID == p2.id)
+    }
+
+    @Test func applyFilterPreservesActiveWhenStillInFilter() throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let db = try ReportDatabase(folderPath: folder)
+
+        var p1 = Photo(filename: "a.CR3",
+                       filePath: folder.appendingPathComponent("a.CR3").path,
+                       folderPath: folder.path)
+        p1.assignedSpecies = [match("eagle")]
+        try db.save(&p1)
+
+        var p2 = Photo(filename: "b.CR3",
+                       filePath: folder.appendingPathComponent("b.CR3").path,
+                       folderPath: folder.path)
+        p2.assignedSpecies = [match("eagle")]
+        try db.save(&p2)
+
+        let app = AppState()
+        app.loadPhotos(for: folder)
+        app.selection.click(p2.id, photos: app.photos)
+
+        app.sidebarSelection = .species("eagle")
+        app.applyFilter()
+
+        #expect(app.selection.activeID == p2.id)
+    }
+
     // MARK: - Undo restores species
 
     @Test func undoRestoresAssignedSpeciesAfterBatchEdit() throws {

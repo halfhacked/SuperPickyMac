@@ -193,15 +193,10 @@ final class AppState {
                 buildSpeciesHierarchy()
             }
 
-            // Re-apply current filter instead of resetting to all
+            // Re-apply current filter instead of resetting to all.
+            // applyFilter() reconciles selection and auto-selects the
+            // first photo when nothing remains active.
             applyFilter()
-
-            // Reconcile selection against the filtered list. Active falls
-            // back per PhotoSelection.reconcile invariants.
-            selection.reconcile(with: photos)
-            if selection.activeID == nil, let first = photos.first {
-                selection.click(first.id, photos: photos)
-            }
         } catch {
             logger.error("loadPhotos failed: \(error)")
             allPhotos = []
@@ -634,5 +629,8 @@ final class AppState {
         }
         rebuildFilteredPhotoIndex()
         selection.reconcile(with: photos)
+        if selection.activeID == nil, let first = photos.first {
+            selection.click(first.id, photos: photos)
+        }
     }
 }
