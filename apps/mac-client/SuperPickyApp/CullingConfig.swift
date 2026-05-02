@@ -70,6 +70,13 @@ final class CullingConfig {
     var birdIdConfidence: Int { didSet { save() } }
     var flightDetectionEnabled: Bool { didSet { save() } }
     var speciesSortOrder: SpeciesSortOrder { didSet { save() } }
+    /// Whether to write JPEG sidecars under
+    /// `~/Library/Caches/com.halfhacked.superpicky/preview/` to speed up
+    /// zoom-mode keyboard navigation. Reads from existing cache files
+    /// regardless.
+    var generatePreviewCache: Bool { didSet { save(); applyPreviewCacheSettings() } }
+    /// LRU cap on the preview-cache size. 0 means unlimited.
+    var previewCacheSizeGB: Int { didSet { save(); applyPreviewCacheSettings() } }
 
     init() {
         let defaults = UserDefaults.standard
@@ -90,6 +97,19 @@ final class CullingConfig {
         self.birdIdConfidence = defaults.object(forKey: "birdIdConfidence") as? Int ?? 70
         self.flightDetectionEnabled = defaults.object(forKey: "flightDetectionEnabled") as? Bool ?? true
         self.speciesSortOrder = SpeciesSortOrder(rawValue: defaults.string(forKey: "speciesSortOrder") ?? "") ?? .name
+        self.generatePreviewCache = defaults.object(forKey: "generatePreviewCache") as? Bool ?? true
+        self.previewCacheSizeGB = defaults.object(forKey: "previewCacheSizeGB") as? Int ?? 20
+        applyPreviewCacheSettings()
+    }
+
+    /// Push the current preview-cache settings into the static slots on
+    /// `ImageLoader` that the decode path reads. Called from init and on
+    /// every Settings change.
+    private func applyPreviewCacheSettings() {
+        ImageLoader.generatePreviewCache = generatePreviewCache
+        ImageLoader.previewCacheCapBytes = previewCacheSizeGB == 0
+            ? 0
+            : Int64(previewCacheSizeGB) * 1024 * 1024 * 1024
     }
 
     private func save() {
@@ -111,6 +131,8 @@ final class CullingConfig {
         defaults.set(birdIdConfidence, forKey: "birdIdConfidence")
         defaults.set(flightDetectionEnabled, forKey: "flightDetectionEnabled")
         defaults.set(speciesSortOrder.rawValue, forKey: "speciesSortOrder")
+        defaults.set(generatePreviewCache, forKey: "generatePreviewCache")
+        defaults.set(previewCacheSizeGB, forKey: "previewCacheSizeGB")
     }
 
     /// Look up a localized string. Reading `appLanguage` makes SwiftUI

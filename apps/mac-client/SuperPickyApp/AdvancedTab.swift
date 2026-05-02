@@ -36,6 +36,9 @@ struct AdvancedTab: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            Section(config.localized("Preview Cache")) {
+                PreviewCacheSettings()
+            }
             Section(config.localized("Burst Detection")) {
                 Toggle(config.localized("Enable burst detection"), isOn: $config.burstDetectionEnabled)
                 if config.burstDetectionEnabled {
@@ -64,6 +67,94 @@ struct AdvancedTab: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+/// Settings UI for the on-disk full-res JPEG cache that speeds up
+/// keyboard navigation in zoom mode.
+struct PreviewCacheSettings: View {
+    @Environment(CullingConfig.self) private var config
+    @State private var currentSize: Int64?
+    @State private var isComputingSize = false
+    @State private var showClearConfirm = false
+
+    private static let sizeOptions: [Int] = [5, 20, 50, 100, 0]
+
+    private var capLabel: String {
+        config.previewCacheSizeGB == 0
+            ? config.localized("Unlimited")
+            : "\(config.previewCacheSizeGB) GB"
+    }
+
+    var body: some View {
+        @Bindable var config = config
+        Toggle(config.localized("Generate preview cache for faster zoom"),
+               isOn: $config.generatePreviewCache)
+
+        Picker(config.localized("Cache size"),
+               selection: $config.previewCacheSizeGB) {
+            ForEach(Self.sizeOptions, id: \.self) { gb in
+                Text(gb == 0 ? config.localized("Unlimited") : "\(gb) GB").tag(gb)
+            }
+        }
+        .accessibilityIdentifier("PreviewCache_SizePicker")
+
+        HStack {
+            Text(config.localized("Currently using"))
+                .foregroundStyle(.secondary)
+            Spacer()
+            if isComputingSize {
+                ProgressView().controlSize(.small)
+            } else if let bytes = currentSize {
+                Text("\(formatBytes(bytes)) / \(capLabel)")
+                    .monospacedDigit()
+                    .accessibilityIdentifier("PreviewCache_CurrentSize")
+            } else {
+                Text(config.localized("Calculating…"))
+                    .foregroundStyle(.secondary)
+            }
+        }
+
+        HStack {
+            Spacer()
+            Button(config.localized("Clear preview cache"), role: .destructive) {
+                showClearConfirm = true
+            }
+            .accessibilityIdentifier("PreviewCache_ClearButton")
+        }
+        .confirmationDialog(
+            config.localized("Clear all cached previews?"),
+            isPresented: $showClearConfirm,
+            titleVisibility: .visible
+        ) {
+            Button(config.localized("Clear"), role: .destructive) {
+                _ = PreviewCache.clearAll()
+                refreshSize()
+            }
+            Button(config.localized("Cancel"), role: .cancel) {}
+        } message: {
+            Text(config.localized("Cached previews will be regenerated next time you zoom into a photo."))
+        }
+        .task { refreshSize() }
+        .onChange(of: config.previewCacheSizeGB) { _, _ in refreshSize() }
+    }
+
+    private func refreshSize() {
+        isComputingSize = true
+        Task.detached(priority: .utility) {
+            let bytes = PreviewCache.currentSizeBytes()
+            await MainActor.run {
+                self.currentSize = bytes
+                self.isComputingSize = false
+            }
+        }
+    }
+
+    private func formatBytes(_ bytes: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useGB, .useMB]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
     }
 }
 
