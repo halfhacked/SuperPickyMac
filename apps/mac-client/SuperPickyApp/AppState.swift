@@ -195,6 +195,14 @@ final class AppState {
 
             // Re-apply current filter instead of resetting to all
             applyFilter()
+
+            if isFolderSwitch {
+                let paths = allPhotos.map(\.filePath)
+                MainActor.assumeIsolated {
+                    PreviewSweepCoordinator.shared.start(folder: folder, paths: paths)
+                    PrefetchCoordinator.shared.reset()
+                }
+            }
         } catch {
             logger.error("loadPhotos failed: \(error)")
             allPhotos = []

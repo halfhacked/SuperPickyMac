@@ -158,6 +158,7 @@
 		743E98D2D106B2DC4CD9A375 /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = D16D64E760C59FE88930FB6D /* Logger.swift */; };
 		A0FE12CD3456789012345678 /* PreviewCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0FE12CD3456789012345678 /* PreviewCache.swift */; };
 		A1FE12CD3456789012345678 /* PrefetchCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1FE12CD3456789012345678 /* PrefetchCoordinator.swift */; };
+		A2FE12CD3456789012345678 /* PreviewSweepCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FE12CD3456789012345678 /* PreviewSweepCoordinator.swift */; };
 		77015E7D20FE9E94039A4710 /* species_list_US-CT.json in Resources */ = {isa = PBXBuildFile; fileRef = FC69DB9AB0604B1868A3B299 /* species_list_US-CT.json */; };
 		77E2CDCA44CEAFF85E7A5846 /* species_list_CN-71.json in Resources */ = {isa = PBXBuildFile; fileRef = EA903F7D9120FDF6460CD01E /* species_list_CN-71.json */; };
 		78939EE79C0DDD7C2E4B4BF8 /* offline_index.json in Resources */ = {isa = PBXBuildFile; fileRef = 67D9011A882448A3C9139930 /* offline_index.json */; };
@@ -603,6 +604,7 @@
 		D3212B6002C7368D529C9F05 /* GPSCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GPSCell.swift; sourceTree = "<group>"; };
 		B0FE12CD3456789012345678 /* PreviewCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewCache.swift; sourceTree = "<group>"; };
 		B1FE12CD3456789012345678 /* PrefetchCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrefetchCoordinator.swift; sourceTree = "<group>"; };
+		B2FE12CD3456789012345678 /* PreviewSweepCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewSweepCoordinator.swift; sourceTree = "<group>"; };
 		D354E8BFE2BB6211ADAA855F /* PreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewView.swift; sourceTree = "<group>"; };
 		D3A36E4779D719861038F9E4 /* species_list_US-UT.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-UT.json"; sourceTree = "<group>"; };
 		D3AC27931EC190A197652D78 /* FlightModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlightModel.swift; sourceTree = "<group>"; };
@@ -790,6 +792,7 @@
 				93BD233E1B5ECE7A7C1FDAB1 /* PipelineCoordinator.swift */,
 				B1FE12CD3456789012345678 /* PrefetchCoordinator.swift */,
 				B0FE12CD3456789012345678 /* PreviewCache.swift */,
+				B2FE12CD3456789012345678 /* PreviewSweepCoordinator.swift */,
 				D354E8BFE2BB6211ADAA855F /* PreviewView.swift */,
 				0252F59F2B2852A81A8FB56F /* RatingEngine.swift */,
 				197514D16AE317EA0B6F2795 /* RAWConverter.swift */,
@@ -1561,6 +1564,7 @@
 				D0CB8BD3324BE76EE0E716B4 /* PipelineCoordinator.swift in Sources */,
 				A1FE12CD3456789012345678 /* PrefetchCoordinator.swift in Sources */,
 				A0FE12CD3456789012345678 /* PreviewCache.swift in Sources */,
+				A2FE12CD3456789012345678 /* PreviewSweepCoordinator.swift in Sources */,
 				93DFF6C1F94162A500AB340A /* PreviewView.swift in Sources */,
 				D846F6D40E95F052E6E6CCD5 /* RAWConverter.swift in Sources */,
 				F0E93BA6594B7964B23E6005 /* RatingEngine.swift in Sources */,
