@@ -62,7 +62,7 @@ final class PreviewSweepCoordinator {
             if PreviewCache.freshURL(for: path) != nil { skipped += 1; continue }
 
             processing.insert(path)
-            _ = await ImageLoader.loadCGImageBackground(path: path, maxPixelSize: nil)
+            _ = await ImageLoader.loadCGImageSweep(path: path, maxPixelSize: nil)
             processing.remove(path)
             written += 1
 

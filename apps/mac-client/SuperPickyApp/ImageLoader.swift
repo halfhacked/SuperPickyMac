@@ -27,37 +27,73 @@ enum ImageLoader {
         return NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
     }
 
-    /// Sendable-friendly decode for the foreground hot path. All foreground
-    /// decodes are serialized through `ImageDecodeQueue.shared` so holding
-    /// an arrow key doesn't pile up N concurrent RAW decodes; superseded
-    /// callers drop at the front of the queue.
+    /// Sendable-friendly decode for the foreground hot path. Serialized
+    /// through `ImageDecodeQueue` so holding arrow doesn't pile up N
+    /// concurrent RAW decodes; eager-decoded so the main thread doesn't
+    /// stall when SwiftUI renders the NSImage.
+    ///
+    /// Small previews (≤ 320 px on the long side) bypass the serial queue:
+    /// they're cheap (~5–10 ms via embedded thumbnail) and routing them
+    /// behind a slow full-res RAW decode is what made the thumbnail strip
+    /// flash gray placeholders during fast arrow navigation.
     static func loadCGImage(path: String, maxPixelSize: Int? = nil) async -> CGImage? {
-        await ImageDecodeQueue.shared.decode {
-            decodeCore(path: path, maxPixelSize: maxPixelSize, tag: "FG")
+        if let cap = maxPixelSize, cap <= 320 {
+            return await loadCGImageThumbnail(path: path, maxPixelSize: cap)
+        }
+        return await ImageDecodeQueue.shared.decode {
+            decodeCore(path: path, maxPixelSize: maxPixelSize, tag: "FG", eager: true)
         }
     }
 
-    /// Background decode for warm-up tasks (sweep, prefetch). Runs on a
-    /// utility-QoS dispatch queue without going through the foreground
-    /// `ImageDecodeQueue`, so a slow sweep RAW decode never blocks the
-    /// next keypress's foreground decode. macOS QoS demotes this work
-    /// when the foreground is busy.
-    static func loadCGImageBackground(path: String, maxPixelSize: Int? = nil, tag: String = "BG") async -> CGImage? {
+    /// Concurrent decode path for thumbnail-strip / sidebar loads. No
+    /// serial gate — multiple thumbnails can decode in parallel and none
+    /// of them ever block behind the foreground full-res decode.
+    private static func loadCGImageThumbnail(path: String, maxPixelSize: Int) async -> CGImage? {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                continuation.resume(returning: decodeCore(path: path, maxPixelSize: maxPixelSize, tag: "THUMB", eager: false))
+            }
+        }
+    }
+
+    /// Background decode that pre-warms the in-memory cache (prefetch).
+    /// Eager-decoded — same reason as foreground. Serialized through a
+    /// dedicated queue so 6 same-burst prefetches don't allocate 6 × 96 MB
+    /// concurrently.
+    static func loadCGImagePrefetch(path: String, maxPixelSize: Int? = nil, tag: String = "PREFETCH") async -> CGImage? {
+        await withCheckedContinuation { continuation in
+            prefetchDecodeQueue.async {
+                continuation.resume(returning: decodeCore(path: path, maxPixelSize: maxPixelSize, tag: tag, eager: true))
+            }
+        }
+    }
+
+    private static let prefetchDecodeQueue: DispatchQueue = {
+        DispatchQueue(label: "com.halfhacked.superpicky.prefetchDecode", qos: .utility)
+    }()
+
+    /// Background decode for the disk-cache sweep — discards the result
+    /// after the JPEG is written, so we deliberately skip the eager decode
+    /// (no display pending) and avoid allocating a full-resolution bitmap
+    /// per swept photo.
+    static func loadCGImageSweep(path: String, maxPixelSize: Int? = nil) async -> CGImage? {
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .utility).async {
-                continuation.resume(returning: decodeCore(path: path, maxPixelSize: maxPixelSize, tag: tag))
+                continuation.resume(returning: decodeCore(path: path, maxPixelSize: maxPixelSize, tag: "SWEEP", eager: false))
             }
         }
     }
 
     /// Shared decode body. Returns the cached full-res JPEG when present,
     /// otherwise decodes from source and (for full-res, when enabled)
-    /// schedules a background JPEG write.
-    private static func decodeCore(path: String, maxPixelSize: Int?, tag: String) -> CGImage? {
+    /// enqueues a serialised JPEG write. Set `eager` only for paths that
+    /// will hand the bitmap to AppKit/SwiftUI for display — eager decoding
+    /// allocates a full-resolution backing buffer (~96 MB for ARW).
+    private static func decodeCore(path: String, maxPixelSize: Int?, tag: String, eager: Bool) -> CGImage? {
         let basename = (path as NSString).lastPathComponent
         let started = DispatchTime.now()
 
-        if maxPixelSize == nil, let cached = loadCachedFullRes(path: path) {
+        if maxPixelSize == nil, let cached = loadCachedFullRes(path: path, eager: eager) {
             let ms = elapsedMs(since: started)
             log.info("[\(tag, privacy: .public)] HIT \(basename, privacy: .public) \(ms, privacy: .public)ms")
             return cached
@@ -73,16 +109,58 @@ enum ImageLoader {
             log.info("[\(tag, privacy: .public)] PREVIEW \(maxPixelSize)px \(basename, privacy: .public) \(ms, privacy: .public)ms")
             return result
         }
-        let cgImage = CGImageSourceCreateImageAtIndex(source, 0, [
-            kCGImageSourceCreateThumbnailWithTransform: true,
-        ] as CFDictionary)
-        let s = PreviewCache.settings
-        if let cgImage, s.generate {
-            writePreviewCacheAsync(image: cgImage, rawPath: path, capBytes: s.capBytes)
+        // ShouldCache pins the decoded bitmap inside the source. We only
+        // want that for paths that will return the bitmap to a caller —
+        // for the sweep we throw it away after the JPEG encode.
+        let createOpts: [CFString: Any] = eager
+            ? [kCGImageSourceShouldCache: true,
+               kCGImageSourceShouldCacheImmediately: true,
+               kCGImageSourceCreateThumbnailWithTransform: true]
+            : [kCGImageSourceShouldCache: false,
+               kCGImageSourceCreateThumbnailWithTransform: true]
+        let cgImage = CGImageSourceCreateImageAtIndex(source, 0, createOpts as CFDictionary)
+
+        let result: CGImage?
+        if let cgImage, eager {
+            result = forceDecode(cgImage)
+        } else {
+            result = cgImage
         }
+
+        // Encode JPEG synchronously now (while the source is in scope and
+        // the pixels are warm) and enqueue only the bytes for disk I/O.
+        // This decouples the writer queue from the source/bitmap lifetime,
+        // which is what was driving 40 GB+ working set.
+        let s = PreviewCache.settings
+        if let imageForEncode = result, s.generate, !Task.isCancelled {
+            if let data = PreviewCache.encodeJPEG(imageForEncode) {
+                schedulePreviewCacheWriteBytes(data: data, rawPath: path, capBytes: s.capBytes)
+            }
+        }
+
         let ms = elapsedMs(since: started)
-        log.info("[\(tag, privacy: .public)] MISS \(basename, privacy: .public) \(ms, privacy: .public)ms write=\(s.generate, privacy: .public)")
-        return cgImage
+        log.info("[\(tag, privacy: .public)] MISS \(basename, privacy: .public) \(ms, privacy: .public)ms eager=\(eager, privacy: .public) write=\(s.generate, privacy: .public)")
+        return result
+    }
+
+    /// Render the image into a same-sized bitmap context and return the
+    /// resulting CGImage. This forces ImageIO's lazy decode to complete on
+    /// this background thread; without it, the pixel decode is deferred
+    /// until SwiftUI draws the NSImage on the main thread, blocking the UI
+    /// for hundreds of ms per photo on RAW files.
+    private static func forceDecode(_ image: CGImage) -> CGImage {
+        let w = image.width
+        let h = image.height
+        let cs = CGColorSpaceCreateDeviceRGB()
+        guard let ctx = CGContext(
+            data: nil, width: w, height: h,
+            bitsPerComponent: 8, bytesPerRow: w * 4,
+            space: cs,
+            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
+                | CGBitmapInfo.byteOrder32Little.rawValue
+        ) else { return image }
+        ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+        return ctx.makeImage() ?? image
     }
 
     private static func elapsedMs(since start: DispatchTime) -> Int {
@@ -92,26 +170,38 @@ enum ImageLoader {
 
     /// Returns a decoded CGImage from the on-disk JPEG cache when available
     /// and fresher than the source. Bumps the cached file's mtime on hit so
-    /// LRU eviction sees recent reads as recently used.
-    private static func loadCachedFullRes(path: String) -> CGImage? {
+    /// LRU eviction sees recent reads as recently used. `eager=false`
+    /// returns a lazy CGImage; the sweep uses this and immediately discards.
+    private static func loadCachedFullRes(path: String, eager: Bool) -> CGImage? {
         guard let cachedURL = PreviewCache.freshURL(for: path) else { return nil }
+        let opts: [CFString: Any] = eager
+            ? [kCGImageSourceShouldCache: true, kCGImageSourceShouldCacheImmediately: true]
+            : [:]
         guard let source = CGImageSourceCreateWithURL(cachedURL as CFURL, nil),
-              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+              let image = CGImageSourceCreateImageAtIndex(source, 0, opts as CFDictionary) else {
             return nil
         }
         PreviewCache.touch(cachedURL)
-        return image
+        return eager ? forceDecode(image) : image
     }
 
-    /// Encode + write the cache off the decode thread; LRU eviction follows.
-    /// `parent` is the caller's task; we skip the write if it was cancelled
-    /// while the decode was running, so a fast scrubber doesn't pay disk I/O
-    /// for photos it has already navigated past.
-    private static func writePreviewCacheAsync(image: CGImage, rawPath: String, capBytes: Int64) {
-        if Task.isCancelled { return }
+    /// Serial queue for JPEG cache writes. Each write decodes the source's
+    /// pixels into RAM to encode JPEG; running many writes concurrently
+    /// multiplies that working set. One at a time keeps memory bounded
+    /// while still completing in the background.
+    private static let cacheWriteQueue: DispatchQueue = {
+        let q = DispatchQueue(label: "com.halfhacked.superpicky.previewCacheWrite", qos: .background)
+        return q
+    }()
+
+    /// Enqueue a serialised disk write of pre-encoded JPEG bytes. The
+    /// writer holds only the Data buffer (~5 MB) and the path string —
+    /// it does not retain the source CGImage / CGImageSource, so a
+    /// backlog of pending writes can't pin decoded bitmaps in memory.
+    private static func schedulePreviewCacheWriteBytes(data: Data, rawPath: String, capBytes: Int64) {
         let url = PreviewCache.cachedURL(for: rawPath)
-        Task.detached(priority: .background) {
-            PreviewCache.write(image, to: url)
+        cacheWriteQueue.async {
+            PreviewCache.writeData(data, to: url)
             if capBytes > 0 { PreviewCache.evictIfOverCap(maxBytes: capBytes) }
         }
     }

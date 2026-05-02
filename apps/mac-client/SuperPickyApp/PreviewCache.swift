@@ -79,6 +79,36 @@ enum PreviewCache {
         try? FileManager.default.setAttributes([.modificationDate: now], ofItemAtPath: url.path)
     }
 
+    /// Encode a CGImage to JPEG bytes. Used by `ImageLoader` to convert the
+    /// in-memory decoded bitmap to a serialisable Data buffer before
+    /// dispatching the disk write — that way the writer queue carries
+    /// ~5 MB of bytes instead of pinning a ~96 MB decoded source.
+    static func encodeJPEG(_ image: CGImage, quality: Double = 0.85) -> Data? {
+        let data = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(data, "public.jpeg" as CFString, 1, nil) else {
+            return nil
+        }
+        let opts: [CFString: Any] = [kCGImageDestinationLossyCompressionQuality: quality]
+        CGImageDestinationAddImage(dest, image, opts as CFDictionary)
+        guard CGImageDestinationFinalize(dest) else { return nil }
+        return data as Data
+    }
+
+    /// Atomically write a JPEG `Data` buffer to disk. Cheap relative to the
+    /// encode step.
+    @discardableResult
+    static func writeData(_ data: Data, to url: URL) -> Bool {
+        do {
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
+                                                    withIntermediateDirectories: true)
+            try data.write(to: url, options: .atomic)
+            return true
+        } catch {
+            log.error("write failed at \(url.path): \(error.localizedDescription)")
+            return false
+        }
+    }
+
     /// Encode and atomically write a JPEG. Caller is responsible for
     /// dispatching off the main/decode actor; this method does I/O.
     @discardableResult

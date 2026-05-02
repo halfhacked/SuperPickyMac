@@ -105,7 +105,7 @@ final class PrefetchCoordinator {
 
     private func scheduleWarm(path: String) {
         let task = Task.detached(priority: .utility) {
-            guard let cgImage = await ImageLoader.loadCGImageBackground(path: path, tag: "PREFETCH") else { return }
+            guard let cgImage = await ImageLoader.loadCGImagePrefetch(path: path) else { return }
             await MainActor.run {
                 let image = NSImage(cgImage: cgImage,
                                     size: NSSize(width: cgImage.width, height: cgImage.height))
