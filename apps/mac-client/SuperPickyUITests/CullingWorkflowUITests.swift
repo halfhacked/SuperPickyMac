@@ -153,18 +153,29 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
         XCTAssertTrue(preview.waitForExistence(timeout: 10))
         let emptyText = app.staticTexts["Select a photo to preview"]
 
+        // SwiftUI Label composes its HStack children — species rows render
+        // in the a11y tree as "Bald Eagle 0/11" rather than a standalone
+        // "Bald Eagle" static text, so match by substring.
+        func clickSidebarRow(containing text: String) {
+            let row = app.staticTexts.matching(
+                NSPredicate(format: "label CONTAINS %@", text)
+            ).firstMatch
+            XCTAssertTrue(row.waitForExistence(timeout: 5),
+                          "Sidebar row containing \"\(text)\" should exist")
+            row.click()
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+
         // Two species filters with deterministic non-empty counts via the
         // mock fixtures: 11 Bald Eagle photos and 11 Anna's Hummingbird
         // photos. Switching between the two guarantees reconcile clears
         // the active each time, exercising the auto-select-first path.
-        app.staticTexts["Bald Eagle"].click()
-        Thread.sleep(forTimeInterval: 0.5)
+        clickSidebarRow(containing: "Bald Eagle")
         XCTAssertFalse(emptyText.exists,
                        "Empty state must not appear after entering Bald Eagle filter")
         XCTAssertTrue(preview.waitForExistence(timeout: 3))
 
-        app.staticTexts["Anna's Hummingbird"].click()
-        Thread.sleep(forTimeInterval: 0.5)
+        clickSidebarRow(containing: "Anna's Hummingbird")
         XCTAssertFalse(emptyText.exists,
                        "Empty state must not appear after switching to Anna's Hummingbird filter")
         XCTAssertTrue(preview.waitForExistence(timeout: 3))
