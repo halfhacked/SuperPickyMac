@@ -22,7 +22,7 @@ final class PreviewSweepCoordinator {
     /// nearby photos are warmed first.
     func start(folder: URL, paths: [String]) {
         stop()
-        guard ImageLoader.generatePreviewCache, !paths.isEmpty else { return }
+        guard PreviewCache.settings.generate, !paths.isEmpty else { return }
         task = Task { [weak self] in
             await self?.run(folder: folder, paths: paths)
         }
@@ -49,7 +49,6 @@ final class PreviewSweepCoordinator {
         let started = Date()
         var written = 0
         var skipped = 0
-        let cap = PreviewCache.settings.capBytes
         for path in paths {
             if Task.isCancelled { break }
 
@@ -65,10 +64,6 @@ final class PreviewSweepCoordinator {
             _ = await ImageLoader.loadCGImageSweep(path: path, maxPixelSize: nil)
             processing.remove(path)
             written += 1
-
-            if cap > 0, written.isMultiple(of: 20) {
-                PreviewCache.evictIfOverCap(maxBytes: cap)
-            }
 
             await Task.yield()
         }

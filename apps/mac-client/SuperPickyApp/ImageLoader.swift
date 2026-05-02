@@ -6,10 +6,6 @@ import os
 
 /// Shared image loading utility — used by PreviewView, FullscreenViewer, and ThumbnailStripView.
 enum ImageLoader {
-    /// Convenience accessor used by sweep/sweep-coordinator to short-circuit
-    /// when the cache is disabled.
-    static var generatePreviewCache: Bool { PreviewCache.settings.generate }
-
     private static let log = Logger(subsystem: "com.halfhacked.superpicky", category: "ImageLoader")
 
     /// Load an image at a given max pixel size, or full resolution if nil.
@@ -127,14 +123,23 @@ enum ImageLoader {
             result = cgImage
         }
 
-        // Encode JPEG synchronously now (while the source is in scope and
-        // the pixels are warm) and enqueue only the bytes for disk I/O.
-        // This decouples the writer queue from the source/bitmap lifetime,
-        // which is what was driving 40 GB+ working set.
         let s = PreviewCache.settings
         if let imageForEncode = result, s.generate, !Task.isCancelled {
-            if let data = PreviewCache.encodeJPEG(imageForEncode) {
-                schedulePreviewCacheWriteBytes(data: data, rawPath: path, capBytes: s.capBytes)
+            if eager {
+                // Eager bitmap holds its own pixels; the writer queue can
+                // encode without re-reading the source. Take the encode
+                // off the caller's await path — they get the image ~50–100
+                // ms sooner.
+                schedulePreviewCacheEncodeAndWrite(image: imageForEncode, rawPath: path, capBytes: s.capBytes)
+            } else {
+                // Sweep path: lazy CGImage references the source. Encode
+                // synchronously while pixels are still in ImageIO's read
+                // buffer; otherwise the writer queue would re-decode from
+                // disk. The caller throws away `result` immediately, so
+                // there's no perceived latency to protect.
+                if let data = PreviewCache.encodeJPEG(imageForEncode) {
+                    schedulePreviewCacheWriteBytes(data: data, rawPath: path, capBytes: s.capBytes)
+                }
             }
         }
 
@@ -201,6 +206,19 @@ enum ImageLoader {
     private static func schedulePreviewCacheWriteBytes(data: Data, rawPath: String, capBytes: Int64) {
         let url = PreviewCache.cachedURL(for: rawPath)
         cacheWriteQueue.async {
+            PreviewCache.writeData(data, to: url)
+            if capBytes > 0 { PreviewCache.evictIfOverCap(maxBytes: capBytes) }
+        }
+    }
+
+    /// Enqueue a serialised JPEG encode + disk write. Used for the eager
+    /// foreground / prefetch paths where the bitmap is held by the CGImage
+    /// itself, so the encode is just walking pixels (no source re-read)
+    /// and is safe to do asynchronously off the caller's await path.
+    private static func schedulePreviewCacheEncodeAndWrite(image: CGImage, rawPath: String, capBytes: Int64) {
+        let url = PreviewCache.cachedURL(for: rawPath)
+        cacheWriteQueue.async {
+            guard let data = PreviewCache.encodeJPEG(image) else { return }
             PreviewCache.writeData(data, to: url)
             if capBytes > 0 { PreviewCache.evictIfOverCap(maxBytes: capBytes) }
         }

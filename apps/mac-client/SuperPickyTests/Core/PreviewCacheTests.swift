@@ -23,6 +23,8 @@ import CoreGraphics
         return folder
     }
 
+    private struct FixtureError: Error { let message: String }
+
     /// Write a tiny solid-color JPEG so we have a real raw-mtime baseline.
     @discardableResult
     private func writeJPEG(at url: URL, sideLength: Int = 16) throws -> URL {
@@ -40,23 +42,27 @@ import CoreGraphics
             space: cs,
             bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
         ), let image = ctx.makeImage() else {
-            throw NSError(domain: "PreviewCacheTests", code: 1)
+            throw FixtureError(message: "CGContext / makeImage failed")
         }
-        let dest = CGImageDestinationCreateWithURL(url as CFURL, "public.jpeg" as CFString, 1, nil)!
+        guard let dest = CGImageDestinationCreateWithURL(url as CFURL, "public.jpeg" as CFString, 1, nil) else {
+            throw FixtureError(message: "CGImageDestinationCreateWithURL failed")
+        }
         CGImageDestinationAddImage(dest, image, nil)
         #expect(CGImageDestinationFinalize(dest))
         return url
     }
 
     /// Make a 1x1 CGImage we can pass to PreviewCache.write.
-    private func makePixel() -> CGImage {
+    private func makePixel() throws -> CGImage {
         let cs = CGColorSpaceCreateDeviceRGB()
-        let ctx = CGContext(
+        guard let ctx = CGContext(
             data: nil, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
             space: cs,
             bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
-        )!
-        return ctx.makeImage()!
+        ), let image = ctx.makeImage() else {
+            throw FixtureError(message: "1x1 CGContext failed")
+        }
+        return image
     }
 
     // MARK: - cachedURL / freshURL
@@ -194,7 +200,7 @@ import CoreGraphics
     @Test func writeProducesReadableJPEG() throws {
         _ = PreviewCache.clearAll()
         let url = PreviewCache.cachedURL(for: "/tmp/PreviewCacheTests/fake/y.ARW")
-        let pixel = makePixel()
+        let pixel = try makePixel()
         #expect(PreviewCache.write(pixel, to: url))
         #expect(FileManager.default.fileExists(atPath: url.path))
         // Round-trip through ImageIO.
