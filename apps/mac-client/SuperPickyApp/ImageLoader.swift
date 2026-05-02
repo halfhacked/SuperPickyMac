@@ -2,12 +2,15 @@ import Foundation
 import CoreGraphics
 import ImageIO
 import AppKit
+import os
 
 /// Shared image loading utility — used by PreviewView, FullscreenViewer, and ThumbnailStripView.
 enum ImageLoader {
     /// Convenience accessor used by sweep/sweep-coordinator to short-circuit
     /// when the cache is disabled.
     static var generatePreviewCache: Bool { PreviewCache.settings.generate }
+
+    private static let log = Logger(subsystem: "com.halfhacked.superpicky", category: "ImageLoader")
 
     /// Load an image at a given max pixel size, or full resolution if nil.
     /// Uses the embedded preview when it's large enough (fast path for RAW),
@@ -30,7 +33,7 @@ enum ImageLoader {
     /// callers drop at the front of the queue.
     static func loadCGImage(path: String, maxPixelSize: Int? = nil) async -> CGImage? {
         await ImageDecodeQueue.shared.decode {
-            decodeCore(path: path, maxPixelSize: maxPixelSize)
+            decodeCore(path: path, maxPixelSize: maxPixelSize, tag: "FG")
         }
     }
 
@@ -39,10 +42,10 @@ enum ImageLoader {
     /// `ImageDecodeQueue`, so a slow sweep RAW decode never blocks the
     /// next keypress's foreground decode. macOS QoS demotes this work
     /// when the foreground is busy.
-    static func loadCGImageBackground(path: String, maxPixelSize: Int? = nil) async -> CGImage? {
+    static func loadCGImageBackground(path: String, maxPixelSize: Int? = nil, tag: String = "BG") async -> CGImage? {
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .utility).async {
-                continuation.resume(returning: decodeCore(path: path, maxPixelSize: maxPixelSize))
+                continuation.resume(returning: decodeCore(path: path, maxPixelSize: maxPixelSize, tag: tag))
             }
         }
     }
@@ -50,16 +53,25 @@ enum ImageLoader {
     /// Shared decode body. Returns the cached full-res JPEG when present,
     /// otherwise decodes from source and (for full-res, when enabled)
     /// schedules a background JPEG write.
-    private static func decodeCore(path: String, maxPixelSize: Int?) -> CGImage? {
+    private static func decodeCore(path: String, maxPixelSize: Int?, tag: String) -> CGImage? {
+        let basename = (path as NSString).lastPathComponent
+        let started = DispatchTime.now()
+
         if maxPixelSize == nil, let cached = loadCachedFullRes(path: path) {
+            let ms = elapsedMs(since: started)
+            log.info("[\(tag, privacy: .public)] HIT \(basename, privacy: .public) \(ms, privacy: .public)ms")
             return cached
         }
         let url = URL(fileURLWithPath: path)
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
+            log.error("[\(tag, privacy: .public)] OPEN-FAIL \(basename, privacy: .public)")
             return nil
         }
         if let maxPixelSize {
-            return decodePreview(source: source, maxPixelSize: maxPixelSize)
+            let result = decodePreview(source: source, maxPixelSize: maxPixelSize)
+            let ms = elapsedMs(since: started)
+            log.info("[\(tag, privacy: .public)] PREVIEW \(maxPixelSize)px \(basename, privacy: .public) \(ms, privacy: .public)ms")
+            return result
         }
         let cgImage = CGImageSourceCreateImageAtIndex(source, 0, [
             kCGImageSourceCreateThumbnailWithTransform: true,
@@ -68,7 +80,14 @@ enum ImageLoader {
         if let cgImage, s.generate {
             writePreviewCacheAsync(image: cgImage, rawPath: path, capBytes: s.capBytes)
         }
+        let ms = elapsedMs(since: started)
+        log.info("[\(tag, privacy: .public)] MISS \(basename, privacy: .public) \(ms, privacy: .public)ms write=\(s.generate, privacy: .public)")
         return cgImage
+    }
+
+    private static func elapsedMs(since start: DispatchTime) -> Int {
+        let ns = DispatchTime.now().uptimeNanoseconds &- start.uptimeNanoseconds
+        return Int(ns / 1_000_000)
     }
 
     /// Returns a decoded CGImage from the on-disk JPEG cache when available

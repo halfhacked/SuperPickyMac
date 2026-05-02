@@ -2,19 +2,28 @@ import Foundation
 import AppKit
 import os
 
-/// Pre-warms `ImageCache.fullRes` for the next photos in the user's nav
-/// direction so holding arrow stays smooth in zoom mode.
+/// Pre-warms `ImageCache.fullRes` for the photos the user is most likely
+/// to view next in zoom mode.
 ///
-/// Direction is inferred from the previous-vs-current index. Forward nav
-/// prefetches `i+1, i+2`; backward nav prefetches `i-1, i-2`. Each call
-/// cancels the prior prefetch tasks before scheduling new ones, so a fast
-/// scrubber never piles up work.
+/// Priority order (matches the user's typical zoom-mode workflow of
+/// comparing similar shots within a burst, then moving to the next):
+///   1. Same-burst photos (excluding the current photo) — chronological.
+///   2. The next-or-previous burst in display order, taking nav direction
+///      from the prior-vs-current index.
+///
+/// Each call cancels the prior prefetch tasks before scheduling new ones.
 @MainActor
 final class PrefetchCoordinator {
     static let shared = PrefetchCoordinator()
-    private static let log = Logger(subsystem: "com.halfhacked.superpicky", category: "Prefetch")
+    fileprivate static let log = Logger(subsystem: "com.halfhacked.superpicky", category: "Prefetch")
 
-    private static let radius = 2
+    /// Cap how many prefetches we schedule per update so we don't blow past
+    /// `ImageCache.fullRes` (countLimit=8) and evict the freshly-warmed entries.
+    private static let budget = 6
+
+    /// How many photos from the next burst to prefetch. Same-burst photos
+    /// already get unlimited prefetch — the next burst is a smaller bet.
+    private static let nextBurstDepth = 3
 
     private var lastIndex: Int?
     private var inflight: [Task<Void, Never>] = []
@@ -28,18 +37,36 @@ final class PrefetchCoordinator {
         defer { lastIndex = currentIndex }
 
         guard zoomActive, photos.indices.contains(currentIndex) else { return }
-        guard let prior = lastIndex else { return }
+        let current = photos[currentIndex]
 
-        let direction = currentIndex - prior
-        guard direction != 0 else { return }
-        let step = direction > 0 ? 1 : -1
+        // Direction defaults to forward when we have no prior selection
+        // (the user just zoomed in cold).
+        let step: Int
+        if let prior = lastIndex, prior != currentIndex {
+            step = currentIndex > prior ? 1 : -1
+        } else {
+            step = 1
+        }
 
-        for i in 1...Self.radius {
-            let target = currentIndex + step * i
-            guard photos.indices.contains(target) else { break }
-            let path = photos[target].filePath
-            if ImageCache.fullRes.get(path) != nil { continue }
-            scheduleWarm(path: path)
+        var targets: [Photo] = []
+
+        if let bid = current.burstGroupID {
+            let same = photos.filter { $0.burstGroupID == bid && $0.id != current.id }
+                .sorted { $0.dateCreated < $1.dateCreated }
+            targets.append(contentsOf: same)
+        }
+
+        let nextBurst = adjacentBurstPhotos(from: currentIndex, in: photos, step: step)
+        targets.append(contentsOf: nextBurst.prefix(Self.nextBurstDepth))
+
+        let scheduled = targets.prefix(Self.budget)
+        Self.log.info(
+            "update idx=\(currentIndex) step=\(step) burst=\(current.burstGroupID?.uuidString.prefix(4) ?? "—", privacy: .public) targets=\(scheduled.map { ($0.filePath as NSString).lastPathComponent }.joined(separator: ","), privacy: .public)"
+        )
+
+        for photo in scheduled {
+            if ImageCache.fullRes.get(photo.filePath) != nil { continue }
+            scheduleWarm(path: photo.filePath)
         }
     }
 
@@ -49,13 +76,41 @@ final class PrefetchCoordinator {
         lastIndex = nil
     }
 
+    /// Walk along `photos` from `index` in `step` direction until the
+    /// burstGroupID changes, then collect that next burst's contiguous
+    /// members. Singletons (nil burst) count as a burst of size 1.
+    /// Returned photos are in display order along `step` (so the
+    /// chronologically-nearest one is first).
+    private func adjacentBurstPhotos(from index: Int, in photos: [Photo], step: Int) -> [Photo] {
+        let currentBurst = photos[index].burstGroupID
+        var i = index + step
+        while photos.indices.contains(i) {
+            if photos[i].burstGroupID == currentBurst, currentBurst != nil {
+                i += step
+                continue
+            }
+            let nbid = photos[i].burstGroupID
+            var collected: [Photo] = [photos[i]]
+            if nbid == nil { return collected }
+            var j = i + step
+            while photos.indices.contains(j) {
+                guard photos[j].burstGroupID == nbid else { break }
+                collected.append(photos[j])
+                j += step
+            }
+            return collected
+        }
+        return []
+    }
+
     private func scheduleWarm(path: String) {
         let task = Task.detached(priority: .utility) {
-            guard let cgImage = await ImageLoader.loadCGImageBackground(path: path) else { return }
+            guard let cgImage = await ImageLoader.loadCGImageBackground(path: path, tag: "PREFETCH") else { return }
             await MainActor.run {
                 let image = NSImage(cgImage: cgImage,
                                     size: NSSize(width: cgImage.width, height: cgImage.height))
                 ImageCache.fullRes.set(path, image: image)
+                Self.log.info("warmed RAM \((path as NSString).lastPathComponent, privacy: .public)")
             }
         }
         inflight.append(task)
