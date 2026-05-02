@@ -148,7 +148,6 @@
 		67BCBF184553A99B8702E259 /* GPSCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3212B6002C7368D529C9F05 /* GPSCell.swift */; };
 		695F2025AFDDC5D1103DCC06 /* BurstDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17855935BCC43C84A3B8B1B6 /* BurstDetector.swift */; };
 		6A3D55C866B011768386C5D0 /* species_list_US-IL.json in Resources */ = {isa = PBXBuildFile; fileRef = 1E28FB6BF8EA365481A5787F /* species_list_US-IL.json */; };
-		6A4A7D7C51F203825A1C919C /* PickedFlagCalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30AA27AB30CB149B9D8F6323 /* PickedFlagCalculatorTests.swift */; };
 		6A5822DDA6A5F74C8B512048 /* CullingWorkflowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4FC5A73B3D82C650DB5DA2F /* CullingWorkflowUITests.swift */; };
 		6D5757931F7710F549168285 /* CGImageExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A794AE5A39946EABE421F4D /* CGImageExtensions.swift */; };
 		6EADF3DDE501AD794F2FA592 /* species_list_CN-23.json in Resources */ = {isa = PBXBuildFile; fileRef = 4733694F70127B85919A83C5 /* species_list_CN-23.json */; };
@@ -244,7 +243,6 @@
 		C66812EEB0D764D40B2A882C /* species_list_GT.json in Resources */ = {isa = PBXBuildFile; fileRef = 5ED61CA816EA4416F8244414 /* species_list_GT.json */; };
 		C7AED39A5D383B3A3616A610 /* species_list_US-ND.json in Resources */ = {isa = PBXBuildFile; fileRef = F657558E42CD479006C1A8C5 /* species_list_US-ND.json */; };
 		C8B71FD5634761985FC15545 /* ExifFormattersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2D4034E9FA4FAEA2BFB8D8D /* ExifFormattersTests.swift */; };
-		C8DC0C9C5326D67D8648CB31 /* PickedFlagCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B15A1A5D0F460C6EAFB87B0 /* PickedFlagCalculator.swift */; };
 		CA72C6008712387A88EF0778 /* CompareViewUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B41F890C0F4B6826B048C97 /* CompareViewUITests.swift */; };
 		CC17EB879BCADA46E70CBDDE /* bird_reference.sqlite in Resources */ = {isa = PBXBuildFile; fileRef = 53825945C4B0B728CC8B1189 /* bird_reference.sqlite */; };
 		CC7BAF4DFA1380997D56794D /* FlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6185C3D655B6106EFBFBEF9A /* FlowLayout.swift */; };
@@ -419,7 +417,6 @@
 		2DF402CFA2CC35EF411BE2EF /* species_list_GH.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_GH.json; sourceTree = "<group>"; };
 		2E6F8B5A1F51928F3F226F23 /* StarRatingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarRatingView.swift; sourceTree = "<group>"; };
 		2F7A3AFB121ADF5B23A8D2A4 /* species_list_AU-VIC.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_AU-VIC.json"; sourceTree = "<group>"; };
-		30AA27AB30CB149B9D8F6323 /* PickedFlagCalculatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PickedFlagCalculatorTests.swift; sourceTree = "<group>"; };
 		341A6E790FEEF335963B81FD /* species_list_US-AR.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-AR.json"; sourceTree = "<group>"; };
 		35F7E268EAB8ADCA8CBBF702 /* species_list_US-OR.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-OR.json"; sourceTree = "<group>"; };
 		36C41BBBBB9D9A15469ED880 /* species_list_AU-QLD.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_AU-QLD.json"; sourceTree = "<group>"; };
@@ -517,7 +514,6 @@
 		874D5B3B2230C5E5693018BA /* BurstDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BurstDetectorTests.swift; sourceTree = "<group>"; };
 		88BE904F561D8C65A8EBC315 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 		8A88AA7B997C67426FC3E3DE /* species_list_CN-21.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-21.json"; sourceTree = "<group>"; };
-		8B15A1A5D0F460C6EAFB87B0 /* PickedFlagCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PickedFlagCalculator.swift; sourceTree = "<group>"; };
 		8D0804F653E43FD4460C5AF8 /* species_list_US-ID.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-ID.json"; sourceTree = "<group>"; };
 		8D61960564355CE428DB7AAB /* ExifPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExifPanelView.swift; sourceTree = "<group>"; };
 		8D8D60E1764C1EF204A7AEC3 /* species_list_US-WA.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-WA.json"; sourceTree = "<group>"; };
@@ -720,7 +716,6 @@
 				622BC8DFB8850CF206885FBD /* LocalizationTests.swift */,
 				961E549D049211A4D632059F /* PhotoInheritSpeciesTests.swift */,
 				E78186D0F185EDD20A629C0E /* PhotoRatingPredictorTests.swift */,
-				30AA27AB30CB149B9D8F6323 /* PickedFlagCalculatorTests.swift */,
 				84174ECCE34EBFCB5E91A2FD /* PipelineCoordinatorDatabaseNameTests.swift */,
 				B08209CB9A6CFAC3264FF9D8 /* PipelineCoordinatorTests.swift */,
 				0489E5D77DB7CA63F489D2D9 /* PipelinePrewarmTests.swift */,
@@ -788,7 +783,6 @@
 				978BD285BA4245F2711720E0 /* MainView.swift */,
 				5EAEF125F85AE85042A82314 /* Photo.swift */,
 				5DF7946FDA6598F54AFD92F2 /* PhotoRatingPredictor.swift */,
-				8B15A1A5D0F460C6EAFB87B0 /* PickedFlagCalculator.swift */,
 				93BD233E1B5ECE7A7C1FDAB1 /* PipelineCoordinator.swift */,
 				D354E8BFE2BB6211ADAA855F /* PreviewView.swift */,
 				0252F59F2B2852A81A8FB56F /* RatingEngine.swift */,
@@ -1492,7 +1486,6 @@
 				E99609D4C4CD0F6AE0B1249A /* OSEAClassifierTests.swift in Sources */,
 				133D4A050580B364818E78E4 /* PhotoInheritSpeciesTests.swift in Sources */,
 				0F35F369453991A6EEF33422 /* PhotoRatingPredictorTests.swift in Sources */,
-				6A4A7D7C51F203825A1C919C /* PickedFlagCalculatorTests.swift in Sources */,
 				B3DC4418BE214210BC699BE4 /* PipelineCoordinatorDatabaseNameTests.swift in Sources */,
 				29015E61042156029536F635 /* PipelineCoordinatorTests.swift in Sources */,
 				90F86733FDE40E550DD8B982 /* PipelinePrewarmTests.swift in Sources */,
@@ -1559,7 +1552,6 @@
 				8EFB8822A06651B2A0246633 /* MockInferenceClientForUI.swift in Sources */,
 				04EF6C1DD4443AF13BA6722D /* Photo.swift in Sources */,
 				0871FDE9E5781152BBD6FB44 /* PhotoRatingPredictor.swift in Sources */,
-				C8DC0C9C5326D67D8648CB31 /* PickedFlagCalculator.swift in Sources */,
 				D0CB8BD3324BE76EE0E716B4 /* PipelineCoordinator.swift in Sources */,
 				93DFF6C1F94162A500AB340A /* PreviewView.swift in Sources */,
 				D846F6D40E95F052E6E6CCD5 /* RAWConverter.swift in Sources */,

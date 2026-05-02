@@ -48,7 +48,6 @@ final class PipelineCoordinator: @unchecked Sendable {
         burstFps: Int = 10,
         burstMinCount: Int = 2,
         burstHashTolerance: Int = 12,
-        pickedTopPercentage: Int = PickedFlagCalculator.defaultTopPercentage,
         databaseName: String = ".report.db",
         onPhotoProcessed: (@Sendable (Photo?) async -> Void)? = nil
     ) async {
@@ -389,7 +388,7 @@ final class PipelineCoordinator: @unchecked Sendable {
             inflight.append((fileURL, task))
         }
 
-        // Cancellation: cancel inflight, skip final drain + picked-flag.
+        // Cancellation: cancel inflight, skip final drain.
         // Write-behind chain keeps running in the background so already-
         // finalized photos still save.
         if Task.isCancelled {
@@ -410,12 +409,9 @@ final class PipelineCoordinator: @unchecked Sendable {
         await allWriteBehindLanes()
         let wbEnd = DispatchTime.now()
 
-        await runPickedFlagCalculation(db: db, topPercentage: pickedTopPercentage)
-        let allEnd = DispatchTime.now()
         let mlMs = Double(mlEnd.uptimeNanoseconds - pipelineStart.uptimeNanoseconds) / 1_000_000
         let wbTailMs = Double(wbEnd.uptimeNanoseconds - mlEnd.uptimeNanoseconds) / 1_000_000
-        let finalMs = Double(allEnd.uptimeNanoseconds - wbEnd.uptimeNanoseconds) / 1_000_000
-        logger.notice("pipeline.finished ml=\(String(format: "%.0f", mlMs), privacy: .public)ms wbTail=\(String(format: "%.0f", wbTailMs), privacy: .public)ms final=\(String(format: "%.0f", finalMs), privacy: .public)ms total=\(String(format: "%.0f", mlMs + wbTailMs + finalMs), privacy: .public)ms")
+        logger.notice("pipeline.finished ml=\(String(format: "%.0f", mlMs), privacy: .public)ms wbTail=\(String(format: "%.0f", wbTailMs), privacy: .public)ms total=\(String(format: "%.0f", mlMs + wbTailMs), privacy: .public)ms")
     }
 
     /// Best photo in a burst: highest combined sharpness + aesthetics score.
@@ -434,36 +430,6 @@ final class PipelineCoordinator: @unchecked Sendable {
         photos
             .filter { $0.hasSpecies }
             .max { ($0.speciesConfidence ?? 0) < ($1.speciesConfidence ?? 0) }
-    }
-
-    private func runPickedFlagCalculation(db: ReportDatabase, topPercentage: Int) async {
-        do {
-            let allPhotos = try db.fetchAllPhotos()
-            let pickedIDs = PickedFlagCalculator.calculatePickedIDs(
-                photos: allPhotos, topPercentage: topPercentage
-            )
-
-            if pickedIDs.isEmpty {
-                logger.info("No picked photos (no 5-star photos or empty intersection)")
-                return
-            }
-
-            logger.info("Picked flag: \(pickedIDs.count) photos selected")
-
-            // Clear old picked flags and set new ones
-            for photo in allPhotos {
-                let shouldBePicked = pickedIDs.contains(photo.id)
-                // Only update if flag needs to change (avoid unnecessary DB writes)
-                if photo.isPick != shouldBePicked {
-                    var updated = photo
-                    updated.isPick = shouldBePicked
-                    try db.save(&updated)
-                    _ = try? XMPWriter.write(photo: updated)
-                }
-            }
-        } catch {
-            logger.error("Picked flag calculation failed: \(error)")
-        }
     }
 
     /// Sendable result of the async ML work for one photo — lets the outer
