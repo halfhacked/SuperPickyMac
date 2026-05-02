@@ -36,6 +36,19 @@ import Foundation
         return ids
     }
 
+    @discardableResult
+    private func seedPhoto(filename: String, species: SpeciesMatch?, into folder: URL) throws -> Photo {
+        let db = try ReportDatabase(folderPath: folder)
+        var p = Photo(
+            filename: filename,
+            filePath: folder.appendingPathComponent(filename).path,
+            folderPath: folder.path
+        )
+        if let species { p.assignedSpecies = [species] }
+        try db.save(&p)
+        return p
+    }
+
     // MARK: - setPick(ids:)
 
     @Test func setPickPicksAllWhenAnyUnpicked() throws {
@@ -265,6 +278,41 @@ import Foundation
             let p = try db.fetchPhoto(id: id)!
             #expect(p.assignedSpecies.first?.speciesID == "eagle")
         }
+    }
+
+    // MARK: - applyFilter() auto-selects first when nothing remains active
+
+    @Test func applyFilterAutoSelectsFirstWhenSelectionEmpty() throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        _ = try seedPhoto(filename: "eagle.CR3", species: match("eagle"), into: folder)
+        let p2 = try seedPhoto(filename: "hawk.CR3", species: match("hawk"), into: folder)
+
+        let app = AppState()
+        app.loadPhotos(for: folder)
+        app.selection.clear()
+
+        app.sidebarSelection = .species("hawk")
+        app.applyFilter()
+
+        #expect(app.photos.count == 1)
+        #expect(app.selection.activeID == p2.id)
+    }
+
+    @Test func applyFilterPreservesActiveWhenStillInFilter() throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        _ = try seedPhoto(filename: "a.CR3", species: match("eagle"), into: folder)
+        let p2 = try seedPhoto(filename: "b.CR3", species: match("eagle"), into: folder)
+
+        let app = AppState()
+        app.loadPhotos(for: folder)
+        app.selection.click(p2.id, photos: app.photos)
+
+        app.sidebarSelection = .species("eagle")
+        app.applyFilter()
+
+        #expect(app.selection.activeID == p2.id)
     }
 
     // MARK: - Undo restores species
