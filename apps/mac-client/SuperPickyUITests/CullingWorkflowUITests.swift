@@ -18,6 +18,58 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
         continueAfterFailure = true
     }
 
+    // MARK: - 00: Diagnostic (temporary)
+
+    /// Diagnostic-only: dump sidebar a11y composition so we can see why
+    /// `app.staticTexts["Bald Eagle"]` and `label CONTAINS "Bald Eagle"`
+    /// both return zero matches in CI even though the species rows should
+    /// fit inside the 1020x700 TEST_MODE window. Always passes; output
+    /// goes to the test log. Remove once the species-row a11y exposure
+    /// is understood.
+    func test00_DiagSidebarA11y() {
+        let app = Self.app!
+        XCTAssertTrue(app.outlines.firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.images[A11y.photoPreview].waitForExistence(timeout: 10))
+
+        func emit(_ tag: String, _ value: String) {
+            // Both stdout and NSLog so the line shows up in Xcode and the
+            // raw GitHub Actions log regardless of capture mode.
+            print("DIAG/\(tag) \(value)")
+            NSLog("DIAG/%@ %@", tag, value)
+        }
+
+        emit("window", "frame=\(app.windows.firstMatch.frame)")
+
+        emit("staticTexts.count", "\(app.staticTexts.count)")
+        for (i, st) in app.staticTexts.allElementsBoundByIndex.enumerated() {
+            emit("staticText[\(i)]",
+                 "label=\(st.label.debugDescription) value=\(String(describing: st.value)) frame=\(st.frame)")
+        }
+
+        let outline = app.outlines.firstMatch
+        emit("outline.cells.count", "\(outline.cells.count)")
+        for (i, cell) in outline.cells.allElementsBoundByIndex.enumerated() {
+            emit("outlineCell[\(i)]",
+                 "label=\(cell.label.debugDescription) elementType=\(cell.elementType.rawValue) frame=\(cell.frame)")
+        }
+
+        emit("eagle.matches", "")
+        for (i, el) in app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS 'Eagle'"))
+            .allElementsBoundByIndex.enumerated() {
+            emit("eagle[\(i)]",
+                 "type=\(el.elementType.rawValue) label=\(el.label.debugDescription) frame=\(el.frame)")
+        }
+
+        emit("hummingbird.matches", "")
+        for (i, el) in app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS 'Hummingbird'"))
+            .allElementsBoundByIndex.enumerated() {
+            emit("hummingbird[\(i)]",
+                 "type=\(el.elementType.rawValue) label=\(el.label.debugDescription) frame=\(el.frame)")
+        }
+    }
+
     // MARK: - 01-09: UI Elements
 
     func test01_SidebarRatingLabels() {
