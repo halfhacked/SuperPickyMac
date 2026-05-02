@@ -85,7 +85,11 @@ enum ImageLoader {
     }
 
     /// Encode + write the cache off the decode thread; LRU eviction follows.
+    /// `parent` is the caller's task; we skip the write if it was cancelled
+    /// while the decode was running, so a fast scrubber doesn't pay disk I/O
+    /// for photos it has already navigated past.
     private static func writePreviewCacheAsync(image: CGImage, rawPath: String, capBytes: Int64) {
+        if Task.isCancelled { return }
         let url = PreviewCache.cachedURL(for: rawPath)
         Task.detached(priority: .background) {
             PreviewCache.write(image, to: url)
