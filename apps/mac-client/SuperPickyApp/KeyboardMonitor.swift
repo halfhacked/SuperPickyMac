@@ -53,6 +53,9 @@ class KeyboardMonitorView: NSView {
                     isRightArrow: event.keyCode == 124
                 )
 
+                Task { @MainActor in
+                    PreviewSweepCoordinator.shared.noteInteraction()
+                }
                 let handled = onKey(keyEvent)
                 return handled ? nil : event
             }

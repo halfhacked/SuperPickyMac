@@ -38,6 +38,9 @@ real-photos/
 # Claude Code local state
 .claude/
 
+# Git worktrees
+.worktrees/
+
 # User-picked photo output
 Picked/
 

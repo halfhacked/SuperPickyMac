@@ -70,6 +70,17 @@ final class CullingConfig {
     var birdIdConfidence: Int { didSet { save() } }
     var flightDetectionEnabled: Bool { didSet { save() } }
     var speciesSortOrder: SpeciesSortOrder { didSet { save() } }
+    /// Whether to write JPEG sidecars under
+    /// `~/Library/Caches/com.halfhacked.superpicky/preview/` to speed up
+    /// zoom-mode keyboard navigation. Reads from existing cache files
+    /// regardless.
+    var generatePreviewCache: Bool { didSet { save(); applyPreviewCacheSettings() } }
+    /// LRU cap on the preview-cache size. 0 means unlimited.
+    var previewCacheSizeGB: Int { didSet { save(); applyPreviewCacheSettings() } }
+    /// When enabled, ImageCache.fullRes uses 50 % of physical RAM instead
+    /// of the default 25 %. Useful on Macs dedicated to SuperPicky; should
+    /// be disabled when running other memory-hungry apps alongside.
+    var aggressiveCache: Bool { didSet { save(); applyPreviewCacheSettings() } }
 
     init() {
         let defaults = UserDefaults.standard
@@ -90,6 +101,29 @@ final class CullingConfig {
         self.birdIdConfidence = defaults.object(forKey: "birdIdConfidence") as? Int ?? 70
         self.flightDetectionEnabled = defaults.object(forKey: "flightDetectionEnabled") as? Bool ?? true
         self.speciesSortOrder = SpeciesSortOrder(rawValue: defaults.string(forKey: "speciesSortOrder") ?? "") ?? .name
+        self.generatePreviewCache = defaults.object(forKey: "generatePreviewCache") as? Bool ?? true
+        self.previewCacheSizeGB = defaults.object(forKey: "previewCacheSizeGB") as? Int ?? 20
+        self.aggressiveCache = defaults.object(forKey: "aggressiveCache") as? Bool ?? false
+        applyPreviewCacheSettings()
+    }
+
+    /// Push the current preview-cache settings into the lock-guarded slot
+    /// the decode path reads. Called from init and on every Settings change.
+    /// Also re-sizes the in-memory `ImageCache.fullRes` to match the new
+    /// aggressive-cache choice.
+    private func applyPreviewCacheSettings() {
+        let cap: Int64 = previewCacheSizeGB == 0
+            ? 0
+            : Int64(previewCacheSizeGB) * 1024 * 1024 * 1024
+        let generate = generatePreviewCache
+        let aggressive = aggressiveCache
+        PreviewCache.updateSettings { s in
+            s.generate = generate
+            s.capBytes = cap
+            s.aggressiveCache = aggressive
+        }
+        let budget = ImageCache.computeFullResBudget()
+        ImageCache.fullRes.resize(countLimit: budget.count, byteLimit: budget.bytes)
     }
 
     private func save() {
@@ -111,6 +145,9 @@ final class CullingConfig {
         defaults.set(birdIdConfidence, forKey: "birdIdConfidence")
         defaults.set(flightDetectionEnabled, forKey: "flightDetectionEnabled")
         defaults.set(speciesSortOrder.rawValue, forKey: "speciesSortOrder")
+        defaults.set(generatePreviewCache, forKey: "generatePreviewCache")
+        defaults.set(previewCacheSizeGB, forKey: "previewCacheSizeGB")
+        defaults.set(aggressiveCache, forKey: "aggressiveCache")
     }
 
     /// Look up a localized string. Reading `appLanguage` makes SwiftUI
