@@ -153,23 +153,21 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
         XCTAssertTrue(preview.waitForExistence(timeout: 10))
         let emptyText = app.staticTexts["Select a photo to preview"]
 
-        // Click "Excellent" — if the previously-active photo isn't 5-star,
-        // reconcile clears the active. Auto-select-first should fill it back
-        // in so the preview never falls back to the empty state.
-        app.staticTexts["Excellent"].click()
+        // Two species filters with deterministic non-empty counts via the
+        // mock fixtures: 11 Bald Eagle photos and 11 Anna's Hummingbird
+        // photos. Switching between the two guarantees reconcile clears
+        // the active each time, exercising the auto-select-first path.
+        app.staticTexts["Bald Eagle"].click()
         Thread.sleep(forTimeInterval: 0.5)
-        if !emptyText.exists {
-            XCTAssertTrue(preview.waitForExistence(timeout: 3),
-                          "Preview should remain visible after Excellent filter (auto-select first)")
-        }
+        XCTAssertFalse(emptyText.exists,
+                       "Empty state must not appear after entering Bald Eagle filter")
+        XCTAssertTrue(preview.waitForExistence(timeout: 3))
 
-        // Click "Reject" — same property: filter has photos → preview shows one.
-        app.staticTexts["Reject"].click()
+        app.staticTexts["Anna's Hummingbird"].click()
         Thread.sleep(forTimeInterval: 0.5)
-        if !emptyText.exists {
-            XCTAssertTrue(preview.waitForExistence(timeout: 3),
-                          "Preview should remain visible after Reject filter (auto-select first)")
-        }
+        XCTAssertFalse(emptyText.exists,
+                       "Empty state must not appear after switching to Anna's Hummingbird filter")
+        XCTAssertTrue(preview.waitForExistence(timeout: 3))
 
         // Restore default filter so later tests start from "all photos".
         let folderName = (Self.testDir! as NSString).lastPathComponent

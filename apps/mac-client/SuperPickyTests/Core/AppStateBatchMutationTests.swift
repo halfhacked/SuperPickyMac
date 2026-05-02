@@ -36,6 +36,19 @@ import Foundation
         return ids
     }
 
+    @discardableResult
+    private func seedPhoto(filename: String, species: SpeciesMatch?, into folder: URL) throws -> Photo {
+        let db = try ReportDatabase(folderPath: folder)
+        var p = Photo(
+            filename: filename,
+            filePath: folder.appendingPathComponent(filename).path,
+            folderPath: folder.path
+        )
+        if let species { p.assignedSpecies = [species] }
+        try db.save(&p)
+        return p
+    }
+
     // MARK: - setPick(ids:)
 
     @Test func setPickPicksAllWhenAnyUnpicked() throws {
@@ -272,19 +285,8 @@ import Foundation
     @Test func applyFilterAutoSelectsFirstWhenSelectionEmpty() throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
-        let db = try ReportDatabase(folderPath: folder)
-
-        var p1 = Photo(filename: "eagle.CR3",
-                       filePath: folder.appendingPathComponent("eagle.CR3").path,
-                       folderPath: folder.path)
-        p1.assignedSpecies = [match("eagle")]
-        try db.save(&p1)
-
-        var p2 = Photo(filename: "hawk.CR3",
-                       filePath: folder.appendingPathComponent("hawk.CR3").path,
-                       folderPath: folder.path)
-        p2.assignedSpecies = [match("hawk")]
-        try db.save(&p2)
+        _ = try seedPhoto(filename: "eagle.CR3", species: match("eagle"), into: folder)
+        let p2 = try seedPhoto(filename: "hawk.CR3", species: match("hawk"), into: folder)
 
         let app = AppState()
         app.loadPhotos(for: folder)
@@ -300,19 +302,8 @@ import Foundation
     @Test func applyFilterPreservesActiveWhenStillInFilter() throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
-        let db = try ReportDatabase(folderPath: folder)
-
-        var p1 = Photo(filename: "a.CR3",
-                       filePath: folder.appendingPathComponent("a.CR3").path,
-                       folderPath: folder.path)
-        p1.assignedSpecies = [match("eagle")]
-        try db.save(&p1)
-
-        var p2 = Photo(filename: "b.CR3",
-                       filePath: folder.appendingPathComponent("b.CR3").path,
-                       folderPath: folder.path)
-        p2.assignedSpecies = [match("eagle")]
-        try db.save(&p2)
+        _ = try seedPhoto(filename: "a.CR3", species: match("eagle"), into: folder)
+        let p2 = try seedPhoto(filename: "b.CR3", species: match("eagle"), into: folder)
 
         let app = AppState()
         app.loadPhotos(for: folder)

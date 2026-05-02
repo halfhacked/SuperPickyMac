@@ -193,9 +193,7 @@ final class AppState {
                 buildSpeciesHierarchy()
             }
 
-            // Re-apply current filter instead of resetting to all.
-            // applyFilter() reconciles selection and auto-selects the
-            // first photo when nothing remains active.
+            // Re-apply current filter instead of resetting to all
             applyFilter()
         } catch {
             logger.error("loadPhotos failed: \(error)")
