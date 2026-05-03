@@ -10,7 +10,6 @@ struct PreviewView: View {
     var appState: AppState? = nil
     var onCorrectSpecies: ((UUID, String) -> Void)?
     @Environment(CullingConfig.self) private var config
-    @State private var previousPhotoID: UUID?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -38,9 +37,6 @@ struct PreviewView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-        }
-        .onChange(of: photo?.id) { _, newID in
-            previousPhotoID = newID
         }
     }
 }

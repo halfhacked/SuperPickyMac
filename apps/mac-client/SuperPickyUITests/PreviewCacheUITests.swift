@@ -93,8 +93,8 @@ final class PreviewCacheUITests: SuperPickyUITestCase {
 
         let duringSkimCount = countCacheFiles()
 
-        // Wait through the 500 ms dwell threshold plus a small grace
-        // window for the prefetch to land at least one full-res JPG.
+        // Wait through the 300 ms dwell threshold plus a grace window
+        // for the prefetch to land at least one full-res JPG.
         Thread.sleep(forTimeInterval: 1.5)
 
         let postDwellCount = countCacheFiles()

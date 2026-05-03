@@ -10,7 +10,6 @@ import os
 @Observable
 final class NavigationStateMonitor {
     static let shared = NavigationStateMonitor()
-    static let log = Logger(subsystem: "com.halfhacked.superpicky", category: "NavigationState")
 
     enum State: Sendable, Equatable { case idle, active, skim, dwell }
 
@@ -43,7 +42,7 @@ final class NavigationStateMonitor {
         pendingContext = (currentIndex, photos)
         let newState: State = (gap.map { $0 < Self.skimThreshold } ?? false) ? .skim : .active
         state = newState
-        Self.log.debug("note idx=\(currentIndex) gap=\(gap ?? -1, privacy: .public) state=\(String(describing: newState), privacy: .public)")
+        Logger.navigation.debug("note idx=\(currentIndex) gap=\(gap ?? -1, privacy: .public) state=\(String(describing: newState), privacy: .public)")
         scheduleDwellTimer()
     }
 
@@ -69,7 +68,7 @@ final class NavigationStateMonitor {
 
     private func enterDwell() {
         state = .dwell
-        Self.log.info("enter dwell")
+        Logger.navigation.info("enter dwell")
         if let ctx = pendingContext {
             onEnterDwell?(ctx.currentIndex, ctx.photos)
         }
