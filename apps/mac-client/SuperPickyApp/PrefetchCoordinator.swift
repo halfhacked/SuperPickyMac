@@ -15,19 +15,19 @@ import os
 /// other 9 prefetches running unchanged.
 @MainActor
 final class PrefetchCoordinator {
-    static let shared: PrefetchCoordinator = {
-        let coordinator = PrefetchCoordinator()
-        // Prefetch fires on dwell. ContentView's selection-change callback
-        // routes through NavigationStateMonitor; the monitor's dwell timer
-        // invokes update() with the latest captured (currentIndex, photos).
-        // SuperPickyApp's onAppear forces this lazy-init at launch so the
-        // hook is installed before the first selection change can fire.
-        NavigationStateMonitor.shared.onEnterDwell = { [weak coordinator] index, photos in
-            coordinator?.update(currentIndex: index, photos: photos)
-        }
-        return coordinator
-    }()
+    static let shared = PrefetchCoordinator()
     fileprivate static let log = Logger(subsystem: "com.halfhacked.superpicky", category: "Prefetch")
+
+    /// Wire the dwell hook on `NavigationStateMonitor`. Must be called
+    /// once at app launch from `SuperPickyApp.onAppear`, before any
+    /// selection change can fire — otherwise the first dwell would
+    /// silently no-op. Routes the monitor's dwell-fire to `update()`
+    /// with the latest captured (currentIndex, photos).
+    func bootstrap() {
+        NavigationStateMonitor.shared.onEnterDwell = { [weak self] index, photos in
+            self?.update(currentIndex: index, photos: photos)
+        }
+    }
 
     /// Baseline number of photos to prefetch from bursts beyond the current
     /// one. Grows with the user's direction streak.
