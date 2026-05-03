@@ -92,7 +92,10 @@ struct PreviewCacheSettings: View {
     private var memoryCacheLabel: String {
         let count = ImageCache.fullRes.approximateCount()
         let bytes = ImageCache.fullRes.approximateBytes()
-        let budget = ImageCache.computeFullResBudget()
+        let budget = ImageCacheBudget.compute(
+            physicalMemory: ProcessInfo.processInfo.physicalMemory,
+            aggressive: PreviewCache.settings.aggressiveCache
+        )
         return "\(count) / \(budget.count) photos, \(formatBytes(Int64(bytes))) / \(formatBytes(Int64(budget.bytes)))"
     }
 
