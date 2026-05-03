@@ -161,6 +161,11 @@
 		A2FE12CD3456789012345678 /* PreviewSweepCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FE12CD3456789012345678 /* PreviewSweepCoordinator.swift */; };
 		A3FE12CD3456789012345678 /* PreviewCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3FE12CD3456789012345678 /* PreviewCacheTests.swift */; };
 		A4FE12CD3456789012345678 /* PreviewCacheUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4FE12CD3456789012345678 /* PreviewCacheUITests.swift */; };
+		A5FE12CD3456789012345678 /* ImageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5FE12CD3456789012345678 /* ImageCache.swift */; };
+		A6FE12CD3456789012345678 /* PreviewLoadPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6FE12CD3456789012345678 /* PreviewLoadPolicy.swift */; };
+		A7FE12CD3456789012345678 /* ImageCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7FE12CD3456789012345678 /* ImageCacheTests.swift */; };
+		A8FE12CD3456789012345678 /* PreviewLoadPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8FE12CD3456789012345678 /* PreviewLoadPolicyTests.swift */; };
+		A9FE12CD3456789012345678 /* PrefetchCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9FE12CD3456789012345678 /* PrefetchCoordinatorTests.swift */; };
 		C0FE12CD3456789012345678 /* NavigationStateMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0FE12CD3456789012345678 /* NavigationStateMonitor.swift */; };
 		C1FE12CD3456789012345678 /* NavigationStateMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1FE12CD3456789012345678 /* NavigationStateMonitorTests.swift */; };
 		77015E7D20FE9E94039A4710 /* species_list_US-CT.json in Resources */ = {isa = PBXBuildFile; fileRef = FC69DB9AB0604B1868A3B299 /* species_list_US-CT.json */; };
@@ -611,6 +616,11 @@
 		B2FE12CD3456789012345678 /* PreviewSweepCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewSweepCoordinator.swift; sourceTree = "<group>"; };
 		B3FE12CD3456789012345678 /* PreviewCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewCacheTests.swift; sourceTree = "<group>"; };
 		B4FE12CD3456789012345678 /* PreviewCacheUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewCacheUITests.swift; sourceTree = "<group>"; };
+		B5FE12CD3456789012345678 /* ImageCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCache.swift; sourceTree = "<group>"; };
+		B6FE12CD3456789012345678 /* PreviewLoadPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewLoadPolicy.swift; sourceTree = "<group>"; };
+		B7FE12CD3456789012345678 /* ImageCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCacheTests.swift; sourceTree = "<group>"; };
+		B8FE12CD3456789012345678 /* PreviewLoadPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewLoadPolicyTests.swift; sourceTree = "<group>"; };
+		B9FE12CD3456789012345678 /* PrefetchCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrefetchCoordinatorTests.swift; sourceTree = "<group>"; };
 		D0FE12CD3456789012345678 /* NavigationStateMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationStateMonitor.swift; sourceTree = "<group>"; };
 		D1FE12CD3456789012345678 /* NavigationStateMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationStateMonitorTests.swift; sourceTree = "<group>"; };
 		D354E8BFE2BB6211ADAA855F /* PreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewView.swift; sourceTree = "<group>"; };
@@ -716,6 +726,9 @@
 				B692D00B454892AE77C8C7E2 /* AssignedSpeciesTests.swift */,
 				D1FE12CD3456789012345678 /* NavigationStateMonitorTests.swift */,
 				B3FE12CD3456789012345678 /* PreviewCacheTests.swift */,
+				B7FE12CD3456789012345678 /* ImageCacheTests.swift */,
+				B8FE12CD3456789012345678 /* PreviewLoadPolicyTests.swift */,
+				B9FE12CD3456789012345678 /* PrefetchCoordinatorTests.swift */,
 				A4B59971656A9AD18B236A2D /* BurstDetectorGPSTests.swift */,
 				874D5B3B2230C5E5693018BA /* BurstDetectorTests.swift */,
 				229472C67589424B4A5072F0 /* CullingConfigTests.swift */,
@@ -805,6 +818,8 @@
 				B0FE12CD3456789012345678 /* PreviewCache.swift */,
 				B2FE12CD3456789012345678 /* PreviewSweepCoordinator.swift */,
 				D354E8BFE2BB6211ADAA855F /* PreviewView.swift */,
+				B5FE12CD3456789012345678 /* ImageCache.swift */,
+				B6FE12CD3456789012345678 /* PreviewLoadPolicy.swift */,
 				0252F59F2B2852A81A8FB56F /* RatingEngine.swift */,
 				197514D16AE317EA0B6F2795 /* RAWConverter.swift */,
 				E726094A2C453F4B243141FD /* ReportDatabase.swift */,
@@ -1485,6 +1500,9 @@
 				7CF4E498D7CA0C66F2559AFE /* AssignedSpeciesTests.swift in Sources */,
 				C1FE12CD3456789012345678 /* NavigationStateMonitorTests.swift in Sources */,
 				A3FE12CD3456789012345678 /* PreviewCacheTests.swift in Sources */,
+				A7FE12CD3456789012345678 /* ImageCacheTests.swift in Sources */,
+				A8FE12CD3456789012345678 /* PreviewLoadPolicyTests.swift in Sources */,
+				A9FE12CD3456789012345678 /* PrefetchCoordinatorTests.swift in Sources */,
 				964B6A7D156A55F0174BA44C /* BurstDetectorGPSTests.swift in Sources */,
 				BBEB9FC0A982439506A82FAF /* BurstDetectorTests.swift in Sources */,
 				142EF22BA97B679CCFF77E5A /* CullingConfigTests.swift in Sources */,
@@ -1582,6 +1600,8 @@
 				A0FE12CD3456789012345678 /* PreviewCache.swift in Sources */,
 				A2FE12CD3456789012345678 /* PreviewSweepCoordinator.swift in Sources */,
 				93DFF6C1F94162A500AB340A /* PreviewView.swift in Sources */,
+				A5FE12CD3456789012345678 /* ImageCache.swift in Sources */,
+				A6FE12CD3456789012345678 /* PreviewLoadPolicy.swift in Sources */,
 				D846F6D40E95F052E6E6CCD5 /* RAWConverter.swift in Sources */,
 				F0E93BA6594B7964B23E6005 /* RatingEngine.swift in Sources */,
 				3B30B50F73D434EB0A32456A /* ReportDatabase.swift in Sources */,

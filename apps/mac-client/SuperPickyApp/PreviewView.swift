@@ -41,133 +41,6 @@ struct PreviewView: View {
     }
 }
 
-/// NSCache wrapper keyed by file path. Preview holds many small 2000 px
-/// decodes; fullRes holds full-resolution eager-decoded bitmaps to keep
-/// zoom-mode navigation instant. Both caches are shared between
-/// PreviewView, FullscreenViewer, and the zoom neighbour-prefetcher so
-/// back-arrow nav reuses cached frames regardless of which surface
-/// decoded them.
-///
-/// `fullRes` is sized off `ProcessInfo.physicalMemory` so 64+ GB Macs
-/// can hold hundreds of full-res bitmaps and treat re-visits within the
-/// folder as zero-cost. 16 GB Macs still get the previous 800 MB / 8
-/// entry floor.
-final class ImageCache {
-    static let preview = ImageCache(name: "preview", countLimit: 10, byteLimit: 400 * 1024 * 1024)
-    static let fullRes: ImageCache = {
-        let budget = computeFullResBudget()
-        Logger.imageCache.info(
-            "fullRes budget: \(budget.count) entries, \(budget.bytes / (1024 * 1024)) MB (physical=\(ProcessInfo.processInfo.physicalMemory / (1024 * 1024 * 1024)) GB) aggressive=\(PreviewCache.settings.aggressiveCache, privacy: .public)"
-        )
-        return ImageCache(name: "fullRes", countLimit: budget.count, byteLimit: budget.bytes)
-    }()
-
-    /// Roughly an eager-decoded ARW (6000×4000 × 4 bytes/px ≈ 96 MB).
-    /// Used to translate the byte budget into an entry count.
-    private static let estimatedEntryBytes = 96 * 1024 * 1024
-
-    /// Memory-budget floor (per device) and ceiling. Floor keeps the
-    /// 16 GB-Mac experience at least as good as the previous static
-    /// 800 MB cap. Ceiling avoids starving other apps on workstation
-    /// macs with hundreds of GB of RAM.
-    private static let minBytes = 800 * 1024 * 1024
-    private static let maxBytes = 32 * 1024 * 1024 * 1024  // 32 GB
-
-    /// Resolve the cache budget. "Aggressive" uses 50% of physical RAM,
-    /// "balanced" (default) uses 25%. Both clamp to [minBytes, maxBytes].
-    static func computeFullResBudget() -> (count: Int, bytes: Int) {
-        let physical = ProcessInfo.processInfo.physicalMemory
-        let fraction = PreviewCache.settings.aggressiveCache ? 0.5 : 0.25
-        let raw = Int(Double(physical) * fraction)
-        let bytes = max(minBytes, min(maxBytes, raw))
-        let count = max(8, bytes / estimatedEntryBytes)
-        return (count, bytes)
-    }
-
-    /// Re-apply the budget at runtime when the Settings toggle flips. Cheap
-    /// — NSCache will lazily evict any entries that exceed the new caps.
-    /// Also clamp the bookkeeping mirror to the new limits so the Settings
-    /// readout doesn't briefly show "200 / 80 entries" after a shrink.
-    func resize(countLimit: Int, byteLimit: Int) {
-        cache.countLimit = countLimit
-        cache.totalCostLimit = byteLimit
-        bookkeeping.withLock { state in
-            state.count = min(state.count, countLimit)
-            state.bytes = min(state.bytes, byteLimit)
-        }
-        Logger.imageCache.info("resize \(self.name, privacy: .public): \(countLimit) entries, \(byteLimit / (1024 * 1024)) MB")
-    }
-
-    let name: String
-    private let cache = NSCache<NSString, NSImage>()
-    private let delegate: ImageCacheDelegate
-
-    /// Best-effort mirror of NSCache's contents — NSCache doesn't expose
-    /// count or total cost, so we maintain them ourselves under a lock.
-    /// Used only for diagnostic logging; not relied on for correctness.
-    private let bookkeeping = OSAllocatedUnfairLock<(count: Int, bytes: Int)>(initialState: (0, 0))
-
-    init(name: String, countLimit: Int, byteLimit: Int) {
-        self.name = name
-        self.delegate = ImageCacheDelegate()
-        cache.countLimit = countLimit
-        cache.totalCostLimit = byteLimit
-        cache.delegate = delegate
-        delegate.owner = self
-    }
-
-    func get(_ key: String) -> NSImage? { cache.object(forKey: key as NSString) }
-
-    func set(_ key: String, image: NSImage) {
-        let w = image.representations.first?.pixelsWide ?? Int(image.size.width)
-        let h = image.representations.first?.pixelsHigh ?? Int(image.size.height)
-        let cost = w * h * 4
-        cache.setObject(image, forKey: key as NSString, cost: cost)
-        // NSCache's willEvictObject delegate is best-effort — under count
-        // overflow it sometimes batch-evicts without notifying. Cap our
-        // mirror at the configured limits so bookkeeping can't run away;
-        // the eviction callback brings it down further when it fires.
-        bookkeeping.withLock { state in
-            state.count = min(state.count + 1, self.cache.countLimit)
-            state.bytes = min(state.bytes + cost, self.cache.totalCostLimit)
-        }
-        Logger.imageCache.info(
-            "\(self.name, privacy: .public) set \((key as NSString).lastPathComponent, privacy: .public) cost=\(cost / (1024 * 1024))MB approx_total=\(self.approximateBytes() / (1024 * 1024))MB count=\(self.approximateCount())"
-        )
-    }
-
-    func approximateCount() -> Int { bookkeeping.withLock { $0.count } }
-    func approximateBytes() -> Int { bookkeeping.withLock { $0.bytes } }
-
-    fileprivate func noteEviction(_ image: NSImage) {
-        let w = image.representations.first?.pixelsWide ?? Int(image.size.width)
-        let h = image.representations.first?.pixelsHigh ?? Int(image.size.height)
-        let cost = w * h * 4
-        bookkeeping.withLock { state in
-            state.count = max(0, state.count - 1)
-            state.bytes = max(0, state.bytes - cost)
-        }
-        Logger.imageCache.info(
-            "\(self.name, privacy: .public) evict cost=\(cost / (1024 * 1024))MB approx_total=\(self.approximateBytes() / (1024 * 1024))MB count=\(self.approximateCount())"
-        )
-    }
-}
-
-/// Per-instance NSCache delegate so each `ImageCache` knows when its own
-/// cache evicts an entry and can update its bookkeeping.
-private final class ImageCacheDelegate: NSObject, NSCacheDelegate {
-    weak var owner: ImageCache?
-
-    func cache(_ cache: NSCache<AnyObject, AnyObject>, willEvictObject obj: Any) {
-        guard let image = obj as? NSImage else { return }
-        owner?.noteEviction(image)
-    }
-}
-
-extension Logger {
-    fileprivate static let imageCache = Logger(subsystem: "com.halfhacked.superpicky", category: "ImageCache")
-}
-
 /// Loads a full-size preview image asynchronously.
 struct AsyncPreviewImage: View {
     let filePath: String
@@ -208,32 +81,34 @@ struct AsyncPreviewImage: View {
         }
         .task(id: filePath) {
             isFullRes = false
-            // Always prefer an in-RAM full-res hit, even during skim — it's
-            // free (no decode, no allocation) and full quality.
-            if let cached = ImageCache.fullRes.get(filePath) {
-                image = cached
+            let cachedFullRes = ImageCache.fullRes.get(filePath)
+            let cachedPreview = ImageCache.preview.get(filePath)
+            let action = decidePrimaryLoad(
+                state: NavigationStateMonitor.shared.state,
+                zoomScale: zoomState.scale,
+                hasFullRes: cachedFullRes != nil,
+                hasPreview: cachedPreview != nil
+            )
+            switch action {
+            case .useCachedFullRes:
+                image = cachedFullRes
                 isFullRes = true
                 return
-            }
-            // Zoom + skim: take the 2000 px preview path so fast scrubbing
-            // hits ~30/sec. Single deliberate keypresses in zoom (state !=
-            // .skim at task start) keep the current direct-to-full-res
-            // behavior.
-            let inSkim = NavigationStateMonitor.shared.state == .skim
-            if zoomState.scale > 1.0, !inSkim {
+            case .loadFullResDirect:
                 if let full = await loadFullRes(filePath) {
                     guard !Task.isCancelled else { return }
                     image = full
                     isFullRes = true
                 }
                 return
-            }
-            if let cached = ImageCache.preview.get(filePath) {
-                image = cached
-            } else if let loaded = await ImageLoader.load(path: filePath, maxPixelSize: 2000) {
-                guard !Task.isCancelled else { return }
-                ImageCache.preview.set(filePath, image: loaded)
-                image = loaded
+            case .useCachedPreview:
+                image = cachedPreview
+            case .loadPreview:
+                if let loaded = await ImageLoader.load(path: filePath, maxPixelSize: 2000) {
+                    guard !Task.isCancelled else { return }
+                    ImageCache.preview.set(filePath, image: loaded)
+                    image = loaded
+                }
             }
             // Dwell-preload: rebinding an 80 MB NSImage while at fit scale
             // forces a main-thread redraw that stalls arrow-key handling, so
