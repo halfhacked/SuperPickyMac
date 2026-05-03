@@ -15,7 +15,17 @@ import os
 /// other 9 prefetches running unchanged.
 @MainActor
 final class PrefetchCoordinator {
-    static let shared = PrefetchCoordinator()
+    static let shared: PrefetchCoordinator = {
+        let coordinator = PrefetchCoordinator()
+        // Prefetch fires on dwell. ContentView's selection-change
+        // callback now routes through NavigationStateMonitor; the
+        // monitor's dwell timer invokes update() with the latest
+        // captured (currentIndex, photos).
+        NavigationStateMonitor.shared.onEnterDwell = { [weak coordinator] index, photos in
+            coordinator?.update(currentIndex: index, photos: photos)
+        }
+        return coordinator
+    }()
     fileprivate static let log = Logger(subsystem: "com.halfhacked.superpicky", category: "Prefetch")
 
     /// Baseline number of photos to prefetch from bursts beyond the current
