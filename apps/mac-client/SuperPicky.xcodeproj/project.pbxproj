@@ -165,6 +165,7 @@
 		A6FE12CD3456789012345678 /* PreviewLoadPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6FE12CD3456789012345678 /* PreviewLoadPolicy.swift */; };
 		A7FE12CD3456789012345678 /* ImageCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7FE12CD3456789012345678 /* ImageCacheTests.swift */; };
 		A8FE12CD3456789012345678 /* PreviewLoadPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8FE12CD3456789012345678 /* PreviewLoadPolicyTests.swift */; };
+		A9FE12CD3456789012345678 /* PrefetchCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9FE12CD3456789012345678 /* PrefetchCoordinatorTests.swift */; };
 		C0FE12CD3456789012345678 /* NavigationStateMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0FE12CD3456789012345678 /* NavigationStateMonitor.swift */; };
 		C1FE12CD3456789012345678 /* NavigationStateMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1FE12CD3456789012345678 /* NavigationStateMonitorTests.swift */; };
 		77015E7D20FE9E94039A4710 /* species_list_US-CT.json in Resources */ = {isa = PBXBuildFile; fileRef = FC69DB9AB0604B1868A3B299 /* species_list_US-CT.json */; };
@@ -619,6 +620,7 @@
 		B6FE12CD3456789012345678 /* PreviewLoadPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewLoadPolicy.swift; sourceTree = "<group>"; };
 		B7FE12CD3456789012345678 /* ImageCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCacheTests.swift; sourceTree = "<group>"; };
 		B8FE12CD3456789012345678 /* PreviewLoadPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewLoadPolicyTests.swift; sourceTree = "<group>"; };
+		B9FE12CD3456789012345678 /* PrefetchCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrefetchCoordinatorTests.swift; sourceTree = "<group>"; };
 		D0FE12CD3456789012345678 /* NavigationStateMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationStateMonitor.swift; sourceTree = "<group>"; };
 		D1FE12CD3456789012345678 /* NavigationStateMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationStateMonitorTests.swift; sourceTree = "<group>"; };
 		D354E8BFE2BB6211ADAA855F /* PreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewView.swift; sourceTree = "<group>"; };
@@ -726,6 +728,7 @@
 				B3FE12CD3456789012345678 /* PreviewCacheTests.swift */,
 				B7FE12CD3456789012345678 /* ImageCacheTests.swift */,
 				B8FE12CD3456789012345678 /* PreviewLoadPolicyTests.swift */,
+				B9FE12CD3456789012345678 /* PrefetchCoordinatorTests.swift */,
 				A4B59971656A9AD18B236A2D /* BurstDetectorGPSTests.swift */,
 				874D5B3B2230C5E5693018BA /* BurstDetectorTests.swift */,
 				229472C67589424B4A5072F0 /* CullingConfigTests.swift */,
@@ -1499,6 +1502,7 @@
 				A3FE12CD3456789012345678 /* PreviewCacheTests.swift in Sources */,
 				A7FE12CD3456789012345678 /* ImageCacheTests.swift in Sources */,
 				A8FE12CD3456789012345678 /* PreviewLoadPolicyTests.swift in Sources */,
+				A9FE12CD3456789012345678 /* PrefetchCoordinatorTests.swift in Sources */,
 				964B6A7D156A55F0174BA44C /* BurstDetectorGPSTests.swift in Sources */,
 				BBEB9FC0A982439506A82FAF /* BurstDetectorTests.swift in Sources */,
 				142EF22BA97B679CCFF77E5A /* CullingConfigTests.swift in Sources */,
