@@ -10,7 +10,6 @@ struct PreviewView: View {
     var appState: AppState? = nil
     var onCorrectSpecies: ((UUID, String) -> Void)?
     @Environment(CullingConfig.self) private var config
-    @State private var previousPhotoID: UUID?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -38,9 +37,6 @@ struct PreviewView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-        }
-        .onChange(of: photo?.id) { _, newID in
-            previousPhotoID = newID
         }
     }
 }
@@ -180,6 +176,27 @@ struct AsyncPreviewImage: View {
     @State private var image: NSImage?
     @State private var isFullRes = false
 
+    /// Replace the displayed preview-tier image with a full-res decode in
+    /// place. Used both when the user zooms in and when the user dwells
+    /// on a photo while already at zoom > 1.0.
+    private func upgradeToFullRes() {
+        if isFullRes { return }
+        isFullRes = true
+        if let cached = ImageCache.fullRes.get(filePath) {
+            image = cached
+            return
+        }
+        let pinnedPath = filePath
+        Task {
+            if let full = await loadFullRes(pinnedPath) {
+                guard !Task.isCancelled, filePath == pinnedPath else { return }
+                image = full
+            } else if filePath == pinnedPath {
+                isFullRes = false
+            }
+        }
+    }
+
     var body: some View {
         ZStack {
             Color(nsColor: .controlBackgroundColor)
@@ -191,7 +208,19 @@ struct AsyncPreviewImage: View {
         }
         .task(id: filePath) {
             isFullRes = false
-            if zoomState.scale > 1.0 {
+            // Always prefer an in-RAM full-res hit, even during skim — it's
+            // free (no decode, no allocation) and full quality.
+            if let cached = ImageCache.fullRes.get(filePath) {
+                image = cached
+                isFullRes = true
+                return
+            }
+            // Zoom + skim: take the 2000 px preview path so fast scrubbing
+            // hits ~30/sec. Single deliberate keypresses in zoom (state !=
+            // .skim at task start) keep the current direct-to-full-res
+            // behavior.
+            let inSkim = NavigationStateMonitor.shared.state == .skim
+            if zoomState.scale > 1.0, !inSkim {
                 if let full = await loadFullRes(filePath) {
                     guard !Task.isCancelled else { return }
                     image = full
@@ -222,21 +251,14 @@ struct AsyncPreviewImage: View {
             }
         }
         .onChange(of: zoomState.scale) { _, newScale in
-            guard newScale > 1.0, !isFullRes else { return }
-            isFullRes = true
-            if let cached = ImageCache.fullRes.get(filePath) {
-                image = cached
-                return
-            }
-            let pinnedPath = filePath
-            Task {
-                if let full = await loadFullRes(pinnedPath) {
-                    guard !Task.isCancelled, filePath == pinnedPath else { return }
-                    image = full
-                } else if filePath == pinnedPath {
-                    isFullRes = false  // allow retry on next zoom
-                }
-            }
+            guard newScale > 1.0 else { return }
+            upgradeToFullRes()
+        }
+        .onChange(of: NavigationStateMonitor.shared.state) { _, newState in
+            // After a skim ends in zoom mode, swap the soft preview-tier
+            // image we displayed during skim for a full-res decode.
+            guard newState == .dwell, zoomState.scale > 1.0 else { return }
+            upgradeToFullRes()
         }
     }
 

@@ -161,6 +161,8 @@
 		A2FE12CD3456789012345678 /* PreviewSweepCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FE12CD3456789012345678 /* PreviewSweepCoordinator.swift */; };
 		A3FE12CD3456789012345678 /* PreviewCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3FE12CD3456789012345678 /* PreviewCacheTests.swift */; };
 		A4FE12CD3456789012345678 /* PreviewCacheUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4FE12CD3456789012345678 /* PreviewCacheUITests.swift */; };
+		C0FE12CD3456789012345678 /* NavigationStateMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0FE12CD3456789012345678 /* NavigationStateMonitor.swift */; };
+		C1FE12CD3456789012345678 /* NavigationStateMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1FE12CD3456789012345678 /* NavigationStateMonitorTests.swift */; };
 		77015E7D20FE9E94039A4710 /* species_list_US-CT.json in Resources */ = {isa = PBXBuildFile; fileRef = FC69DB9AB0604B1868A3B299 /* species_list_US-CT.json */; };
 		77E2CDCA44CEAFF85E7A5846 /* species_list_CN-71.json in Resources */ = {isa = PBXBuildFile; fileRef = EA903F7D9120FDF6460CD01E /* species_list_CN-71.json */; };
 		78939EE79C0DDD7C2E4B4BF8 /* offline_index.json in Resources */ = {isa = PBXBuildFile; fileRef = 67D9011A882448A3C9139930 /* offline_index.json */; };
@@ -609,6 +611,8 @@
 		B2FE12CD3456789012345678 /* PreviewSweepCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewSweepCoordinator.swift; sourceTree = "<group>"; };
 		B3FE12CD3456789012345678 /* PreviewCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewCacheTests.swift; sourceTree = "<group>"; };
 		B4FE12CD3456789012345678 /* PreviewCacheUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewCacheUITests.swift; sourceTree = "<group>"; };
+		D0FE12CD3456789012345678 /* NavigationStateMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationStateMonitor.swift; sourceTree = "<group>"; };
+		D1FE12CD3456789012345678 /* NavigationStateMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationStateMonitorTests.swift; sourceTree = "<group>"; };
 		D354E8BFE2BB6211ADAA855F /* PreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewView.swift; sourceTree = "<group>"; };
 		D3A36E4779D719861038F9E4 /* species_list_US-UT.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-UT.json"; sourceTree = "<group>"; };
 		D3AC27931EC190A197652D78 /* FlightModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlightModel.swift; sourceTree = "<group>"; };
@@ -710,6 +714,7 @@
 			isa = PBXGroup;
 			children = (
 				B692D00B454892AE77C8C7E2 /* AssignedSpeciesTests.swift */,
+				D1FE12CD3456789012345678 /* NavigationStateMonitorTests.swift */,
 				B3FE12CD3456789012345678 /* PreviewCacheTests.swift */,
 				A4B59971656A9AD18B236A2D /* BurstDetectorGPSTests.swift */,
 				874D5B3B2230C5E5693018BA /* BurstDetectorTests.swift */,
@@ -792,6 +797,7 @@
 				71E1C64CFB5D669BE650C34C /* LocalizationManager.swift */,
 				D16D64E760C59FE88930FB6D /* Logger.swift */,
 				978BD285BA4245F2711720E0 /* MainView.swift */,
+				D0FE12CD3456789012345678 /* NavigationStateMonitor.swift */,
 				5EAEF125F85AE85042A82314 /* Photo.swift */,
 				5DF7946FDA6598F54AFD92F2 /* PhotoRatingPredictor.swift */,
 				93BD233E1B5ECE7A7C1FDAB1 /* PipelineCoordinator.swift */,
@@ -1477,6 +1483,7 @@
 			files = (
 				DDE8E519157564DD655F575A /* AestheticsModelTests.swift in Sources */,
 				7CF4E498D7CA0C66F2559AFE /* AssignedSpeciesTests.swift in Sources */,
+				C1FE12CD3456789012345678 /* NavigationStateMonitorTests.swift in Sources */,
 				A3FE12CD3456789012345678 /* PreviewCacheTests.swift in Sources */,
 				964B6A7D156A55F0174BA44C /* BurstDetectorGPSTests.swift in Sources */,
 				BBEB9FC0A982439506A82FAF /* BurstDetectorTests.swift in Sources */,
@@ -1567,6 +1574,7 @@
 				743E98D2D106B2DC4CD9A375 /* Logger.swift in Sources */,
 				EB526AFC3879286A8B692A21 /* MainView.swift in Sources */,
 				8EFB8822A06651B2A0246633 /* MockInferenceClientForUI.swift in Sources */,
+				C0FE12CD3456789012345678 /* NavigationStateMonitor.swift in Sources */,
 				04EF6C1DD4443AF13BA6722D /* Photo.swift in Sources */,
 				0871FDE9E5781152BBD6FB44 /* PhotoRatingPredictor.swift in Sources */,
 				D0CB8BD3324BE76EE0E716B4 /* PipelineCoordinator.swift in Sources */,

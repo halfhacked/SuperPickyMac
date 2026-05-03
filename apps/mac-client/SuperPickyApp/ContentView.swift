@@ -86,7 +86,7 @@ struct ContentView: View {
                               let idx = filteredPhotos.firstIndex(where: { $0.id == newID }) else {
                             return
                         }
-                        PrefetchCoordinator.shared.update(
+                        NavigationStateMonitor.shared.note(
                             currentIndex: idx,
                             photos: filteredPhotos
                         )
