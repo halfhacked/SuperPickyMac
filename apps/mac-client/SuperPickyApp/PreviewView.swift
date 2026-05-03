@@ -81,32 +81,32 @@ struct AsyncPreviewImage: View {
         }
         .task(id: filePath) {
             isFullRes = false
-            // Always prefer an in-RAM full-res hit, even during skim — it's
-            // free (no decode, no allocation) and full quality.
-            if let cached = ImageCache.fullRes.get(filePath) {
-                image = cached
+            let action = decidePrimaryLoad(
+                state: NavigationStateMonitor.shared.state,
+                zoomScale: zoomState.scale,
+                hasFullRes: ImageCache.fullRes.get(filePath) != nil,
+                hasPreview: ImageCache.preview.get(filePath) != nil
+            )
+            switch action {
+            case .useCachedFullRes:
+                image = ImageCache.fullRes.get(filePath)
                 isFullRes = true
                 return
-            }
-            // Zoom + skim: take the 2000 px preview path so fast scrubbing
-            // hits ~30/sec. Single deliberate keypresses in zoom (state !=
-            // .skim at task start) keep the current direct-to-full-res
-            // behavior.
-            let inSkim = NavigationStateMonitor.shared.state == .skim
-            if zoomState.scale > 1.0, !inSkim {
+            case .loadFullResDirect:
                 if let full = await loadFullRes(filePath) {
                     guard !Task.isCancelled else { return }
                     image = full
                     isFullRes = true
                 }
                 return
-            }
-            if let cached = ImageCache.preview.get(filePath) {
-                image = cached
-            } else if let loaded = await ImageLoader.load(path: filePath, maxPixelSize: 2000) {
-                guard !Task.isCancelled else { return }
-                ImageCache.preview.set(filePath, image: loaded)
-                image = loaded
+            case .useCachedPreview:
+                image = ImageCache.preview.get(filePath)
+            case .loadPreview:
+                if let loaded = await ImageLoader.load(path: filePath, maxPixelSize: 2000) {
+                    guard !Task.isCancelled else { return }
+                    ImageCache.preview.set(filePath, image: loaded)
+                    image = loaded
+                }
             }
             // Dwell-preload: rebinding an 80 MB NSImage while at fit scale
             // forces a main-thread redraw that stalls arrow-key handling, so
