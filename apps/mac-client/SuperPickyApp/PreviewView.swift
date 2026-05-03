@@ -180,6 +180,27 @@ struct AsyncPreviewImage: View {
     @State private var image: NSImage?
     @State private var isFullRes = false
 
+    /// Replace the displayed preview-tier image with a full-res decode in
+    /// place. Used both when the user zooms in and when the user dwells
+    /// on a photo while already at zoom > 1.0.
+    private func upgradeToFullRes() {
+        if isFullRes { return }
+        isFullRes = true
+        if let cached = ImageCache.fullRes.get(filePath) {
+            image = cached
+            return
+        }
+        let pinnedPath = filePath
+        Task {
+            if let full = await loadFullRes(pinnedPath) {
+                guard !Task.isCancelled, filePath == pinnedPath else { return }
+                image = full
+            } else if filePath == pinnedPath {
+                isFullRes = false
+            }
+        }
+    }
+
     var body: some View {
         ZStack {
             Color(nsColor: .controlBackgroundColor)
@@ -227,21 +248,14 @@ struct AsyncPreviewImage: View {
             }
         }
         .onChange(of: zoomState.scale) { _, newScale in
-            guard newScale > 1.0, !isFullRes else { return }
-            isFullRes = true
-            if let cached = ImageCache.fullRes.get(filePath) {
-                image = cached
-                return
-            }
-            let pinnedPath = filePath
-            Task {
-                if let full = await loadFullRes(pinnedPath) {
-                    guard !Task.isCancelled, filePath == pinnedPath else { return }
-                    image = full
-                } else if filePath == pinnedPath {
-                    isFullRes = false  // allow retry on next zoom
-                }
-            }
+            guard newScale > 1.0 else { return }
+            upgradeToFullRes()
+        }
+        .onChange(of: NavigationStateMonitor.shared.state) { _, newState in
+            // After a skim ends in zoom mode, swap the soft preview-tier
+            // image we displayed during skim for a full-res decode.
+            guard newState == .dwell, zoomState.scale > 1.0 else { return }
+            upgradeToFullRes()
         }
     }
 
