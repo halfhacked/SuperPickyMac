@@ -38,6 +38,11 @@ struct SuperPickyApp: App {
             .preferredColorScheme(config.appTheme.colorScheme)
             .onAppear {
                 LocalizationManager.localizeMenuBar(language: config.appLanguage)
+                // Touch PrefetchCoordinator.shared so its lazy-init closure
+                // installs NavigationStateMonitor.shared.onEnterDwell before
+                // any selection change can fire — otherwise the first dwell
+                // would silently no-op.
+                _ = PrefetchCoordinator.shared
                 Task { await modelState.ensureReady() }
             }
             .onChange(of: config.appTheme) { _, theme in

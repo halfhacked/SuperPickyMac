@@ -17,10 +17,11 @@ import os
 final class PrefetchCoordinator {
     static let shared: PrefetchCoordinator = {
         let coordinator = PrefetchCoordinator()
-        // Prefetch fires on dwell. ContentView's selection-change
-        // callback now routes through NavigationStateMonitor; the
-        // monitor's dwell timer invokes update() with the latest
-        // captured (currentIndex, photos).
+        // Prefetch fires on dwell. ContentView's selection-change callback
+        // routes through NavigationStateMonitor; the monitor's dwell timer
+        // invokes update() with the latest captured (currentIndex, photos).
+        // SuperPickyApp's onAppear forces this lazy-init at launch so the
+        // hook is installed before the first selection change can fire.
         NavigationStateMonitor.shared.onEnterDwell = { [weak coordinator] index, photos in
             coordinator?.update(currentIndex: index, photos: photos)
         }
