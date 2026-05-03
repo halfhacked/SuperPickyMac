@@ -81,15 +81,17 @@ struct AsyncPreviewImage: View {
         }
         .task(id: filePath) {
             isFullRes = false
+            let cachedFullRes = ImageCache.fullRes.get(filePath)
+            let cachedPreview = ImageCache.preview.get(filePath)
             let action = decidePrimaryLoad(
                 state: NavigationStateMonitor.shared.state,
                 zoomScale: zoomState.scale,
-                hasFullRes: ImageCache.fullRes.get(filePath) != nil,
-                hasPreview: ImageCache.preview.get(filePath) != nil
+                hasFullRes: cachedFullRes != nil,
+                hasPreview: cachedPreview != nil
             )
             switch action {
             case .useCachedFullRes:
-                image = ImageCache.fullRes.get(filePath)
+                image = cachedFullRes
                 isFullRes = true
                 return
             case .loadFullResDirect:
@@ -100,7 +102,7 @@ struct AsyncPreviewImage: View {
                 }
                 return
             case .useCachedPreview:
-                image = ImageCache.preview.get(filePath)
+                image = cachedPreview
             case .loadPreview:
                 if let loaded = await ImageLoader.load(path: filePath, maxPixelSize: 2000) {
                     guard !Task.isCancelled else { return }

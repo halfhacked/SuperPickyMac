@@ -3,14 +3,18 @@ import Foundation
 import CoreGraphics
 @testable import SuperPicky
 
-/// Exhaustive tests for `decidePrimaryLoad`. The function picks one of four
-/// load actions for `AsyncPreviewImage.body.task` based on the
+/// Tests for `decidePrimaryLoad`. The function picks one of four load
+/// actions for `AsyncPreviewImage.body.task` based on the
 /// `NavigationStateMonitor` state, the current zoom scale, and whether
 /// either RAM cache currently has the photo.
 ///
-/// Pinning rule from PreviewView.swift:211 — an in-RAM full-res hit ALWAYS
-/// wins, regardless of zoom or skim state — because it's free (no decode,
-/// no allocation) and full quality.
+/// Pinning rule (step 1 of `decidePrimaryLoad`) — an in-RAM full-res hit
+/// ALWAYS wins, regardless of zoom or skim state — because it's free
+/// (no decode, no allocation) and full quality.
+///
+/// 11 tests cover every branch in `decidePrimaryLoad`. Combos are elided
+/// when `state` is irrelevant by equivalence class (e.g. once `hasFullRes`
+/// is true, `state` is never read).
 struct PreviewLoadPolicyTests {
 
     // MARK: - .useCachedFullRes wins everywhere
@@ -28,7 +32,7 @@ struct PreviewLoadPolicyTests {
     }
 
     @Test func cachedFullResWinsEvenInSkim() {
-        // PreviewView.swift:211 rule: full-res RAM hit beats the
+        // Step 1 of decidePrimaryLoad: full-res RAM hit beats the
         // 2000 px preview path even during fast scrubbing.
         let action = decidePrimaryLoad(state: .skim, zoomScale: 2.0,
                                        hasFullRes: true, hasPreview: false)
