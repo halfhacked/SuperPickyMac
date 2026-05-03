@@ -122,7 +122,10 @@ final class CullingConfig {
             s.capBytes = cap
             s.aggressiveCache = aggressive
         }
-        let budget = ImageCache.computeFullResBudget()
+        let budget = ImageCacheBudget.compute(
+            physicalMemory: ProcessInfo.processInfo.physicalMemory,
+            aggressive: PreviewCache.settings.aggressiveCache
+        )
         ImageCache.fullRes.resize(countLimit: budget.count, byteLimit: budget.bytes)
     }
 
