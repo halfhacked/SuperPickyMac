@@ -74,4 +74,45 @@ final class PreviewCacheUITests: SuperPickyUITestCase {
         XCTAssertNotNil(cached,
                         "Preview cache file should be regenerated after a manual wipe")
     }
+
+    func test03_skimSuppressesPrefetchUntilDwell() throws {
+        // Wipe cache — the disk-JPG sweep is gated behind dwell too via
+        // the foreground decode path, so a fresh start makes the delta
+        // visible.
+        try? FileManager.default.removeItem(at: Self.cacheRoot)
+
+        let app = Self.app!
+        XCTAssertTrue(app.images[A11y.photoPreview].waitForExistence(timeout: 10))
+        app.typeKey("z", modifierFlags: [])
+
+        // Rapid keypresses — XCUITest delivers them synchronously, so the
+        // inter-key gap is ~0–10 ms, well under the 250 ms skim threshold.
+        for _ in 0..<10 {
+            app.typeKey(.rightArrow, modifierFlags: [])
+        }
+
+        let duringSkimCount = countCacheFiles()
+
+        // Wait through the 300 ms dwell threshold plus a grace window
+        // for the prefetch to land at least one full-res JPG.
+        Thread.sleep(forTimeInterval: 1.5)
+
+        let postDwellCount = countCacheFiles()
+        XCTAssertGreaterThan(postDwellCount, duringSkimCount,
+                             "Dwell should write more cache files than were present during skim")
+    }
+
+    private func countCacheFiles() -> Int {
+        guard let enumerator = FileManager.default.enumerator(
+            at: Self.cacheRoot,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else { return 0 }
+        var count = 0
+        for case let url as URL in enumerator
+            where url.pathExtension == "jpg" {
+            count += 1
+        }
+        return count
+    }
 }
