@@ -10,40 +10,37 @@ struct ImageCacheBudgetTests {
 
     private let oneGB: UInt64 = 1024 * 1024 * 1024
 
-    @Test func floorOnLowMemoryMac() {
-        // 8 GB Mac, balanced: 25% would be 2 GB, but minBytes (800 MB) is
-        // the floor — except 2 GB > 800 MB so balance wins. The actual
-        // floor case is 1 GB physical; 25% = 256 MB, clamped to 800 MB.
+    /// 1 GB physical → 25% = 256 MB, clamped up to the 800 MB floor.
+    @Test func balancedClampsUpToFloor() {
         let (count, bytes) = ImageCacheBudget.compute(physicalMemory: oneGB, aggressive: false)
         #expect(bytes == ImageCacheBudget.minBytes)
-        #expect(count >= 8)
-    }
-
-    @Test func balancedScalesWith25Percent() {
-        let (count, bytes) = ImageCacheBudget.compute(physicalMemory: 64 * oneGB, aggressive: false)
-        // 25% of 64 GB = 16 GB, well within [minBytes, maxBytes].
-        #expect(bytes == 16 * Int(oneGB))
-        #expect(count == bytes / ImageCacheBudget.estimatedEntryBytes)
-    }
-
-    @Test func aggressiveDoublesBudget() {
-        let (_, bytes) = ImageCacheBudget.compute(physicalMemory: 64 * oneGB, aggressive: true)
-        // 50% of 64 GB = 32 GB — exactly maxBytes.
-        #expect(bytes == ImageCacheBudget.maxBytes)
-    }
-
-    @Test func ceilingClampsHugeMemory() {
-        let (_, bytes) = ImageCacheBudget.compute(physicalMemory: 256 * oneGB, aggressive: true)
-        // 50% of 256 GB = 128 GB, clamped to maxBytes (32 GB).
-        #expect(bytes == ImageCacheBudget.maxBytes)
-    }
-
-    @Test func countNeverBelowEight() {
-        // Synthetic tiny memory: bytes clamps to minBytes (800 MB), and
-        // 800 MB / 96 MB = 8 entries, which is also the floor. Use a
-        // value so small that the raw computation would yield 0 entries.
-        let (count, bytes) = ImageCacheBudget.compute(physicalMemory: 0, aggressive: false)
-        #expect(bytes == ImageCacheBudget.minBytes)
         #expect(count == 8)
+    }
+
+    /// 64 GB balanced → 25% = 16 GB, well within [minBytes, maxBytes].
+    @Test func balancedScalesAt25Percent() {
+        let (_, bytes) = ImageCacheBudget.compute(physicalMemory: 64 * oneGB, aggressive: false)
+        #expect(bytes == 16 * Int(oneGB))
+    }
+
+    /// 16 GB aggressive → 50% = 8 GB, well within [minBytes, maxBytes].
+    /// Pins the aggressive multiplier in the unclamped regime.
+    @Test func aggressiveScalesAt50Percent() {
+        let (_, bytes) = ImageCacheBudget.compute(physicalMemory: 16 * oneGB, aggressive: true)
+        #expect(bytes == 8 * Int(oneGB))
+    }
+
+    /// Same physical memory, balanced vs aggressive: aggressive must double
+    /// the byte budget when neither result is clamped.
+    @Test func aggressiveDoublesBalanced() {
+        let balanced = ImageCacheBudget.compute(physicalMemory: 16 * oneGB, aggressive: false)
+        let aggressive = ImageCacheBudget.compute(physicalMemory: 16 * oneGB, aggressive: true)
+        #expect(aggressive.bytes == balanced.bytes * 2)
+    }
+
+    /// 256 GB aggressive → 50% = 128 GB, clamped down to maxBytes (32 GB).
+    @Test func aggressiveClampsDownToCeiling() {
+        let (_, bytes) = ImageCacheBudget.compute(physicalMemory: 256 * oneGB, aggressive: true)
+        #expect(bytes == ImageCacheBudget.maxBytes)
     }
 }

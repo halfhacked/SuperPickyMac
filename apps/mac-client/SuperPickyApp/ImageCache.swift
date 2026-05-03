@@ -43,12 +43,11 @@ enum ImageCacheBudget {
 final class ImageCache {
     static let preview = ImageCache(name: "preview", countLimit: 10, byteLimit: 400 * 1024 * 1024)
     static let fullRes: ImageCache = {
-        let budget = ImageCacheBudget.compute(
-            physicalMemory: ProcessInfo.processInfo.physicalMemory,
-            aggressive: PreviewCache.settings.aggressiveCache
-        )
+        let physical = ProcessInfo.processInfo.physicalMemory
+        let aggressive = PreviewCache.settings.aggressiveCache
+        let budget = ImageCacheBudget.compute(physicalMemory: physical, aggressive: aggressive)
         Logger.imageCache.info(
-            "fullRes budget: \(budget.count) entries, \(budget.bytes / (1024 * 1024)) MB (physical=\(ProcessInfo.processInfo.physicalMemory / (1024 * 1024 * 1024)) GB) aggressive=\(PreviewCache.settings.aggressiveCache, privacy: .public)"
+            "fullRes budget: \(budget.count) entries, \(budget.bytes / (1024 * 1024)) MB (physical=\(physical / (1024 * 1024 * 1024)) GB) aggressive=\(aggressive, privacy: .public)"
         )
         return ImageCache(name: "fullRes", countLimit: budget.count, byteLimit: budget.bytes)
     }()
