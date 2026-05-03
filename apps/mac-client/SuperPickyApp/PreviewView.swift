@@ -212,6 +212,13 @@ struct AsyncPreviewImage: View {
         }
         .task(id: filePath) {
             isFullRes = false
+            // Always prefer an in-RAM full-res hit, even during skim — it's
+            // free (no decode, no allocation) and full quality.
+            if let cached = ImageCache.fullRes.get(filePath) {
+                image = cached
+                isFullRes = true
+                return
+            }
             // Zoom + skim: take the 2000 px preview path so fast scrubbing
             // hits ~30/sec. Single deliberate keypresses in zoom (state !=
             // .skim at task start) keep the current direct-to-full-res
