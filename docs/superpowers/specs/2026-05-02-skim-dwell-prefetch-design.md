@@ -26,8 +26,8 @@ Approach B (universal preview-first with dwell upgrade for *every* photo) was re
 ```
 IDLE  ──(keypress)──> ACTIVE  ──(2nd press within 250ms)──> SKIM
   ▲                     │                                     │
-  │                     │ (no press for 500ms)                │
-  └─────────────────────┴─────────────(500ms idle)────────────┘
+  │                     │ (no press for 300ms)                │
+  └─────────────────────┴─────────────(300ms idle)────────────┘
                                   │
                                   ▼
                                 DWELL
@@ -38,11 +38,11 @@ IDLE  ──(keypress)──> ACTIVE  ──(2nd press within 250ms)──> SKIM
 | `idle` | Initial / after `reset()` | Full-res (current) | No |
 | `active` | Single `note()` | Full-res (current) | Pending dwell |
 | `skim` | 2 notes within 250 ms | 2000 px preview (zoom only) / unchanged for fit | No |
-| `dwell` | 500 ms idle after last note | Full-res, upgrade in place if currently soft | Yes — fires `onEnterDwell` |
+| `dwell` | 300 ms idle after last note | Full-res, upgrade in place if currently soft | Yes — fires `onEnterDwell` |
 
 Thresholds:
 - **`skimThreshold = 250 ms`** — inter-keypress gap that promotes ACTIVE to SKIM. ~4/sec roughly matches the RAW-decode ceiling.
-- **`dwellThreshold = 500 ms`** — silence that fires the dwell hook. Comfortable "I've stopped" pause; matches the codebase's existing 400 ms dwell-preload calibration within an order.
+- **`dwellThreshold = 300 ms`** — silence that fires the dwell hook. Aggressive enough that the soft → sharp upgrade feels immediate after a fast scrub; well above the 250 ms skim threshold so a deliberate keypress cadence stays in `.active`.
 
 Both thresholds are constants today, tunable via `#if DEBUG` overrides if real-world usage suggests revising them.
 
@@ -85,7 +85,7 @@ final class NavigationStateMonitor {
 
     func reset() { /* cancel timer, clear context, state = .idle */ }
 
-    private func scheduleDwellTimer() { /* cancel + restart 500 ms timer */ }
+    private func scheduleDwellTimer() { /* cancel + restart 300 ms timer */ }
     private func enterDwell() { /* state = .dwell; onEnterDwell?(...) */ }
 }
 ```
@@ -148,9 +148,9 @@ The classic culling rhythm. Prefetch fires once per dwell with the latest contex
 Inject a clock so tests don't sleep on real time.
 
 - `idleStartsIdle` — initial state is `.idle`.
-- `singlePressEntersActiveThenDwell` — one `note(...)`, advance 500 ms → state is `.dwell`, `onEnterDwell` fired with captured context.
+- `singlePressEntersActiveThenDwell` — one `note(...)`, advance 300 ms → state is `.dwell`, `onEnterDwell` fired with captured context.
 - `twoFastPressesEnterSkim` — `note()` at t=0, `note()` at t=200 ms → state is `.skim`.
-- `skimDecaysToDwell` — once in `.skim`, no more presses for 500 ms → state becomes `.dwell`.
+- `skimDecaysToDwell` — once in `.skim`, no more presses for 300 ms → state becomes `.dwell`.
 - `dwellTimerCancelledOnNewPress` — dwell timer pending, new press resets it.
 - `resetReturnsToIdle` — `reset()` cancels timer, clears pending context, state back to `.idle`.
 - `pendingContextIsLatestNote` — multiple `note()` calls; `onEnterDwell` fires with the most recent one.

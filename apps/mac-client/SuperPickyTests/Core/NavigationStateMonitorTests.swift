@@ -92,11 +92,11 @@ struct NavigationStateMonitorTests {
         monitor.onEnterDwell = { _, _ in dwellCalls += 1 }
 
         monitor.note(currentIndex: 0, photos: photos)
-        try await Task.sleep(nanoseconds: 300_000_000)  // before dwell threshold
+        try await Task.sleep(nanoseconds: 150_000_000)  // safely below dwell threshold
 
         clock.advance(0.3)
         monitor.note(currentIndex: 1, photos: photos)  // resets timer
-        try await Task.sleep(nanoseconds: 700_000_000)
+        try await Task.sleep(nanoseconds: 500_000_000)
 
         // Only one dwell fires (the second one), not two.
         #expect(dwellCalls == 1)

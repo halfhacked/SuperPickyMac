@@ -17,7 +17,7 @@ final class NavigationStateMonitor {
     /// Inter-keypress gap below which we promote ACTIVE to SKIM.
     static let skimThreshold: TimeInterval = 0.25
     /// Silence after the last keypress that triggers DWELL.
-    static let dwellThreshold: TimeInterval = 0.5
+    static let dwellThreshold: TimeInterval = 0.3
 
     private(set) var state: State = .idle
 
