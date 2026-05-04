@@ -587,25 +587,41 @@ final class PipelineCoordinator: @unchecked Sendable {
         photo.flightConfidence = flight.confidence
 
         // Head-region sharpness (circular mask around eye, matches superpicky).
+        //
+        // Sharpness needs a higher-resolution input than ML inference does.
+        // At the 1280 max-side inference resolution a distant bird's head
+        // crop is 80–150 px and 1-pixel focus blur becomes unobservable;
+        // raw gradient² values for two visibly distinct shots tie within
+        // 0.1 % (verified on DSC09838 vs DSC09846). Decode the embedded
+        // full-res preview just for the sharpness pass and reuse the
+        // already-normalized YOLO bbox. Falls back to the inference image
+        // when the hi-res decode isn't available (older RAW with no
+        // embedded preview).
+        let sharpnessSource: CGImage = rawConverter.decodeForSharpness(fileURL: fileURL) ?? image
+        let sharpnessBirdCrop = sharpnessSource.smartSquareBirdCrop(bbox: bird.bbox) ?? birdCrop
+
         // Build a bird-crop-aligned segmentation mask so the head circle is
         // intersected with the YOLO seg mask, matching the
         // `cv2.bitwise_and(circle_mask, seg_mask)` step in
         // `superpicky/core/keypoint_detector.py:_calculate_head_sharpness`.
+        // The mask alignment uses the same source image the bird crop was
+        // taken from — at hi-res the YOLO letterbox math still resolves
+        // correctly because the aspect ratio matches the inference image.
         let birdCropSegMask = Self.birdCropAlignedSegMask(
             yoloMask: bird.mask,
-            inferImage: image,
+            inferImage: sharpnessSource,
             bbox: bird.bbox,
-            birdCropSize: birdCrop.width
+            birdCropSize: sharpnessBirdCrop.width
         )
-        // YOLO bbox in inference-image pixel space — feeds HeadSharpness's
+        // YOLO bbox in sharpness-source pixel space — feeds HeadSharpness's
         // no-beak radius fallback (matches superpicky's `box[2]/box[3]`
         // branch in keypoint_detector.py:248-252).
         let bboxPx = (
-            width:  Int((bird.bbox.width  * CGFloat(image.width )).rounded()),
-            height: Int((bird.bbox.height * CGFloat(image.height)).rounded())
+            width:  Int((bird.bbox.width  * CGFloat(sharpnessSource.width )).rounded()),
+            height: Int((bird.bbox.height * CGFloat(sharpnessSource.height)).rounded())
         )
         let headSharpness = HeadSharpness.score(
-            birdCrop: birdCrop,
+            birdCrop: sharpnessBirdCrop,
             leftEyeX: keypoints.leftEye.x, leftEyeY: keypoints.leftEye.y,
             leftEyeVis: keypoints.leftEye.visibility,
             rightEyeX: keypoints.rightEye.x, rightEyeY: keypoints.rightEye.y,
@@ -614,7 +630,7 @@ final class PipelineCoordinator: @unchecked Sendable {
             beakVis: keypoints.beak.visibility,
             segMask: birdCropSegMask,
             birdBboxSize: bboxPx
-        ) ?? TenengradSharpness.score(image: birdCrop) // fallback to full-crop
+        ) ?? TenengradSharpness.score(image: sharpnessBirdCrop) // fallback to full-crop
 
         // `imageProps` (loaded at the top) also feeds the ISO sharpness
         // factor and the focus-point weighting below — one CGImageSource
