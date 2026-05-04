@@ -192,6 +192,22 @@ struct FocusPointDetector {
            let result = parseCanonFocusPoint(makerNote: mn, model: model, orientation: orientation) {
             return result
         }
+        if (make.contains("OLYMPUS") || make.contains("OM DIGITAL")), let mn = makerNote,
+           let result = parseOlympusFocusPoint(makerNote: mn,
+                                                imageWidth: pixelWidth, imageHeight: pixelHeight,
+                                                orientation: orientation) {
+            return result
+        }
+        if make.contains("FUJIFILM"), let mn = makerNote,
+           let result = parseFujifilmFocusPoint(makerNote: mn,
+                                                 imageWidth: pixelWidth, imageHeight: pixelHeight,
+                                                 orientation: orientation) {
+            return result
+        }
+        if make.contains("PANASONIC"), let mn = makerNote,
+           let result = parsePanasonicFocusPoint(makerNote: mn, orientation: orientation) {
+            return result
+        }
         if make.contains("NIKON"), let mn = makerNote,
            let result = parseNikonFocusPoint(makerNote: mn, orientation: orientation) {
             return result
@@ -275,6 +291,127 @@ struct FocusPointDetector {
             return ints.isEmpty ? nil : ints
         }
         return nil
+    }
+
+    // MARK: - Olympus AF parsing (exposed for testing)
+
+    /// Parse an Olympus / OM System MakerNote dict into a focus point.
+    ///
+    /// Olympus exposes the AF point in two forms; we prefer the first:
+    /// 1. `AFPointSelected` — normalized `"x y"` (0.0-1.0). Sometimes wrapped
+    ///    as `"(50%,50%)"` on certain bodies.
+    /// 2. `AFFocusArea` (pixel `"x y w h"`) + `AFFrameSize` (`"w h"`).
+    ///
+    /// Mirrors superpicky's `_detect_olympus`
+    /// (`core/focus_point_detector.py:423-534`).
+    static func parseOlympusFocusPoint(
+        makerNote: [String: Any],
+        imageWidth: Int,
+        imageHeight: Int,
+        orientation: Int
+    ) -> FocusPointResult? {
+        if let mode = makerNote["FocusMode"] {
+            let modeStr = String(describing: mode).uppercased()
+            if modeStr.contains("MF") || modeStr.contains("MANUAL") { return nil }
+        }
+
+        // Path 1: AFPointSelected normalized
+        if let raw = makerNote["AFPointSelected"] {
+            let str = String(describing: raw)
+            if !str.isEmpty, str != "0 0" {
+                if str.contains("%") {
+                    // "(50%,50%)"
+                    let digits = str.split(whereSeparator: { !$0.isNumber })
+                                    .compactMap { Int($0) }
+                    if digits.count >= 2 {
+                        var nx = Float(digits[0]) / 100
+                        var ny = Float(digits[1]) / 100
+                        (nx, ny) = applyOrientationCorrection(x: nx, y: ny, orientation: orientation)
+                        return FocusPointResult(x: nx, y: ny, isFocused: true)
+                    }
+                } else {
+                    let parts = str.split(whereSeparator: { $0.isWhitespace })
+                                   .compactMap { Float($0) }
+                    if parts.count >= 2 {
+                        var nx = parts[0], ny = parts[1]
+                        (nx, ny) = applyOrientationCorrection(x: nx, y: ny, orientation: orientation)
+                        return FocusPointResult(x: nx, y: ny, isFocused: true)
+                    }
+                }
+            }
+        }
+
+        // Path 2: AFFocusArea pixel coords + AFFrameSize
+        if let area = sonyIntArray(makerNote["AFFocusArea"]),
+           let frame = sonyIntArray(makerNote["AFFrameSize"]),
+           area.count >= 4, frame.count >= 2 {
+            let (frameW, frameH) = (frame[0], frame[1])
+            guard frameW > 0, frameH > 0 else { return nil }
+            let centerX = area[0] + area[2] / 2
+            let centerY = area[1] + area[3] / 2
+            var nx = Float(centerX) / Float(frameW)
+            var ny = Float(centerY) / Float(frameH)
+            (nx, ny) = applyOrientationCorrection(x: nx, y: ny, orientation: orientation)
+            return FocusPointResult(x: nx, y: ny, isFocused: true)
+        }
+
+        _ = (imageWidth, imageHeight)  // reserved for future raw-px result
+        return nil
+    }
+
+    // MARK: - Fujifilm AF parsing (exposed for testing)
+
+    /// Parse a Fujifilm X / GFX MakerNote dict into a focus point.
+    ///
+    /// Fujifilm stores `FocusPixel` as `"x y"` in **embedded-JPEG-preview**
+    /// pixel coordinates (not the full RAW frame). The reference frame is
+    /// `ExifImageWidth` / `ExifImageHeight` from the EXIF dict — mirrors
+    /// the V3.9 fix in `superpicky/core/focus_point_detector.py:566-580`
+    /// where using `RawImageCroppedSize` instead caused a ~0.29 mis-norm.
+    static func parseFujifilmFocusPoint(
+        makerNote: [String: Any],
+        imageWidth: Int,
+        imageHeight: Int,
+        orientation: Int
+    ) -> FocusPointResult? {
+        if let mode = makerNote["FocusMode"] {
+            let modeStr = String(describing: mode).uppercased()
+            if modeStr.contains("MF") || modeStr.contains("MANUAL") { return nil }
+        }
+        guard imageWidth > 0, imageHeight > 0,
+              let parts = sonyIntArray(makerNote["FocusPixel"]),
+              parts.count >= 2 else {
+            return nil
+        }
+        let rawX = parts[0], rawY = parts[1]
+        var nx = Float(rawX) / Float(imageWidth)
+        var ny = Float(rawY) / Float(imageHeight)
+        (nx, ny) = applyOrientationCorrection(x: nx, y: ny, orientation: orientation)
+        return FocusPointResult(x: nx, y: ny, isFocused: true)
+    }
+
+    // MARK: - Panasonic AF parsing (exposed for testing)
+
+    /// Parse a Panasonic LUMIX S / G MakerNote dict into a focus point.
+    /// `AFPointPosition` is normalized `"x y"`; the value `4.194e+006`
+    /// is Panasonic's "no AF point" sentinel and must be rejected.
+    static func parsePanasonicFocusPoint(
+        makerNote: [String: Any],
+        orientation: Int
+    ) -> FocusPointResult? {
+        if let mode = makerNote["FocusMode"] {
+            let modeStr = String(describing: mode).uppercased()
+            if modeStr.contains("MF") || modeStr.contains("MANUAL") { return nil }
+        }
+        guard let raw = makerNote["AFPointPosition"] else { return nil }
+        let str = String(describing: raw)
+        if str.isEmpty || str.contains("4.194e") { return nil }
+        let parts = str.split(whereSeparator: { $0.isWhitespace })
+                       .compactMap { Float($0) }
+        guard parts.count >= 2 else { return nil }
+        var nx = parts[0], ny = parts[1]
+        (nx, ny) = applyOrientationCorrection(x: nx, y: ny, orientation: orientation)
+        return FocusPointResult(x: nx, y: ny, isFocused: true)
     }
 
     // MARK: - Canon AF parsing (exposed for testing)
