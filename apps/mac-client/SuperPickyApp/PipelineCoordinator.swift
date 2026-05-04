@@ -501,6 +501,13 @@ final class PipelineCoordinator: @unchecked Sendable {
            let h = props[kCGImagePropertyPixelHeight as String] as? Int {
             imageSizeOut = (w, h)
         }
+        // EXIF DateTimeOriginal + SubSecTimeOriginal — overrides the ingestion-
+        // time `Date()` set by Photo.init so the strip and the captureDate
+        // sort actually reflect when the shutter fired.
+        if let props = imageProps,
+           let ts = BurstDetector.parseTimestamp(from: props) {
+            photo.dateCreated = Date(timeIntervalSince1970: ts)
+        }
         // Perceptual hash for the burst-similarity check — reuse the already
         // decoded image instead of reopening the file for a 64px thumbnail.
         let pHashStart = DispatchTime.now()

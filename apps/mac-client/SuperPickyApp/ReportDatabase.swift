@@ -185,7 +185,11 @@ final class ReportDatabase: Sendable {
 
     func fetchAllPhotos() throws -> [Photo] {
         try dbQueue.read { db in
-            try Photo.fetchAll(db)
+            // Filename tiebreaker — burst shots can share an EXIF
+            // DateTimeOriginal down to the SubSecTimeOriginal precision, and
+            // some camera bodies don't write SubSec at all. Without a stable
+            // tiebreaker the strip order would be arbitrary on those rows.
+            try Photo.order(Column("dateCreated"), Column("filename")).fetchAll(db)
         }
     }
 
