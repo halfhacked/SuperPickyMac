@@ -13,11 +13,18 @@ struct HeadSharpness {
 
     /// Compute head-region sharpness of the bird crop using a circular mask centered on the best eye.
     /// Returns nil if crop is too small to measure.
+    ///
+    /// `segMask`, when supplied, is a `birdCrop.width × birdCrop.height` byte
+    /// array (1 = bird, 0 = background) and is intersected with the head
+    /// circle, matching superpicky's
+    /// `cv2.bitwise_and(circle_mask, seg_mask)` in
+    /// `core/keypoint_detector.py:_calculate_head_sharpness`.
     static func score(
         birdCrop: CGImage,
         leftEyeX: Float?, leftEyeY: Float?, leftEyeVis: Float?,
         rightEyeX: Float?, rightEyeY: Float?, rightEyeVis: Float?,
-        beakX: Float?, beakY: Float?, beakVis: Float?
+        beakX: Float?, beakY: Float?, beakVis: Float?,
+        segMask: [UInt8]? = nil
     ) -> Float? {
         let w = birdCrop.width
         let h = birdCrop.height
@@ -71,11 +78,14 @@ struct HeadSharpness {
         }
         radius = max(10, min(radius, min(w, h) / 2))
 
-        // Compute masked Tenengrad
+        // Compute masked Tenengrad — intersect the head circle with the
+        // YOLO segmentation mask when available so background pixels (sky,
+        // foliage, water) don't contribute their gradient² to the average.
         let score = TenengradSharpness.maskedScore(
             image: birdCrop,
             centerX: eyePx.0, centerY: eyePx.1,
-            radius: radius
+            radius: radius,
+            extraMask: segMask
         )
 
         return bothHidden ? score * lowVisPenalty : score
