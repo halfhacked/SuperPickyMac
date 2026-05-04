@@ -225,27 +225,27 @@ final class RecorderSink: PrefetchSink {
     }
 
     @Test func prefillResetsStreak() async {
-        // Coordinator A: fresh, just one update at idx 30.
+        // Coordinator A: fresh, just one update at idx 50.
         let recA = RecorderSink()
         let coordA = PrefetchCoordinator(sink: recA)
-        coordA.update(currentIndex: 30, photos: plainPhotos(60))
+        coordA.update(currentIndex: 50, photos: plainPhotos(60))
         let baseline = Set(recA.warmed)
 
         // Coordinator B: build a long forward streak (which inflates the
-        // depth boost so update()s schedule extra targets), then reset +
-        // prefill at 30 — matching production's reset-then-prefill in
-        // AppState. After prefill, the new targets must match A's baseline
-        // — if the streak weren't reset, B would carry a deeper, boosted
-        // target list rather than the baseline depth.
+        // depth boost so update()s schedule extra targets), then prefill
+        // far enough away (idx 50) that the streak's inflight working set
+        // (~p10..p31) doesn't overlap with prefill's target window (p51..).
+        // After prefill, the new targets must match A's baseline — if the
+        // streak weren't reset, B would carry a deeper, boosted target list
+        // (p51..p72) instead of the baseline depth (p51..p56).
         let recB = RecorderSink()
         let coordB = PrefetchCoordinator(sink: recB)
         let photos = plainPhotos(60)
         for i in 0..<10 {
             coordB.update(currentIndex: i, photos: photos)
         }
-        coordB.reset()  // mirrors AppState.swift:204
         let beforePrefill = recB.warmed.count
-        coordB.prefill(photos: photos, around: 30)
+        coordB.prefill(photos: photos, around: 50)
         let prefillTargets = Set(recB.warmed.suffix(from: beforePrefill))
 
         #expect(prefillTargets == baseline,
