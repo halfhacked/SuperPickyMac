@@ -85,6 +85,14 @@ enum ImageLoader {
     /// enqueues a serialised JPEG write. Set `eager` only for paths that
     /// will hand the bitmap to AppKit/SwiftUI for display — eager decoding
     /// allocates a full-resolution backing buffer (~96 MB for ARW).
+    ///
+    /// Sony ARW fast path: full-res requests pull the embedded JPEG
+    /// directly from IFD2 (5616×3744 on A1, 8640×5760 on A1 II / A7R V).
+    /// Skips ImageIO's CIRAW pipeline (~250 ms → ~70 ms per photo on
+    /// internal SSD) and writes the extracted bytes to the disk cache
+    /// verbatim — no decode-encode round-trip. Falls back to the
+    /// CGImageSource path on extraction failure (older Sony bodies that
+    /// don't write the IFD2 entry).
     private static func decodeCore(path: String, maxPixelSize: Int?, tag: String, eager: Bool) -> CGImage? {
         let basename = (path as NSString).lastPathComponent
         let started = DispatchTime.now()
@@ -94,6 +102,26 @@ enum ImageLoader {
             log.info("[\(tag, privacy: .public)] HIT \(basename, privacy: .public) \(ms, privacy: .public)ms")
             return cached
         }
+
+        // ARW fast path: full-res requests bypass CIRAW entirely.
+        let isARW = (path as NSString).pathExtension.lowercased() == "arw"
+        if maxPixelSize == nil, isARW,
+           let jpegData = ARWPreviewExtractor.extractFullResJPEG(from: path),
+           let arwSource = CGImageSourceCreateWithData(jpegData as CFData, nil),
+           let result = decodeFromSource(arwSource, eager: eager) {
+            let s = PreviewCache.settings
+            if s.generate, !Task.isCancelled {
+                // The extracted bytes are already a JPEG — write them to
+                // disk verbatim instead of re-encoding from a decoded
+                // bitmap. Saves ~50 ms per first-visit photo and avoids
+                // pinning a 96 MB CGImage in the writer queue.
+                schedulePreviewCacheWriteBytes(data: jpegData, rawPath: path, capBytes: s.capBytes)
+            }
+            let ms = elapsedMs(since: started)
+            log.info("[\(tag, privacy: .public)] ARW-MISS \(basename, privacy: .public) \(ms, privacy: .public)ms eager=\(eager, privacy: .public) write=\(s.generate, privacy: .public)")
+            return result
+        }
+
         let url = URL(fileURLWithPath: path)
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
             log.error("[\(tag, privacy: .public)] OPEN-FAIL \(basename, privacy: .public)")
@@ -105,23 +133,7 @@ enum ImageLoader {
             log.info("[\(tag, privacy: .public)] PREVIEW \(maxPixelSize)px \(basename, privacy: .public) \(ms, privacy: .public)ms")
             return result
         }
-        // ShouldCache pins the decoded bitmap inside the source. We only
-        // want that for paths that will return the bitmap to a caller —
-        // for the sweep we throw it away after the JPEG encode.
-        let createOpts: [CFString: Any] = eager
-            ? [kCGImageSourceShouldCache: true,
-               kCGImageSourceShouldCacheImmediately: true,
-               kCGImageSourceCreateThumbnailWithTransform: true]
-            : [kCGImageSourceShouldCache: false,
-               kCGImageSourceCreateThumbnailWithTransform: true]
-        let cgImage = CGImageSourceCreateImageAtIndex(source, 0, createOpts as CFDictionary)
-
-        let result: CGImage?
-        if let cgImage, eager {
-            result = forceDecode(cgImage)
-        } else {
-            result = cgImage
-        }
+        let result = decodeFromSource(source, eager: eager)
 
         let s = PreviewCache.settings
         if let imageForEncode = result, s.generate, !Task.isCancelled {
@@ -146,6 +158,25 @@ enum ImageLoader {
         let ms = elapsedMs(since: started)
         log.info("[\(tag, privacy: .public)] MISS \(basename, privacy: .public) \(ms, privacy: .public)ms eager=\(eager, privacy: .public) write=\(s.generate, privacy: .public)")
         return result
+    }
+
+    /// Decode the primary image from a `CGImageSource` with the
+    /// eager/lazy bookkeeping shared between the ARW fast path and the
+    /// regular CGImageSource path.
+    private static func decodeFromSource(_ source: CGImageSource, eager: Bool) -> CGImage? {
+        // ShouldCache pins the decoded bitmap inside the source. We only
+        // want that for paths that will return the bitmap to a caller —
+        // for the sweep we throw it away after the JPEG encode.
+        let createOpts: [CFString: Any] = eager
+            ? [kCGImageSourceShouldCache: true,
+               kCGImageSourceShouldCacheImmediately: true,
+               kCGImageSourceCreateThumbnailWithTransform: true]
+            : [kCGImageSourceShouldCache: false,
+               kCGImageSourceCreateThumbnailWithTransform: true]
+        guard let cgImage = CGImageSourceCreateImageAtIndex(source, 0, createOpts as CFDictionary) else {
+            return nil
+        }
+        return eager ? forceDecode(cgImage) : cgImage
     }
 
     /// Render the image into a same-sized bitmap context and return the
