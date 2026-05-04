@@ -40,10 +40,10 @@ enum SonyMakerNoteReader {
     /// Pure-data entry point. Exposed `internal` for tests that craft
     /// byte buffers without touching the filesystem.
     static func readFocusData(fromContainer data: Data) -> [String: Any]? {
-        guard let tiffStart = locateTIFFStart(in: data) else { return nil }
+        guard let tiffStart = TIFFIFDReader.locateTIFFStart(in: data) else { return nil }
         guard data.count >= tiffStart + 8 else { return nil }
 
-        let byteOrder: ByteOrder
+        let byteOrder: TIFFIFDReader.ByteOrder
         switch (data[tiffStart], data[tiffStart + 1]) {
         case (0x49, 0x49): byteOrder = .little
         case (0x4D, 0x4D): byteOrder = .big
@@ -53,18 +53,22 @@ enum SonyMakerNoteReader {
 
         // IFD0 → ExifIFD (tag 0x8769) → MakerNote (tag 0x927C).
         let ifd0Offset = Int(byteOrder.read32(data, at: tiffStart + 4))
-        guard let exifIFDPtr = findTagValueField(in: data,
-                                                  tiffStart: tiffStart,
-                                                  ifdRelativeOffset: ifd0Offset,
-                                                  tag: 0x8769,
-                                                  byteOrder: byteOrder) else {
+        guard let exifIFDPtr = TIFFIFDReader.findTagValueField(
+            in: data,
+            tiffStart: tiffStart,
+            ifdRelativeOffset: ifd0Offset,
+            tag: 0x8769,
+            byteOrder: byteOrder
+        ) else {
             return nil
         }
-        guard let makerNoteEntry = findEntry(in: data,
-                                              tiffStart: tiffStart,
-                                              ifdRelativeOffset: Int(exifIFDPtr),
-                                              tag: 0x927C,
-                                              byteOrder: byteOrder) else {
+        guard let makerNoteEntry = TIFFIFDReader.findEntry(
+            in: data,
+            tiffStart: tiffStart,
+            ifdRelativeOffset: Int(exifIFDPtr),
+            tag: 0x927C,
+            byteOrder: byteOrder
+        ) else {
             return nil
         }
         // MakerNote contents live at the value-offset; the count is the
@@ -128,84 +132,11 @@ enum SonyMakerNoteReader {
         return out.isEmpty ? nil : out
     }
 
-    // MARK: - Container detection
-
-    /// Same logic as `EXIFOffsetReader.locateTIFFStart` — bare TIFF/ARW
-    /// at offset 0, JPEG inside an APP1 segment after `"Exif\0\0"`.
-    private static func locateTIFFStart(in data: Data) -> Int? {
-        guard data.count >= 4 else { return nil }
-        if (data[0] == 0x49 && data[1] == 0x49) || (data[0] == 0x4D && data[1] == 0x4D) {
-            return 0
-        }
-        guard data[0] == 0xFF, data[1] == 0xD8 else { return nil }
-        var cursor = 2
-        while cursor + 4 <= data.count {
-            guard data[cursor] == 0xFF else { return nil }
-            let marker = data[cursor + 1]
-            if marker == 0xDA || marker == 0xD9 { return nil }
-            let segmentLength = Int(data[cursor + 2]) << 8 | Int(data[cursor + 3])
-            guard segmentLength >= 2 else { return nil }
-            if marker == 0xE1 {
-                let headerStart = cursor + 4
-                if headerStart + 6 <= data.count,
-                   data[headerStart]     == 0x45,   // 'E'
-                   data[headerStart + 1] == 0x78,   // 'x'
-                   data[headerStart + 2] == 0x69,   // 'i'
-                   data[headerStart + 3] == 0x66,   // 'f'
-                   data[headerStart + 4] == 0x00,
-                   data[headerStart + 5] == 0x00 {
-                    return headerStart + 6
-                }
-            }
-            cursor += 2 + segmentLength
-        }
-        return nil
-    }
-
-    // MARK: - IFD walking
-
-    /// Returns the absolute byte offset of the IFD entry for `tag`, or
-    /// nil when not present. The 12-byte entry layout is
-    /// `(tag:2)(type:2)(count:4)(value-or-offset:4)`.
-    private static func findEntry(in data: Data,
-                                  tiffStart: Int,
-                                  ifdRelativeOffset: Int,
-                                  tag: UInt16,
-                                  byteOrder: ByteOrder) -> Int? {
-        let ifdAbsolute = tiffStart + ifdRelativeOffset
-        guard ifdAbsolute >= 0, ifdAbsolute + 2 <= data.count else { return nil }
-        let entryCount = Int(byteOrder.read16(data, at: ifdAbsolute))
-        guard entryCount >= 0, entryCount < 4096 else { return nil }
-        let entriesStart = ifdAbsolute + 2
-        guard entriesStart + entryCount * 12 <= data.count else { return nil }
-        for index in 0..<entryCount {
-            let entry = entriesStart + index * 12
-            if byteOrder.read16(data, at: entry) == tag {
-                return entry
-            }
-        }
-        return nil
-    }
-
-    /// Convenience: read the `(value-or-offset)` field of an IFD entry.
-    private static func findTagValueField(in data: Data,
-                                          tiffStart: Int,
-                                          ifdRelativeOffset: Int,
-                                          tag: UInt16,
-                                          byteOrder: ByteOrder) -> UInt32? {
-        guard let entry = findEntry(in: data,
-                                     tiffStart: tiffStart,
-                                     ifdRelativeOffset: ifdRelativeOffset,
-                                     tag: tag,
-                                     byteOrder: byteOrder) else { return nil }
-        return byteOrder.read32(data, at: entry + 8)
-    }
-
     // MARK: - Typed value extraction
 
     /// Read a single BYTE-typed (type=1) tag value.
     private static func readByte(in data: Data, entry: Int,
-                                 tiffStart: Int, byteOrder: ByteOrder) -> UInt8? {
+                                 tiffStart: Int, byteOrder: TIFFIFDReader.ByteOrder) -> UInt8? {
         let type = byteOrder.read16(data, at: entry + 2)
         let count = Int(byteOrder.read32(data, at: entry + 4))
         guard type == 1 || type == 7, count >= 1 else { return nil }
@@ -218,7 +149,7 @@ enum SonyMakerNoteReader {
     /// the byte payload, then reinterpret as little/big-endian shorts.
     /// This handles the `undef[6] → int16u[3]` case for FocusFrameSize.
     private static func readUInt16Array(in data: Data, entry: Int,
-                                        tiffStart: Int, byteOrder: ByteOrder,
+                                        tiffStart: Int, byteOrder: TIFFIFDReader.ByteOrder,
                                         expectedType: UInt16?,
                                         expectedByteCount: Int? = nil) -> [UInt16]? {
         let type = byteOrder.read16(data, at: entry + 2)
@@ -262,25 +193,4 @@ enum SonyMakerNoteReader {
         return result
     }
 
-    // MARK: - Byte order
-
-    enum ByteOrder {
-        case little, big
-
-        func read16(_ data: Data, at offset: Int) -> UInt16 {
-            let b0 = UInt16(data[offset])
-            let b1 = UInt16(data[offset + 1])
-            return self == .little ? (b1 << 8) | b0 : (b0 << 8) | b1
-        }
-
-        func read32(_ data: Data, at offset: Int) -> UInt32 {
-            let b0 = UInt32(data[offset])
-            let b1 = UInt32(data[offset + 1])
-            let b2 = UInt32(data[offset + 2])
-            let b3 = UInt32(data[offset + 3])
-            return self == .little
-                ? (b3 << 24) | (b2 << 16) | (b1 << 8) | b0
-                : (b0 << 24) | (b1 << 16) | (b2 << 8) | b3
-        }
-    }
 }

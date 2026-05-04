@@ -274,7 +274,7 @@ import SuperPickyInference
     @Test func olympusParsesAFPointSelectedNormalized() {
         let mn: [String: Any] = ["AFPointSelected": "0.5 0.5"]
         let r = FocusPointDetector.parseOlympusFocusPoint(
-            makerNote: mn, imageWidth: 4000, imageHeight: 3000, orientation: 1)!
+            makerNote: mn, orientation: 1)!
         #expect(r.x == 0.5 && r.y == 0.5)
         #expect(r.isFocused == true)
     }
@@ -283,7 +283,7 @@ import SuperPickyInference
         // Some bodies surface "(50%,50%)"
         let mn: [String: Any] = ["AFPointSelected": "(50%,50%)"]
         let r = FocusPointDetector.parseOlympusFocusPoint(
-            makerNote: mn, imageWidth: 4000, imageHeight: 3000, orientation: 1)!
+            makerNote: mn, orientation: 1)!
         #expect(r.x == 0.5 && r.y == 0.5)
     }
 
@@ -294,7 +294,7 @@ import SuperPickyInference
             "AFFrameSize": "4000 3000"
         ]
         let r = FocusPointDetector.parseOlympusFocusPoint(
-            makerNote: mn, imageWidth: 0, imageHeight: 0, orientation: 1)!
+            makerNote: mn, orientation: 1)!
         // Center = (100+100, 100+100) = (200, 200) → (0.05, 0.0667)
         #expect(abs(r.x - 0.05) < 0.001)
         #expect(abs(r.y - Float(200) / Float(3000)) < 0.001)
@@ -304,7 +304,7 @@ import SuperPickyInference
         // "0 0" is Olympus's empty marker — fall through to AFFocusArea path
         let mn: [String: Any] = ["AFPointSelected": "0 0"]
         #expect(FocusPointDetector.parseOlympusFocusPoint(
-            makerNote: mn, imageWidth: 4000, imageHeight: 3000, orientation: 1) == nil)
+            makerNote: mn, orientation: 1) == nil)
     }
 
     @Test func olympusRejectsManualFocus() {
@@ -313,7 +313,7 @@ import SuperPickyInference
             "AFPointSelected": "0.5 0.5"
         ]
         #expect(FocusPointDetector.parseOlympusFocusPoint(
-            makerNote: mn, imageWidth: 4000, imageHeight: 3000, orientation: 1) == nil)
+            makerNote: mn, orientation: 1) == nil)
     }
 
     // MARK: - Fujifilm AF parsing

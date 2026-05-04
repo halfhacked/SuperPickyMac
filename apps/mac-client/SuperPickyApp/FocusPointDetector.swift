@@ -211,9 +211,7 @@ struct FocusPointDetector {
             return result
         }
         if (make.contains("OLYMPUS") || make.contains("OM DIGITAL")), let mn = makerNote,
-           let result = parseOlympusFocusPoint(makerNote: mn,
-                                                imageWidth: pixelWidth, imageHeight: pixelHeight,
-                                                orientation: orientation) {
+           let result = parseOlympusFocusPoint(makerNote: mn, orientation: orientation) {
             return result
         }
         if make.contains("FUJIFILM"), let mn = makerNote,
@@ -252,6 +250,20 @@ struct FocusPointDetector {
         return nil
     }
 
+    // MARK: - Brand-parser shared helpers
+
+    /// Returns true when MakerNote.FocusMode reads as manual focus.
+    /// Every brand's manual-focus probe is identical — uppercase the
+    /// FocusMode value and look for "MF"/"MANUAL". Sony adds the
+    /// numeric "1" sentinel, passed via `extraSentinels`.
+    private static func isManualFocus(_ makerNote: [String: Any],
+                                       extraSentinels: [String] = []) -> Bool {
+        guard let raw = makerNote["FocusMode"] else { return false }
+        let modeStr = String(describing: raw).uppercased()
+        if modeStr.contains("MF") || modeStr.contains("MANUAL") { return true }
+        return extraSentinels.contains(modeStr)
+    }
+
     // MARK: - Sony FocusLocation parsing (exposed for testing)
 
     /// Parse a Sony MakerNote dict into a focus point.
@@ -269,13 +281,9 @@ struct FocusPointDetector {
         makerNote: [String: Any],
         orientation: Int
     ) -> FocusPointResult? {
-        // Manual focus → no AF data
-        if let mode = makerNote["FocusMode"] {
-            let modeStr = String(describing: mode).uppercased()
-            if modeStr == "1" || modeStr.contains("MF") || modeStr.contains("MANUAL") {
-                return nil
-            }
-        }
+        // Sony's FocusMode tag uses the numeric sentinel "1" for MF in
+        // addition to the textual MF/MANUAL labels.
+        if isManualFocus(makerNote, extraSentinels: ["1"]) { return nil }
 
         guard let parts = sonyIntArray(makerNote["FocusLocation"]),
               parts.count >= 4 else {
@@ -324,14 +332,9 @@ struct FocusPointDetector {
     /// (`core/focus_point_detector.py:423-534`).
     static func parseOlympusFocusPoint(
         makerNote: [String: Any],
-        imageWidth: Int,
-        imageHeight: Int,
         orientation: Int
     ) -> FocusPointResult? {
-        if let mode = makerNote["FocusMode"] {
-            let modeStr = String(describing: mode).uppercased()
-            if modeStr.contains("MF") || modeStr.contains("MANUAL") { return nil }
-        }
+        if isManualFocus(makerNote) { return nil }
 
         // Path 1: AFPointSelected normalized
         if let raw = makerNote["AFPointSelected"] {
@@ -373,7 +376,6 @@ struct FocusPointDetector {
             return FocusPointResult(x: nx, y: ny, isFocused: true)
         }
 
-        _ = (imageWidth, imageHeight)  // reserved for future raw-px result
         return nil
     }
 
@@ -392,10 +394,7 @@ struct FocusPointDetector {
         imageHeight: Int,
         orientation: Int
     ) -> FocusPointResult? {
-        if let mode = makerNote["FocusMode"] {
-            let modeStr = String(describing: mode).uppercased()
-            if modeStr.contains("MF") || modeStr.contains("MANUAL") { return nil }
-        }
+        if isManualFocus(makerNote) { return nil }
         guard imageWidth > 0, imageHeight > 0,
               let parts = sonyIntArray(makerNote["FocusPixel"]),
               parts.count >= 2 else {
@@ -417,10 +416,7 @@ struct FocusPointDetector {
         makerNote: [String: Any],
         orientation: Int
     ) -> FocusPointResult? {
-        if let mode = makerNote["FocusMode"] {
-            let modeStr = String(describing: mode).uppercased()
-            if modeStr.contains("MF") || modeStr.contains("MANUAL") { return nil }
-        }
+        if isManualFocus(makerNote) { return nil }
         guard let raw = makerNote["AFPointPosition"] else { return nil }
         let str = String(describing: raw)
         if str.isEmpty || str.contains("4.194e") { return nil }
@@ -453,10 +449,7 @@ struct FocusPointDetector {
         model: String,
         orientation: Int
     ) -> FocusPointResult? {
-        if let mode = makerNote["FocusMode"] {
-            let modeStr = String(describing: mode).uppercased()
-            if modeStr.contains("MF") || modeStr.contains("MANUAL") { return nil }
-        }
+        if isManualFocus(makerNote) { return nil }
 
         guard let imgW = (makerNote["AFImageWidth"] as? Int)
                 ?? (makerNote["ExifImageWidth"] as? Int),
