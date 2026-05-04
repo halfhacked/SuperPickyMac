@@ -224,11 +224,31 @@ final class RecorderSink: PrefetchSink {
                 "reset must cancel every in-flight task")
     }
 
-    @Test func prefillResetsStreakAndUpdates() async {
-        let recorder = RecorderSink()
-        let coord = PrefetchCoordinator(sink: recorder)
-        coord.prefill(photos: plainPhotos(30), around: 10)
-        #expect(!recorder.warmed.isEmpty,
-                "prefill must run an update so the initial RAM cache fills")
+    @Test func prefillResetsStreak() async {
+        // Coordinator A: fresh, just one update at idx 30.
+        let recA = RecorderSink()
+        let coordA = PrefetchCoordinator(sink: recA)
+        coordA.update(currentIndex: 30, photos: plainPhotos(60))
+        let baseline = Set(recA.warmed)
+
+        // Coordinator B: build a long forward streak (which inflates the
+        // depth boost so update()s schedule extra targets), then reset +
+        // prefill at 30 — matching production's reset-then-prefill in
+        // AppState. After prefill, the new targets must match A's baseline
+        // — if the streak weren't reset, B would carry a deeper, boosted
+        // target list rather than the baseline depth.
+        let recB = RecorderSink()
+        let coordB = PrefetchCoordinator(sink: recB)
+        let photos = plainPhotos(60)
+        for i in 0..<10 {
+            coordB.update(currentIndex: i, photos: photos)
+        }
+        coordB.reset()  // mirrors AppState.swift:204
+        let beforePrefill = recB.warmed.count
+        coordB.prefill(photos: photos, around: 30)
+        let prefillTargets = Set(recB.warmed.suffix(from: beforePrefill))
+
+        #expect(prefillTargets == baseline,
+                "prefill must produce the same targets as a fresh coordinator")
     }
 }
