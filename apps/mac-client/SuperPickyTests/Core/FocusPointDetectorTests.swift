@@ -269,6 +269,99 @@ import SuperPickyInference
         #expect(abs(portrait.y - (1 - landscape.x)) < 0.001)
     }
 
+    // MARK: - Canon AF parsing
+
+    @Test func canonEosCenteredAfPointWithYInversion() {
+        // EOS body: image 6000×4000, AF point at offset (300, -200)
+        // → expected raw = (3000+300, 2000-(-200)*-1) = (3300, 2200)
+        // Wait: yDirection = -1 for EOS, so rawY = h/2 + yList[idx] * (-1)
+        //                                       = 2000 + (-200) * (-1) = 2200.
+        // Normalized: (3300/6000, 2200/4000) = (0.55, 0.55).
+        let mn: [String: Any] = [
+            "AFImageWidth": 6000,
+            "AFImageHeight": 4000,
+            "AFAreaXPositions": "300",
+            "AFAreaYPositions": "-200",
+            "AFPointsInFocus": "1"
+        ]
+        let r = FocusPointDetector.parseCanonFocusPoint(makerNote: mn, model: "Canon EOS R5", orientation: 1)!
+        #expect(abs(r.x - 0.55) < 0.001)
+        #expect(abs(r.y - 0.55) < 0.001)
+        #expect(r.isFocused == true)
+    }
+
+    @Test func canonCompactDoesNotInvertY() {
+        // Compact (PowerShot): yDirection = +1 → rawY = 2000 + (-200) = 1800.
+        let mn: [String: Any] = [
+            "AFImageWidth": 6000,
+            "AFImageHeight": 4000,
+            "AFAreaXPositions": "300",
+            "AFAreaYPositions": "-200",
+            "AFPointsInFocus": "1"
+        ]
+        let r = FocusPointDetector.parseCanonFocusPoint(makerNote: mn, model: "Canon PowerShot G7 X", orientation: 1)!
+        #expect(abs(r.y - 0.45) < 0.001)
+    }
+
+    @Test func canonPicksFirstFocusedAfPointFromBitmask() {
+        // 4 AF points; bitmask "0 0 1 0" → index 2 is in focus.
+        let mn: [String: Any] = [
+            "AFImageWidth": 6000,
+            "AFImageHeight": 4000,
+            "AFAreaXPositions": "0 0 600 0",
+            "AFAreaYPositions": "0 0 400 0",
+            "AFPointsInFocus": "0 0 1 0"
+        ]
+        let r = FocusPointDetector.parseCanonFocusPoint(makerNote: mn, model: "Canon EOS R6", orientation: 1)!
+        // Index 2: rawX = 3000+600 = 3600, rawY = 2000-400 = 1600 (EOS)
+        #expect(abs(r.x - 0.6) < 0.001)
+        #expect(abs(r.y - 0.4) < 0.001)
+        #expect(r.isFocused == true)
+    }
+
+    @Test func canonHandlesCommaSeparatedFocusIndices() {
+        // Some bodies surface "0,1" instead of bitmask
+        let mn: [String: Any] = [
+            "AFImageWidth": 6000,
+            "AFImageHeight": 4000,
+            "AFAreaXPositions": "100 200 300",
+            "AFAreaYPositions": "0 0 0",
+            "AFPointsInFocus": "1,2"
+        ]
+        let r = FocusPointDetector.parseCanonFocusPoint(makerNote: mn, model: "Canon EOS R", orientation: 1)!
+        // First locked index = 1 → rawX = 3000+200 = 3200
+        #expect(abs(r.x - Float(3200) / Float(6000)) < 0.001)
+    }
+
+    @Test func canonNoLockedPointFallsBackToFirstAfPointButReportsUnfocused() {
+        // No AFPointsInFocus → use index 0 but isFocused=false
+        let mn: [String: Any] = [
+            "AFImageWidth": 6000,
+            "AFImageHeight": 4000,
+            "AFAreaXPositions": "300",
+            "AFAreaYPositions": "-200",
+        ]
+        let r = FocusPointDetector.parseCanonFocusPoint(makerNote: mn, model: "Canon EOS R", orientation: 1)!
+        #expect(r.isFocused == false)
+        #expect(abs(r.x - 0.55) < 0.001)
+    }
+
+    @Test func canonRejectsManualFocus() {
+        let mn: [String: Any] = [
+            "FocusMode": "Manual",
+            "AFImageWidth": 6000,
+            "AFImageHeight": 4000,
+            "AFAreaXPositions": "300",
+            "AFAreaYPositions": "-200"
+        ]
+        #expect(FocusPointDetector.parseCanonFocusPoint(makerNote: mn, model: "Canon EOS R", orientation: 1) == nil)
+    }
+
+    @Test func canonReturnsNilWhenAfPositionsMissing() {
+        let mn: [String: Any] = ["AFImageWidth": 6000, "AFImageHeight": 4000]
+        #expect(FocusPointDetector.parseCanonFocusPoint(makerNote: mn, model: "Canon EOS R", orientation: 1) == nil)
+    }
+
     // MARK: - headRadiusFraction helper
 
     @Test func headRadiusFractionUsesEyeBeakDistanceWhenBeakVisible() {

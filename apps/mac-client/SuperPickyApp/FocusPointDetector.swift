@@ -178,13 +178,18 @@ struct FocusPointDetector {
         let tiffDict = props["{TIFF}"] as? [String: Any]
         let orientation = (tiffDict?["Orientation"] as? Int) ?? 1
         let make = ((tiffDict?["Make"] as? String) ?? "").uppercased()
+        let model = (tiffDict?["Model"] as? String) ?? ""
 
         let makerNote = props["{MakerNote}"] as? [String: Any]
 
         // Brand-specific MakerNote parsers (matches superpicky's
-        // _detect_sony / _detect_nikon dispatch in focus_point_detector.py).
+        // _detect_<brand> dispatch in focus_point_detector.py).
         if make.contains("SONY"), let mn = makerNote,
            let result = parseSonyFocusPoint(makerNote: mn, orientation: orientation) {
+            return result
+        }
+        if make.contains("CANON"), let mn = makerNote,
+           let result = parseCanonFocusPoint(makerNote: mn, model: model, orientation: orientation) {
             return result
         }
         if make.contains("NIKON"), let mn = makerNote,
@@ -270,6 +275,86 @@ struct FocusPointDetector {
             return ints.isEmpty ? nil : ints
         }
         return nil
+    }
+
+    // MARK: - Canon AF parsing (exposed for testing)
+
+    /// Parse a Canon MakerNote dict into a focus point.
+    ///
+    /// Canon stores AF point positions as **offsets from image center**:
+    /// - `AFAreaXPositions` / `AFAreaYPositions` — space-separated ints,
+    ///   one entry per AF point.
+    /// - `AFImageWidth` / `AFImageHeight` — reference frame for the offsets.
+    /// - `AFPointsInFocus` — bitmask ("1 0 0 0 …") or comma-separated
+    ///   indices ("0,1") indicating which AF points actually locked.
+    /// - Y axis is inverted on EOS bodies (DSLR/mirrorless) and normal on
+    ///   compact bodies (PowerShot/IXUS/ELPH); detected from the `Model` tag.
+    /// - `FocusMode` containing "MF"/"MANUAL" → manual focus, no AF data.
+    ///
+    /// Mirrors superpicky's `_detect_canon` in
+    /// `core/focus_point_detector.py:307-421`.
+    static func parseCanonFocusPoint(
+        makerNote: [String: Any],
+        model: String,
+        orientation: Int
+    ) -> FocusPointResult? {
+        if let mode = makerNote["FocusMode"] {
+            let modeStr = String(describing: mode).uppercased()
+            if modeStr.contains("MF") || modeStr.contains("MANUAL") { return nil }
+        }
+
+        guard let imgW = (makerNote["AFImageWidth"] as? Int)
+                ?? (makerNote["ExifImageWidth"] as? Int),
+              let imgH = (makerNote["AFImageHeight"] as? Int)
+                ?? (makerNote["ExifImageHeight"] as? Int),
+              imgW > 0, imgH > 0 else {
+            return nil
+        }
+
+        guard let xList = sonyIntArray(makerNote["AFAreaXPositions"]),
+              let yList = sonyIntArray(makerNote["AFAreaYPositions"]),
+              !xList.isEmpty, !yList.isEmpty else {
+            return nil
+        }
+
+        // Resolve which AF point locked. Two encodings:
+        //   "1 0 0 0 …"  → bitmask, indices where value==1 are in focus
+        //   "0,1"        → comma-separated index list
+        var focusIndices: [Int] = []
+        if let raw = makerNote["AFPointsInFocus"] {
+            let str = String(describing: raw).trimmingCharacters(in: .whitespaces)
+            if !str.isEmpty {
+                if str.contains(",") {
+                    focusIndices = str.split(separator: ",")
+                        .compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+                } else {
+                    let parts = str.split(whereSeparator: { $0.isWhitespace })
+                    focusIndices = parts.enumerated()
+                        .filter { $1 == "1" || $1 == "1.0" }
+                        .map { $0.offset }
+                }
+            }
+        }
+        let idx = (focusIndices.first.flatMap { $0 < xList.count ? $0 : nil }) ?? 0
+        guard idx < yList.count else { return nil }
+
+        // Y axis: EOS bodies invert, compact bodies don't.
+        let modelUpper = model.uppercased()
+        let isCompact = modelUpper.contains("POWERSHOT")
+            || modelUpper.contains("IXUS")
+            || modelUpper.contains("ELPH")
+        let yDirection = isCompact ? 1 : -1
+
+        let rawX = imgW / 2 + xList[idx]
+        let rawY = imgH / 2 + yList[idx] * yDirection
+
+        var normX = Float(rawX) / Float(imgW)
+        var normY = Float(rawY) / Float(imgH)
+        (normX, normY) = applyOrientationCorrection(x: normX, y: normY, orientation: orientation)
+
+        // Locked iff at least one AFPointsInFocus index resolved.
+        let isFocused = !focusIndices.isEmpty
+        return FocusPointResult(x: normX, y: normY, isFocused: isFocused)
     }
 
     // MARK: - Nikon AF parsing (exposed for testing)
