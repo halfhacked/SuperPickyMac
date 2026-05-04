@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import CoreGraphics
+import SuperPickyInference
 @testable import SuperPicky
 
 @Suite struct FocusPointDetectorTests {
@@ -189,6 +190,39 @@ import CoreGraphics
         )
         #expect(result.sharpness == 0.8)
         #expect(result.aesthetics == 0.9)
+    }
+
+    // MARK: - headRadiusFraction helper
+
+    @Test func headRadiusFractionUsesEyeBeakDistanceWhenBeakVisible() {
+        // eye-beak distance = √((0.6-0.5)² + 0²) = 0.10 → ×1.2 = 0.12.
+        // Different from the 0.15 no-beak fallback; confirms the helper
+        // actually uses the keypoint geometry instead of returning the
+        // constant.
+        let r = FocusPointDetector.headRadiusFraction(
+            beakVisibility: 0.9,
+            eye: (x: 0.5, y: 0.5),
+            beak: (x: 0.6, y: 0.5)
+        )
+        #expect(abs(r - 0.12) < 0.001)
+    }
+
+    @Test func headRadiusFractionFallsBackWhenBeakHidden() {
+        let r = FocusPointDetector.headRadiusFraction(
+            beakVisibility: 0.1,
+            eye: (x: 0.5, y: 0.5),
+            beak: (x: 0.6, y: 0.5)
+        )
+        #expect(r == 0.15)
+    }
+
+    @Test func headRadiusFractionTreatsBeakBelowThresholdAsHidden() {
+        let r = FocusPointDetector.headRadiusFraction(
+            beakVisibility: InferenceConstants.keypointVisibilityThreshold - 0.01,
+            eye: (x: 0.5, y: 0.5),
+            beak: (x: 0.5, y: 0.5)
+        )
+        #expect(r == 0.15)
     }
 
     // MARK: - No eye center: head check skipped, falls through to seg/bbox

@@ -642,6 +642,17 @@ final class PipelineCoordinator: @unchecked Sendable {
             return (keypoints.rightEye.x, keypoints.rightEye.y)
         }()
 
+        // Head-circle radius for the focus-point .headFocus tier. Mirrors
+        // the radius HeadSharpness uses: eye-beak distance × 1.2 when the
+        // beak is visible, otherwise the bbox max-side × 0.15 fallback.
+        // Without this, every photo got the no-beak constant (0.15) for
+        // its head circle, which over-triggered .headFocus on ~most shots.
+        let headRadiusFraction = FocusPointDetector.headRadiusFraction(
+            beakVisibility: keypoints.beak.visibility,
+            eye: bestEye,
+            beak: (x: keypoints.beak.x, y: keypoints.beak.y)
+        )
+
         // Seg mask: YOLO outputs a square mask at model resolution (e.g. 160x160).
         // Infer dimensions from data size (sqrt of byte count for square masks).
         let segMask: Data? = bird.mask.isEmpty ? nil : bird.mask
@@ -655,7 +666,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                     properties: props,
                     birdBbox: bird.bbox,
                     eyeCenter: bestEye,
-                    headRadiusFraction: HeadSharpness.noBeakRadiusRatio,
+                    headRadiusFraction: headRadiusFraction,
                     segMask: segMask,
                     maskWidth: maskWidth,
                     maskHeight: maskHeight
@@ -667,7 +678,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                 filePath: fileURL.path,
                 birdBbox: bird.bbox,
                 eyeCenter: bestEye,
-                headRadiusFraction: HeadSharpness.noBeakRadiusRatio,
+                headRadiusFraction: headRadiusFraction,
                 segMask: segMask,
                 maskWidth: maskWidth,
                 maskHeight: maskHeight

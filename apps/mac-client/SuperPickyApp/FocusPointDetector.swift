@@ -1,6 +1,7 @@
 import Foundation
 import CoreGraphics
 import ImageIO
+import SuperPickyInference
 
 /// Detects focus point from RAW EXIF and computes sharpness/aesthetics weights
 /// based on where the focus falls relative to the bird.
@@ -204,6 +205,32 @@ struct FocusPointDetector {
         }
 
         return nil  // No focus data → caller gets .unknown
+    }
+
+    // MARK: - Head radius (exposed for testing)
+
+    /// Compute the head-circle radius (as a fraction of `max(bbox.w, bbox.h)`)
+    /// for the .headFocus tier, mirroring HeadSharpness's radius logic:
+    ///
+    /// - `beak visible` → eye-beak distance × 1.2 (in bird-crop coordinates,
+    ///   used as a bbox-relative fraction by the existing `computeWeights`
+    ///   math).
+    /// - `beak hidden`  → 0.15, the no-beak fallback constant.
+    ///
+    /// Mirrors superpicky's `head_radius_val` derivation in
+    /// `keypoint_detector.py:282-290`.
+    static func headRadiusFraction(
+        beakVisibility: Float,
+        eye: (x: Float, y: Float),
+        beak: (x: Float, y: Float),
+        visibilityThreshold: Float = InferenceConstants.keypointVisibilityThreshold,
+        radiusMultiplier: Float = 1.2,
+        noBeakRatio: Float = 0.15
+    ) -> Float {
+        if beakVisibility >= visibilityThreshold {
+            return hypot(eye.x - beak.x, eye.y - beak.y) * radiusMultiplier
+        }
+        return noBeakRatio
     }
 
     // MARK: - SubjectArea parsing (exposed for testing)
