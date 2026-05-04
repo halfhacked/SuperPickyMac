@@ -132,6 +132,14 @@ final class PrefetchCoordinator {
                 } onCancel: {
                     inner.cancel()
                 }
+                // If we were cancelled, update()/reset() already cleared (or
+                // replaced) our inflight entry — wiping it again could trash a
+                // newer wrapper that took our slot during a drop+re-include cycle.
+                // (No unit test: the racy interleaving requires a holding sink that
+                // blocks the inner task on a continuation until cancelled, which is
+                // disproportionate test-only machinery for a one-line invariant
+                // that's provable by inspection.)
+                guard !Task.isCancelled else { return }
                 self?.inflight.removeValue(forKey: path)
             }
             scheduled += 1
