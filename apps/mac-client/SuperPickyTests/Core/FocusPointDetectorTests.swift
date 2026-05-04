@@ -192,6 +192,83 @@ import SuperPickyInference
         #expect(result.aesthetics == 0.9)
     }
 
+    // MARK: - Sony FocusLocation parsing
+
+    @Test func sonyParsesFocusLocationFromStringForm() {
+        // Sony A1 MakerNote (exiftool string form): "5616 3744 2812 1885"
+        let makerNote: [String: Any] = [
+            "FocusLocation": "5616 3744 2812 1885",
+            "FocusFrameSize": "224 224 1"
+        ]
+        let r = FocusPointDetector.parseSonyFocusPoint(makerNote: makerNote, orientation: 1)!
+        #expect(abs(r.x - Float(2812) / Float(5616)) < 0.0001)
+        #expect(abs(r.y - Float(1885) / Float(3744)) < 0.0001)
+        #expect(r.isFocused == true)
+    }
+
+    @Test func sonyParsesFocusLocationFromArrayForm() {
+        // Same data but as [NSNumber] array (Apple ImageIO sometimes
+        // surfaces multi-int MakerNote tags this way).
+        let makerNote: [String: Any] = [
+            "FocusLocation": [NSNumber(value: 5616), NSNumber(value: 3744),
+                              NSNumber(value: 2812), NSNumber(value: 1885)],
+            "FocusFrameSize": [NSNumber(value: 224), NSNumber(value: 224), NSNumber(value: 1)]
+        ]
+        let r = FocusPointDetector.parseSonyFocusPoint(makerNote: makerNote, orientation: 1)!
+        #expect(abs(r.x - 0.5006) < 0.001)
+        #expect(r.isFocused == true)
+    }
+
+    @Test func sonyTreatsValidityZeroAsUnfocused() {
+        // FocusFrameSize[2] = 0 → AF didn't lock
+        let makerNote: [String: Any] = [
+            "FocusLocation": "5616 3744 2812 1885",
+            "FocusFrameSize": "224 224 0"
+        ]
+        let r = FocusPointDetector.parseSonyFocusPoint(makerNote: makerNote, orientation: 1)!
+        #expect(r.isFocused == false)
+    }
+
+    @Test func sonyDefaultsToFocusedWhenFrameSizeMissing() {
+        // No FocusFrameSize tag → conservatively assume focused (matches
+        // Python's `focus_result = 1` default).
+        let makerNote: [String: Any] = ["FocusLocation": "5616 3744 2812 1885"]
+        let r = FocusPointDetector.parseSonyFocusPoint(makerNote: makerNote, orientation: 1)!
+        #expect(r.isFocused == true)
+    }
+
+    @Test func sonyRejectsManualFocus() {
+        // FocusMode = "1" (Sony's MF code) → no AF data
+        let makerNote: [String: Any] = [
+            "FocusMode": "1",
+            "FocusLocation": "5616 3744 2812 1885"
+        ]
+        #expect(FocusPointDetector.parseSonyFocusPoint(makerNote: makerNote, orientation: 1) == nil)
+    }
+
+    @Test func sonyRejectsManualFocusByName() {
+        // Some Sony bodies surface "Manual" as a string label
+        let makerNote: [String: Any] = [
+            "FocusMode": "Manual",
+            "FocusLocation": "5616 3744 2812 1885"
+        ]
+        #expect(FocusPointDetector.parseSonyFocusPoint(makerNote: makerNote, orientation: 1) == nil)
+    }
+
+    @Test func sonyReturnsNilWhenFocusLocationMissing() {
+        let makerNote: [String: Any] = ["FocusFrameSize": "224 224 1"]
+        #expect(FocusPointDetector.parseSonyFocusPoint(makerNote: makerNote, orientation: 1) == nil)
+    }
+
+    @Test func sonyAppliesOrientationCorrection() {
+        // Portrait CW (orientation=6): (x, y) → (y, 1-x)
+        let makerNote: [String: Any] = ["FocusLocation": "5616 3744 1404 936"]
+        let landscape = FocusPointDetector.parseSonyFocusPoint(makerNote: makerNote, orientation: 1)!
+        let portrait  = FocusPointDetector.parseSonyFocusPoint(makerNote: makerNote, orientation: 6)!
+        #expect(abs(portrait.x - landscape.y) < 0.001)
+        #expect(abs(portrait.y - (1 - landscape.x)) < 0.001)
+    }
+
     // MARK: - headRadiusFraction helper
 
     @Test func headRadiusFractionUsesEyeBeakDistanceWhenBeakVisible() {
