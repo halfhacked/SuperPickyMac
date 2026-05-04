@@ -19,12 +19,20 @@ struct HeadSharpness {
     /// circle, matching superpicky's
     /// `cv2.bitwise_and(circle_mask, seg_mask)` in
     /// `core/keypoint_detector.py:_calculate_head_sharpness`.
+    ///
+    /// `birdBboxSize`, when supplied, is the `(width, height)` of the YOLO
+    /// detection bbox in inference-image pixels. It's used as the no-beak
+    /// fallback radius (`max(w, h) × 0.15`), preferred over the
+    /// `birdCrop` size which is ~15% larger because of the 1.15× smart-
+    /// square padding. Mirrors the `box` branch in superpicky's
+    /// `_calculate_head_sharpness:248-252,283-290`.
     static func score(
         birdCrop: CGImage,
         leftEyeX: Float?, leftEyeY: Float?, leftEyeVis: Float?,
         rightEyeX: Float?, rightEyeY: Float?, rightEyeVis: Float?,
         beakX: Float?, beakY: Float?, beakVis: Float?,
-        segMask: [UInt8]? = nil
+        segMask: [UInt8]? = nil,
+        birdBboxSize: (width: Int, height: Int)? = nil
     ) -> Float? {
         let w = birdCrop.width
         let h = birdCrop.height
@@ -67,12 +75,21 @@ struct HeadSharpness {
 
         let eyePx = (Int(eye.0 * Float(w)), Int(eye.1 * Float(h)))
 
-        // Compute radius from eye-beak distance × 1.2, or 15% of crop if no beak
+        // Compute radius. Three-branch fallback matches superpicky's
+        // _calculate_head_sharpness:
+        //   1. eye-beak distance × 1.2 (when beak is visible)
+        //   2. YOLO bbox max-side × 0.15 (when bbox is provided)
+        //   3. bird-crop max-side × 0.15 (last-resort fallback;
+        //      bird-crop is ~15% larger than the bbox because of the
+        //      1.15× smart-square padding, so this only matches Python
+        //      when both beak and bbox are absent)
         var radius: Int
         if beakVisible, let bx = beakX, let by = beakY {
             let beakPx = (Int(bx * Float(w)), Int(by * Float(h)))
             let dist = hypot(Float(eyePx.0 - beakPx.0), Float(eyePx.1 - beakPx.1))
             radius = Int(dist * radiusMultiplier)
+        } else if let box = birdBboxSize {
+            radius = Int(Float(max(box.width, box.height)) * noBeakRadiusRatio)
         } else {
             radius = Int(Float(max(w, h)) * noBeakRadiusRatio)
         }

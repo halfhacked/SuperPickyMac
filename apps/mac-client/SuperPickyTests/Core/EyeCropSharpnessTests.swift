@@ -149,6 +149,65 @@ struct HeadSharpnessTests {
         #expect(withMask < withoutMask)
     }
 
+    @Test func noBeakBboxFallbackUsesBboxNotCropSize() {
+        // 200×200 image with a single high-contrast vertical edge at x=120.
+        // Beak hidden → fallback radius branch fires.
+        // birdBboxSize.maxSide = 100  → radius = max(10, min(100*0.15=15, 99)) = 15
+        // No bbox             → radius = max(10, min(200*0.15=30, 99)) = 30
+        // The two radii produce DIFFERENT scores because the no-bbox circle
+        // covers more of the edge than the bbox circle.
+        let w = 200, h = 200
+        let cs = CGColorSpaceCreateDeviceRGB()
+        let ctx = CGContext(data: nil, width: w, height: h,
+                            bitsPerComponent: 8, bytesPerRow: 0, space: cs,
+                            bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+        ctx.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
+        ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
+        ctx.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+        ctx.fill(CGRect(x: 120, y: 0, width: 1, height: h))
+        let image = ctx.makeImage()!
+
+        let withoutBox = HeadSharpness.score(
+            birdCrop: image,
+            leftEyeX: 0.5, leftEyeY: 0.5, leftEyeVis: 0.9,
+            rightEyeX: nil, rightEyeY: nil, rightEyeVis: 0.0,
+            beakX: nil, beakY: nil, beakVis: 0.0  // beak hidden → fallback
+        )!
+        let withBox = HeadSharpness.score(
+            birdCrop: image,
+            leftEyeX: 0.5, leftEyeY: 0.5, leftEyeVis: 0.9,
+            rightEyeX: nil, rightEyeY: nil, rightEyeVis: 0.0,
+            beakX: nil, beakY: nil, beakVis: 0.0,
+            birdBboxSize: (width: 100, height: 100)
+        )!
+        // Different radii → different scores. The exact direction depends
+        // on whether the edge sits inside the smaller bbox circle; what
+        // matters for parity is that the bbox value actually changes the
+        // computation rather than being silently ignored.
+        #expect(withoutBox != withBox)
+    }
+
+    @Test func beakVisibleIgnoresBboxFallback() {
+        // When the beak is visible the eye-beak × 1.2 path takes over and
+        // birdBboxSize is irrelevant — passing a wildly different bbox
+        // size must produce identical scores to omitting it.
+        let image = makeTestCGImage()
+        let withoutBox = HeadSharpness.score(
+            birdCrop: image,
+            leftEyeX: 0.5, leftEyeY: 0.5, leftEyeVis: 0.9,
+            rightEyeX: nil, rightEyeY: nil, rightEyeVis: 0.0,
+            beakX: 0.6, beakY: 0.7, beakVis: 0.9
+        )
+        let withTinyBox = HeadSharpness.score(
+            birdCrop: image,
+            leftEyeX: 0.5, leftEyeY: 0.5, leftEyeVis: 0.9,
+            rightEyeX: nil, rightEyeY: nil, rightEyeVis: 0.0,
+            beakX: 0.6, beakY: 0.7, beakVis: 0.9,
+            birdBboxSize: (width: 10, height: 10)
+        )
+        #expect(withoutBox == withTinyBox)
+    }
+
     @Test func birdCropAlignedSegMaskRejectsMalformedInput() {
         let image = makeTestCGImage(width: 1280, height: 853)
         let bbox = CGRect(x: 0.4, y: 0.4, width: 0.2, height: 0.2)

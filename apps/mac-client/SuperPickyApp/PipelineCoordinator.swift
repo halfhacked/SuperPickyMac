@@ -597,6 +597,13 @@ final class PipelineCoordinator: @unchecked Sendable {
             bbox: bird.bbox,
             birdCropSize: birdCrop.width
         )
+        // YOLO bbox in inference-image pixel space — feeds HeadSharpness's
+        // no-beak radius fallback (matches superpicky's `box[2]/box[3]`
+        // branch in keypoint_detector.py:248-252).
+        let bboxPx = (
+            width:  Int((bird.bbox.width  * CGFloat(image.width )).rounded()),
+            height: Int((bird.bbox.height * CGFloat(image.height)).rounded())
+        )
         let headSharpness = HeadSharpness.score(
             birdCrop: birdCrop,
             leftEyeX: keypoints.leftEye.x, leftEyeY: keypoints.leftEye.y,
@@ -605,7 +612,8 @@ final class PipelineCoordinator: @unchecked Sendable {
             rightEyeVis: keypoints.rightEye.visibility,
             beakX: keypoints.beak.x, beakY: keypoints.beak.y,
             beakVis: keypoints.beak.visibility,
-            segMask: birdCropSegMask
+            segMask: birdCropSegMask,
+            birdBboxSize: bboxPx
         ) ?? TenengradSharpness.score(image: birdCrop) // fallback to full-crop
 
         // `imageProps` (loaded at the top) also feeds the ISO sharpness
