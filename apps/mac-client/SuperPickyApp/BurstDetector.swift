@@ -95,7 +95,7 @@ struct BurstDetector: Sendable {
         return (parseTimestamp(from: props), GPSExtractor.gps(fromProperties: props))
     }
 
-    private static func parseTimestamp(from props: [String: Any]) -> Double? {
+    static func parseTimestamp(from props: [String: Any]) -> Double? {
         guard let exif = props["{Exif}"] as? [String: Any],
               let dateStr = exif["DateTimeOriginal"] as? String,
               let date = exifDateFormatter.date(from: dateStr) else { return nil }
