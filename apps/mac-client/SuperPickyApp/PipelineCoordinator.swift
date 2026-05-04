@@ -672,6 +672,7 @@ final class PipelineCoordinator: @unchecked Sendable {
             sharpness: photo.sharpnessScore ?? 0,
             aesthetics: photo.aestheticsScore,
             allKeypointsHidden: keypoints.allKeypointsHidden,
+            bestEyeVisibility: keypoints.bestEyeVisibility,
             isOverexposed: photo.exposureStatus == ExposureStatus.overexposed.rawValue,
             isUnderexposed: photo.exposureStatus == ExposureStatus.underexposed.rawValue,
             focusSharpnessWeight: focusWeights.sharpness,

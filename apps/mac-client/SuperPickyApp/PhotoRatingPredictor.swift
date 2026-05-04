@@ -21,11 +21,18 @@ enum PhotoRatingPredictor {
             sharpness: photo.sharpnessScore ?? 0,
             aesthetics: photo.aestheticsScore,
             allKeypointsHidden: allKeypointsHidden(photo),
+            bestEyeVisibility: bestEyeVisibility(photo),
             isOverexposed: photo.exposureStatus == ExposureStatus.overexposed.rawValue,
             isUnderexposed: photo.exposureStatus == ExposureStatus.underexposed.rawValue,
             isFlying: photo.isFlying,
             config: config
         ).rating
+    }
+
+    /// `max(leftEyeVis, rightEyeVis)` — feeds RatingEngine's visibility
+    /// degradation. Nil eye visibilities are treated as 0.
+    static func bestEyeVisibility(_ photo: Photo) -> Float {
+        max(photo.leftEyeVis ?? 0, photo.rightEyeVis ?? 0)
     }
 
     /// Every keypoint visibility (nil treated as 0) falls below the
