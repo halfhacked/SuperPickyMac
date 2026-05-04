@@ -664,6 +664,7 @@ final class PipelineCoordinator: @unchecked Sendable {
             if let props = imageProps {
                 return FocusPointDetector.computeWeights(
                     properties: props,
+                    filePath: fileURL.path,
                     birdBbox: bird.bbox,
                     eyeCenter: bestEye,
                     headRadiusFraction: headRadiusFraction,

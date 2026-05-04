@@ -72,8 +72,11 @@ struct FocusPointDetector {
     /// Variant that consumes a pre-loaded `CGImageSource` properties dict,
     /// so the pipeline can open the file once per photo and fan the dict
     /// out to every consumer (EXIFReader, this detector, …).
+    /// `filePath` is optional; when provided it enables raw-byte fallbacks
+    /// for tags ImageIO drops (Sony MakerNote in particular).
     static func computeWeights(
         properties: [String: Any],
+        filePath: String? = nil,
         birdBbox: CGRect,
         eyeCenter: (x: Float, y: Float)?,
         headRadiusFraction: Float,
@@ -81,7 +84,7 @@ struct FocusPointDetector {
         maskWidth: Int = 0,
         maskHeight: Int = 0
     ) -> FocusWeights {
-        guard let focusResult = readFocusPoint(properties: properties) else {
+        guard let focusResult = readFocusPoint(properties: properties, filePath: filePath) else {
             return .unknown
         }
         return computeWeights(
@@ -161,17 +164,22 @@ struct FocusPointDetector {
     /// Read focus point from image EXIF.
     /// Brand-dispatches by `{TIFF}.Make`:
     /// - **Sony**: parses MakerNote `FocusLocation` ("imgW imgH x y") and
-    ///   `FocusFrameSize` for the focus-validity flag.
+    ///   `FocusFrameSize` for the focus-validity flag. Apple's ImageIO
+    ///   doesn't surface Sony MakerNote, so we fall back to a raw IFD
+    ///   walker (`SonyMakerNoteReader`) on the file bytes.
     /// - **Nikon**: parses MakerNote `AFAreaXPosition` / `AFImageWidth`.
     /// - **Other / unknown**: falls through to standard EXIF `SubjectArea`.
     /// Returns nil when no AF data is available.
     static func readFocusPoint(filePath: String) -> FocusPointResult? {
         guard let props = ImageProperties.load(filePath: filePath) else { return nil }
-        return readFocusPoint(properties: props)
+        return readFocusPoint(properties: props, filePath: filePath)
     }
 
     /// Parse the focus point from a pre-loaded properties dict.
-    static func readFocusPoint(properties props: [String: Any]) -> FocusPointResult? {
+    /// `filePath`, when supplied, enables raw-byte fallbacks for tags
+    /// Apple's ImageIO doesn't surface (e.g. Sony MakerNote).
+    static func readFocusPoint(properties props: [String: Any],
+                               filePath: String? = nil) -> FocusPointResult? {
         let pixelWidth = (props["PixelWidth"] as? Int) ?? 0
         let pixelHeight = (props["PixelHeight"] as? Int) ?? 0
 
@@ -184,9 +192,19 @@ struct FocusPointDetector {
 
         // Brand-specific MakerNote parsers (matches superpicky's
         // _detect_<brand> dispatch in focus_point_detector.py).
-        if make.contains("SONY"), let mn = makerNote,
-           let result = parseSonyFocusPoint(makerNote: mn, orientation: orientation) {
-            return result
+        if make.contains("SONY") {
+            // ImageIO surfaces Sony MakerNote on some macOS versions but
+            // not others; try the dict first, then fall back to a raw
+            // TIFF IFD walker on the file bytes.
+            if let mn = makerNote,
+               let result = parseSonyFocusPoint(makerNote: mn, orientation: orientation) {
+                return result
+            }
+            if let path = filePath,
+               let mn = SonyMakerNoteReader.readFocusData(from: path),
+               let result = parseSonyFocusPoint(makerNote: mn, orientation: orientation) {
+                return result
+            }
         }
         if make.contains("CANON"), let mn = makerNote,
            let result = parseCanonFocusPoint(makerNote: mn, model: model, orientation: orientation) {
