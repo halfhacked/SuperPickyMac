@@ -270,6 +270,9 @@
 		D4B41663AF0FD67BBA6422DC /* species_list_CN-44.json in Resources */ = {isa = PBXBuildFile; fileRef = BEE856D59E22C64D1ACC4EB6 /* species_list_CN-44.json */; };
 		D562D508BE9BC7F68F390C75 /* species_list_CN-41.json in Resources */ = {isa = PBXBuildFile; fileRef = 83CCD975564900EE5E75D5D4 /* species_list_CN-41.json */; };
 		D5780C7327D0F6E8E642EA4E /* EXIFOffsetReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55DC1B03F94601690B7CEE70 /* EXIFOffsetReader.swift */; };
+		C3901B0082034877AE3BC55C /* SonyMakerNoteReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCEACE5C871E4202BF29F2E5 /* SonyMakerNoteReader.swift */; };
+		4ED691282A8C468A9D7BD925 /* TIFFIFDReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B53C33BA781A440C9AE778D6 /* TIFFIFDReader.swift */; };
+		C411A16A447248E699F22041 /* SonyMakerNoteReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91ADC144F7724CCEB918F650 /* SonyMakerNoteReaderTests.swift */; };
 		D6070A885F8DE451AE897CEE /* ImageLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1508E6CA44451D6B09FAD8BF /* ImageLoader.swift */; };
 		D716E8F51325F58C77043E42 /* species_list_CN-91.json in Resources */ = {isa = PBXBuildFile; fileRef = 0840F652B0CB17459DB81648 /* species_list_CN-91.json */; };
 		D7C44A0A7CB40C61F07B0E60 /* species_list_EC.json in Resources */ = {isa = PBXBuildFile; fileRef = 13F27D4ED0A3709B0C5A410D /* species_list_EC.json */; };
@@ -465,6 +468,9 @@
 		54A7888D696878AA3088420A /* StarFilterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarFilterTests.swift; sourceTree = "<group>"; };
 		54FECD0590A3C20869543AFA /* species_list_US-AK.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_US-AK.json"; sourceTree = "<group>"; };
 		55DC1B03F94601690B7CEE70 /* EXIFOffsetReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EXIFOffsetReader.swift; sourceTree = "<group>"; };
+		DCEACE5C871E4202BF29F2E5 /* SonyMakerNoteReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SonyMakerNoteReader.swift; sourceTree = "<group>"; };
+		B53C33BA781A440C9AE778D6 /* TIFFIFDReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TIFFIFDReader.swift; sourceTree = "<group>"; };
+		91ADC144F7724CCEB918F650 /* SonyMakerNoteReaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SonyMakerNoteReaderTests.swift; sourceTree = "<group>"; };
 		55FD8383417E1258A87ACD4A /* species_list_FI.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_FI.json; sourceTree = "<group>"; };
 		56C47414BCC2DF0A9F491F21 /* RegionBounds.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegionBounds.swift; sourceTree = "<group>"; };
 		58AE30066FA590520817814A /* species_list_PE.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_PE.json; sourceTree = "<group>"; };
@@ -734,6 +740,7 @@
 				229472C67589424B4A5072F0 /* CullingConfigTests.swift */,
 				B2D4034E9FA4FAEA2BFB8D8D /* ExifFormattersTests.swift */,
 				1B0DFDEC10521C90189BDE9F /* EXIFOffsetReaderTests.swift */,
+				91ADC144F7724CCEB918F650 /* SonyMakerNoteReaderTests.swift */,
 				CB9A3A9BD8A728146C3DDD2F /* EXIFReaderTests.swift */,
 				7B7DFAB7427E7D50B6C2F83D /* ExportServiceTests.swift */,
 				42EA84402A20D3F540816789 /* ExposureDetectorTests.swift */,
@@ -792,6 +799,8 @@
 				950F762228EBD7BA89B8B2C0 /* DirectoryScanner.swift */,
 				D6D8E5ED328E7CA41C95BBD9 /* ExifFormatters.swift */,
 				55DC1B03F94601690B7CEE70 /* EXIFOffsetReader.swift */,
+				DCEACE5C871E4202BF29F2E5 /* SonyMakerNoteReader.swift */,
+				B53C33BA781A440C9AE778D6 /* TIFFIFDReader.swift */,
 				8D61960564355CE428DB7AAB /* ExifPanelView.swift */,
 				75A29A263D346C79918EC367 /* EXIFReader.swift */,
 				C9D7B139DADC49E884F6DC14 /* ExportService.swift */,
@@ -1508,6 +1517,7 @@
 				142EF22BA97B679CCFF77E5A /* CullingConfigTests.swift in Sources */,
 				A677967B8F5115A2BA4E50F7 /* DirectoryScannerTests.swift in Sources */,
 				C4C1B719F8B6A6E22DBB1B38 /* EXIFOffsetReaderTests.swift in Sources */,
+				C411A16A447248E699F22041 /* SonyMakerNoteReaderTests.swift in Sources */,
 				1F6EE45CD79999D1EF5491F3 /* EXIFReaderTests.swift in Sources */,
 				C8B71FD5634761985FC15545 /* ExifFormattersTests.swift in Sources */,
 				0248B7B5C0E566EFFBB63CCB /* ExifPanelTests.swift in Sources */,
@@ -1572,6 +1582,8 @@
 				2CF05E13A2B84DFB79CE7DD0 /* DetectionResult.swift in Sources */,
 				2537E1B585BD0EFF83728969 /* DirectoryScanner.swift in Sources */,
 				D5780C7327D0F6E8E642EA4E /* EXIFOffsetReader.swift in Sources */,
+				C3901B0082034877AE3BC55C /* SonyMakerNoteReader.swift in Sources */,
+				4ED691282A8C468A9D7BD925 /* TIFFIFDReader.swift in Sources */,
 				E8A2927BC88504E05E879CEC /* EXIFReader.swift in Sources */,
 				AD9998180DB9935038EF3D5A /* ExifFormatters.swift in Sources */,
 				8D6EA52385D28EA1B9D1B25F /* ExifPanelView.swift in Sources */,

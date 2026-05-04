@@ -18,10 +18,18 @@ enum TenengradSharpness {
     }
 
     /// Sharpness within a circular mask (for head-region measurement).
-    static func maskedScore(image: CGImage, centerX: Int, centerY: Int, radius: Int) -> Float {
+    ///
+    /// `extraMask`, when supplied, must be a `width × height` row-major byte
+    /// array; pixels with a zero entry are skipped. Used to intersect the
+    /// head circle with the YOLO segmentation mask so background pixels
+    /// outside the bird body don't contribute, mirroring superpicky's
+    /// `cv2.bitwise_and(circle_mask, seg_mask)`.
+    static func maskedScore(image: CGImage, centerX: Int, centerY: Int, radius: Int,
+                            extraMask: [UInt8]? = nil) -> Float {
         let w = image.width
         let h = image.height
         guard w > 2 && h > 2 && radius > 1 else { return 0 }
+        if let m = extraMask, m.count != w * h { return 0 }
 
         guard let src = grayscaleFloats(from: image) else { return 0 }
 
@@ -42,6 +50,7 @@ enum TenengradSharpness {
             for x in xMin...xMax {
                 let dx = x - centerX
                 guard dx * dx + dy * dy <= r2 else { continue }
+                if let m = extraMask, m[row0 + x] == 0 { continue }
 
                 let gx = -src[rowM + x - 1] + src[rowM + x + 1]
                        + -2 * src[row0 + x - 1] + 2 * src[row0 + x + 1]

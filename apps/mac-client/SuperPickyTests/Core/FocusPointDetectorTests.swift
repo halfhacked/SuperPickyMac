@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import CoreGraphics
+import SuperPickyInference
 @testable import SuperPicky
 
 @Suite struct FocusPointDetectorTests {
@@ -189,6 +190,317 @@ import CoreGraphics
         )
         #expect(result.sharpness == 0.8)
         #expect(result.aesthetics == 0.9)
+    }
+
+    // MARK: - Sony FocusLocation parsing
+
+    @Test func sonyParsesFocusLocationFromStringForm() {
+        // Sony A1 MakerNote (exiftool string form): "5616 3744 2812 1885"
+        let makerNote: [String: Any] = [
+            "FocusLocation": "5616 3744 2812 1885",
+            "FocusFrameSize": "224 224 1"
+        ]
+        let r = FocusPointDetector.parseSonyFocusPoint(makerNote: makerNote, orientation: 1)!
+        #expect(abs(r.x - Float(2812) / Float(5616)) < 0.0001)
+        #expect(abs(r.y - Float(1885) / Float(3744)) < 0.0001)
+        #expect(r.isFocused == true)
+    }
+
+    @Test func sonyParsesFocusLocationFromArrayForm() {
+        // Same data but as [NSNumber] array (Apple ImageIO sometimes
+        // surfaces multi-int MakerNote tags this way).
+        let makerNote: [String: Any] = [
+            "FocusLocation": [NSNumber(value: 5616), NSNumber(value: 3744),
+                              NSNumber(value: 2812), NSNumber(value: 1885)],
+            "FocusFrameSize": [NSNumber(value: 224), NSNumber(value: 224), NSNumber(value: 1)]
+        ]
+        let r = FocusPointDetector.parseSonyFocusPoint(makerNote: makerNote, orientation: 1)!
+        #expect(abs(r.x - 0.5006) < 0.001)
+        #expect(r.isFocused == true)
+    }
+
+    @Test func sonyTreatsValidityZeroAsUnfocused() {
+        // FocusFrameSize[2] = 0 → AF didn't lock
+        let makerNote: [String: Any] = [
+            "FocusLocation": "5616 3744 2812 1885",
+            "FocusFrameSize": "224 224 0"
+        ]
+        let r = FocusPointDetector.parseSonyFocusPoint(makerNote: makerNote, orientation: 1)!
+        #expect(r.isFocused == false)
+    }
+
+    @Test func sonyDefaultsToFocusedWhenFrameSizeMissing() {
+        // No FocusFrameSize tag → conservatively assume focused (matches
+        // Python's `focus_result = 1` default).
+        let makerNote: [String: Any] = ["FocusLocation": "5616 3744 2812 1885"]
+        let r = FocusPointDetector.parseSonyFocusPoint(makerNote: makerNote, orientation: 1)!
+        #expect(r.isFocused == true)
+    }
+
+    @Test func sonyRejectsManualFocus() {
+        // FocusMode = "1" (Sony's MF code) → no AF data
+        let makerNote: [String: Any] = [
+            "FocusMode": "1",
+            "FocusLocation": "5616 3744 2812 1885"
+        ]
+        #expect(FocusPointDetector.parseSonyFocusPoint(makerNote: makerNote, orientation: 1) == nil)
+    }
+
+    @Test func sonyRejectsManualFocusByName() {
+        // Some Sony bodies surface "Manual" as a string label
+        let makerNote: [String: Any] = [
+            "FocusMode": "Manual",
+            "FocusLocation": "5616 3744 2812 1885"
+        ]
+        #expect(FocusPointDetector.parseSonyFocusPoint(makerNote: makerNote, orientation: 1) == nil)
+    }
+
+    @Test func sonyReturnsNilWhenFocusLocationMissing() {
+        let makerNote: [String: Any] = ["FocusFrameSize": "224 224 1"]
+        #expect(FocusPointDetector.parseSonyFocusPoint(makerNote: makerNote, orientation: 1) == nil)
+    }
+
+    @Test func sonyAppliesOrientationCorrection() {
+        // Portrait CW (orientation=6): (x, y) → (y, 1-x)
+        let makerNote: [String: Any] = ["FocusLocation": "5616 3744 1404 936"]
+        let landscape = FocusPointDetector.parseSonyFocusPoint(makerNote: makerNote, orientation: 1)!
+        let portrait  = FocusPointDetector.parseSonyFocusPoint(makerNote: makerNote, orientation: 6)!
+        #expect(abs(portrait.x - landscape.y) < 0.001)
+        #expect(abs(portrait.y - (1 - landscape.x)) < 0.001)
+    }
+
+    // MARK: - Olympus AF parsing
+
+    @Test func olympusParsesAFPointSelectedNormalized() {
+        let mn: [String: Any] = ["AFPointSelected": "0.5 0.5"]
+        let r = FocusPointDetector.parseOlympusFocusPoint(
+            makerNote: mn, orientation: 1)!
+        #expect(r.x == 0.5 && r.y == 0.5)
+        #expect(r.isFocused == true)
+    }
+
+    @Test func olympusParsesPercentForm() {
+        // Some bodies surface "(50%,50%)"
+        let mn: [String: Any] = ["AFPointSelected": "(50%,50%)"]
+        let r = FocusPointDetector.parseOlympusFocusPoint(
+            makerNote: mn, orientation: 1)!
+        #expect(r.x == 0.5 && r.y == 0.5)
+    }
+
+    @Test func olympusFallsBackToAFFocusAreaWhenSelectedAbsent() {
+        // No AFPointSelected → use AFFocusArea + AFFrameSize
+        let mn: [String: Any] = [
+            "AFFocusArea": "100 100 200 200",  // x y w h
+            "AFFrameSize": "4000 3000"
+        ]
+        let r = FocusPointDetector.parseOlympusFocusPoint(
+            makerNote: mn, orientation: 1)!
+        // Center = (100+100, 100+100) = (200, 200) → (0.05, 0.0667)
+        #expect(abs(r.x - 0.05) < 0.001)
+        #expect(abs(r.y - Float(200) / Float(3000)) < 0.001)
+    }
+
+    @Test func olympusRejectsZeroZeroSelected() {
+        // "0 0" is Olympus's empty marker — fall through to AFFocusArea path
+        let mn: [String: Any] = ["AFPointSelected": "0 0"]
+        #expect(FocusPointDetector.parseOlympusFocusPoint(
+            makerNote: mn, orientation: 1) == nil)
+    }
+
+    @Test func olympusRejectsManualFocus() {
+        let mn: [String: Any] = [
+            "FocusMode": "Manual",
+            "AFPointSelected": "0.5 0.5"
+        ]
+        #expect(FocusPointDetector.parseOlympusFocusPoint(
+            makerNote: mn, orientation: 1) == nil)
+    }
+
+    // MARK: - Fujifilm AF parsing
+
+    @Test func fujifilmParsesFocusPixelAgainstExifImageDimensions() {
+        // Fujifilm FocusPixel is in embedded-JPEG-preview pixels.
+        // Frame 4416×2944, focus at (2208, 1472) → center → (0.5, 0.5).
+        let mn: [String: Any] = ["FocusPixel": "2208 1472"]
+        let r = FocusPointDetector.parseFujifilmFocusPoint(
+            makerNote: mn, imageWidth: 4416, imageHeight: 2944, orientation: 1)!
+        #expect(abs(r.x - 0.5) < 0.001)
+        #expect(abs(r.y - 0.5) < 0.001)
+        #expect(r.isFocused == true)
+    }
+
+    @Test func fujifilmReturnsNilWithoutImageDimensions() {
+        let mn: [String: Any] = ["FocusPixel": "2208 1472"]
+        #expect(FocusPointDetector.parseFujifilmFocusPoint(
+            makerNote: mn, imageWidth: 0, imageHeight: 0, orientation: 1) == nil)
+    }
+
+    @Test func fujifilmRejectsManualFocus() {
+        let mn: [String: Any] = [
+            "FocusMode": "MF",
+            "FocusPixel": "2208 1472"
+        ]
+        #expect(FocusPointDetector.parseFujifilmFocusPoint(
+            makerNote: mn, imageWidth: 4416, imageHeight: 2944, orientation: 1) == nil)
+    }
+
+    // MARK: - Panasonic AF parsing
+
+    @Test func panasonicParsesAFPointPositionNormalized() {
+        let mn: [String: Any] = ["AFPointPosition": "0.4 0.6"]
+        let r = FocusPointDetector.parsePanasonicFocusPoint(makerNote: mn, orientation: 1)!
+        #expect(abs(r.x - 0.4) < 0.001)
+        #expect(abs(r.y - 0.6) < 0.001)
+        #expect(r.isFocused == true)
+    }
+
+    @Test func panasonicRejectsSentinelValue() {
+        // Panasonic writes 4.194e+006 when no AF point was used
+        let mn: [String: Any] = ["AFPointPosition": "4.194e+006 4.194e+006"]
+        #expect(FocusPointDetector.parsePanasonicFocusPoint(makerNote: mn, orientation: 1) == nil)
+    }
+
+    @Test func panasonicRejectsManualFocus() {
+        let mn: [String: Any] = [
+            "FocusMode": "Manual",
+            "AFPointPosition": "0.5 0.5"
+        ]
+        #expect(FocusPointDetector.parsePanasonicFocusPoint(makerNote: mn, orientation: 1) == nil)
+    }
+
+    @Test func panasonicAppliesOrientationCorrection() {
+        let mn: [String: Any] = ["AFPointPosition": "0.25 0.5"]
+        let landscape = FocusPointDetector.parsePanasonicFocusPoint(makerNote: mn, orientation: 1)!
+        let portrait  = FocusPointDetector.parsePanasonicFocusPoint(makerNote: mn, orientation: 6)!
+        // Orientation 6 (CW): (x, y) → (y, 1-x)
+        #expect(abs(portrait.x - landscape.y) < 0.001)
+        #expect(abs(portrait.y - (1 - landscape.x)) < 0.001)
+    }
+
+    // MARK: - Canon AF parsing
+
+    @Test func canonEosCenteredAfPointWithYInversion() {
+        // EOS body: image 6000×4000, AF point at offset (300, -200)
+        // → expected raw = (3000+300, 2000-(-200)*-1) = (3300, 2200)
+        // Wait: yDirection = -1 for EOS, so rawY = h/2 + yList[idx] * (-1)
+        //                                       = 2000 + (-200) * (-1) = 2200.
+        // Normalized: (3300/6000, 2200/4000) = (0.55, 0.55).
+        let mn: [String: Any] = [
+            "AFImageWidth": 6000,
+            "AFImageHeight": 4000,
+            "AFAreaXPositions": "300",
+            "AFAreaYPositions": "-200",
+            "AFPointsInFocus": "1"
+        ]
+        let r = FocusPointDetector.parseCanonFocusPoint(makerNote: mn, model: "Canon EOS R5", orientation: 1)!
+        #expect(abs(r.x - 0.55) < 0.001)
+        #expect(abs(r.y - 0.55) < 0.001)
+        #expect(r.isFocused == true)
+    }
+
+    @Test func canonCompactDoesNotInvertY() {
+        // Compact (PowerShot): yDirection = +1 → rawY = 2000 + (-200) = 1800.
+        let mn: [String: Any] = [
+            "AFImageWidth": 6000,
+            "AFImageHeight": 4000,
+            "AFAreaXPositions": "300",
+            "AFAreaYPositions": "-200",
+            "AFPointsInFocus": "1"
+        ]
+        let r = FocusPointDetector.parseCanonFocusPoint(makerNote: mn, model: "Canon PowerShot G7 X", orientation: 1)!
+        #expect(abs(r.y - 0.45) < 0.001)
+    }
+
+    @Test func canonPicksFirstFocusedAfPointFromBitmask() {
+        // 4 AF points; bitmask "0 0 1 0" → index 2 is in focus.
+        let mn: [String: Any] = [
+            "AFImageWidth": 6000,
+            "AFImageHeight": 4000,
+            "AFAreaXPositions": "0 0 600 0",
+            "AFAreaYPositions": "0 0 400 0",
+            "AFPointsInFocus": "0 0 1 0"
+        ]
+        let r = FocusPointDetector.parseCanonFocusPoint(makerNote: mn, model: "Canon EOS R6", orientation: 1)!
+        // Index 2: rawX = 3000+600 = 3600, rawY = 2000-400 = 1600 (EOS)
+        #expect(abs(r.x - 0.6) < 0.001)
+        #expect(abs(r.y - 0.4) < 0.001)
+        #expect(r.isFocused == true)
+    }
+
+    @Test func canonHandlesCommaSeparatedFocusIndices() {
+        // Some bodies surface "0,1" instead of bitmask
+        let mn: [String: Any] = [
+            "AFImageWidth": 6000,
+            "AFImageHeight": 4000,
+            "AFAreaXPositions": "100 200 300",
+            "AFAreaYPositions": "0 0 0",
+            "AFPointsInFocus": "1,2"
+        ]
+        let r = FocusPointDetector.parseCanonFocusPoint(makerNote: mn, model: "Canon EOS R", orientation: 1)!
+        // First locked index = 1 → rawX = 3000+200 = 3200
+        #expect(abs(r.x - Float(3200) / Float(6000)) < 0.001)
+    }
+
+    @Test func canonNoLockedPointFallsBackToFirstAfPointButReportsUnfocused() {
+        // No AFPointsInFocus → use index 0 but isFocused=false
+        let mn: [String: Any] = [
+            "AFImageWidth": 6000,
+            "AFImageHeight": 4000,
+            "AFAreaXPositions": "300",
+            "AFAreaYPositions": "-200",
+        ]
+        let r = FocusPointDetector.parseCanonFocusPoint(makerNote: mn, model: "Canon EOS R", orientation: 1)!
+        #expect(r.isFocused == false)
+        #expect(abs(r.x - 0.55) < 0.001)
+    }
+
+    @Test func canonRejectsManualFocus() {
+        let mn: [String: Any] = [
+            "FocusMode": "Manual",
+            "AFImageWidth": 6000,
+            "AFImageHeight": 4000,
+            "AFAreaXPositions": "300",
+            "AFAreaYPositions": "-200"
+        ]
+        #expect(FocusPointDetector.parseCanonFocusPoint(makerNote: mn, model: "Canon EOS R", orientation: 1) == nil)
+    }
+
+    @Test func canonReturnsNilWhenAfPositionsMissing() {
+        let mn: [String: Any] = ["AFImageWidth": 6000, "AFImageHeight": 4000]
+        #expect(FocusPointDetector.parseCanonFocusPoint(makerNote: mn, model: "Canon EOS R", orientation: 1) == nil)
+    }
+
+    // MARK: - headRadiusFraction helper
+
+    @Test func headRadiusFractionUsesEyeBeakDistanceWhenBeakVisible() {
+        // eye-beak distance = √((0.6-0.5)² + 0²) = 0.10 → ×1.2 = 0.12.
+        // Different from the 0.15 no-beak fallback; confirms the helper
+        // actually uses the keypoint geometry instead of returning the
+        // constant.
+        let r = FocusPointDetector.headRadiusFraction(
+            beakVisibility: 0.9,
+            eye: (x: 0.5, y: 0.5),
+            beak: (x: 0.6, y: 0.5)
+        )
+        #expect(abs(r - 0.12) < 0.001)
+    }
+
+    @Test func headRadiusFractionFallsBackWhenBeakHidden() {
+        let r = FocusPointDetector.headRadiusFraction(
+            beakVisibility: 0.1,
+            eye: (x: 0.5, y: 0.5),
+            beak: (x: 0.6, y: 0.5)
+        )
+        #expect(r == 0.15)
+    }
+
+    @Test func headRadiusFractionTreatsBeakBelowThresholdAsHidden() {
+        let r = FocusPointDetector.headRadiusFraction(
+            beakVisibility: InferenceConstants.keypointVisibilityThreshold - 0.01,
+            eye: (x: 0.5, y: 0.5),
+            beak: (x: 0.5, y: 0.5)
+        )
+        #expect(r == 0.15)
     }
 
     // MARK: - No eye center: head check skipped, falls through to seg/bbox
