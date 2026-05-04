@@ -7,6 +7,16 @@ struct RAWConverter: Sendable {
     /// Max pixel dimension for detect/aesthetics/keypoints/flight inference.
     private static let maxInferenceSize = 1280
 
+    /// Max pixel dimension for sharpness measurement. The 1280 inference
+    /// crop is undersampled for sharpness — at that resolution a distant
+    /// bird's head circle is 80–150 px and 1-pixel focus blur is
+    /// unobservable. Decoding to ~5800 picks up the embedded full-res
+    /// JPEG preview that modern bodies (Sony A1/A7Rx/A9, Canon R5/R6,
+    /// Nikon Z9) write into ARW/CR3/NEF — fast enough to run per photo
+    /// and recovers the ~65% raw-gradient gap we see between visually
+    /// distinct shots that tied at 1280.
+    static let maxSharpnessSize = 5800
+
     /// Decoded thumbnail plus the EXIF/TIFF property dictionary read from
     /// the same CGImageSource. `processOnePhoto` needs both for every
     /// photo, and opening the source twice (one thumbnail, one properties)
@@ -61,6 +71,23 @@ struct RAWConverter: Sendable {
             throw RAWConversionError.conversionFailed
         }
         return Decoded(image: image, properties: props)
+    }
+
+    /// Decode a higher-resolution image for the sharpness pass. Uses the
+    /// embedded full-res JPEG preview (no slow CIRAW path) and caps at
+    /// `maxPixelSize` so memory stays bounded. Returns nil on failure;
+    /// caller is expected to fall back to the inference image.
+    func decodeForSharpness(fileURL: URL,
+                            maxPixelSize: Int = RAWConverter.maxSharpnessSize) -> CGImage? {
+        guard let source = CGImageSourceCreateWithURL(fileURL as CFURL, nil) else {
+            return nil
+        }
+        let options: [CFString: Any] = [
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+            kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+        ]
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
     }
 
     /// Slow fallback: full RAW decode.
