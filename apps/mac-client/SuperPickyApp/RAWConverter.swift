@@ -73,18 +73,44 @@ struct RAWConverter: Sendable {
         return Decoded(image: image, properties: props)
     }
 
-    /// Decode a higher-resolution image for the sharpness pass. Uses the
-    /// embedded full-res JPEG preview (no slow CIRAW path) and caps at
-    /// `maxPixelSize` so memory stays bounded. Returns nil on failure;
-    /// caller is expected to fall back to the inference image.
+    /// Decode a higher-resolution image for the sharpness pass.
+    ///
+    /// Sony ARW: extract the embedded full-res JPEG (5616×3744 on A1,
+    /// 8640×5760 on A1 II / A7R V) directly from IFD2 and decode it.
+    /// Bypasses ImageIO's CIRAW path which costs ~611 ms per A1 ARW —
+    /// the embedded-JPEG path costs ~70 ms.
+    ///
+    /// Other RAW formats (CR3, NEF, RAF, …) and JPEG/HEIC fall back to
+    /// `kCGImageSourceCreateThumbnailFromImageAlways`. That's still slow
+    /// for non-Sony RAW (also CIRAW for those) but correct;
+    /// `kCGImageSourceCreateThumbnailFromImageIfAbsent` would silently
+    /// return the small embedded preview and we'd be back to the
+    /// 1280-equivalent resolution problem.
+    ///
+    /// Returns nil only when both the ARW fast path and the ImageIO
+    /// fallback fail. Caller falls back to the inference image.
     func decodeForSharpness(fileURL: URL,
                             maxPixelSize: Int = RAWConverter.maxSharpnessSize) -> CGImage? {
+        let ext = fileURL.pathExtension.lowercased()
+        if ext == "arw",
+           let jpegData = ARWPreviewExtractor.extractFullResJPEG(from: fileURL.path),
+           let source = CGImageSourceCreateWithData(jpegData as CFData, nil) {
+            let options: [CFString: Any] = [
+                kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+            ]
+            if let img = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) {
+                return img
+            }
+        }
+
         guard let source = CGImageSourceCreateWithURL(fileURL as CFURL, nil) else {
             return nil
         }
         let options: [CFString: Any] = [
             kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
-            kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
         ]
         return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
