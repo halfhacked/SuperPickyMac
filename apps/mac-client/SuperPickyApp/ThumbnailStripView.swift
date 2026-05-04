@@ -1,6 +1,22 @@
 import SwiftUI
 import AppKit
 
+/// Cheap O(1) fingerprint for `[Photo]` change detection in `onChange(of:)`.
+/// Misses pure mid-list reorders that preserve count + endpoints, but every
+/// real reorder path (filter switch, sort field/direction toggle) shifts at
+/// least the endpoints.
+private struct PhotoListSignature: Equatable {
+    let count: Int
+    let firstID: UUID?
+    let lastID: UUID?
+
+    init(_ photos: [Photo]) {
+        count = photos.count
+        firstID = photos.first?.id
+        lastID = photos.last?.id
+    }
+}
+
 struct ThumbnailStripView: View {
     let photos: [Photo]
     let selection: PhotoSelection
@@ -34,13 +50,25 @@ struct ThumbnailStripView: View {
             }
             .background(ScrollWheelRedirector())
             .background(.bar)
-            .onChange(of: selection.activeID) { _, newValue in
-                if let id = newValue {
-                    withAnimation {
-                        proxy.scrollTo(id, anchor: .center)
-                    }
-                }
+            .onChange(of: selection.activeID) { _, _ in
+                scrollActiveIntoView(proxy, animated: true)
             }
+            // Cheap signature: photos array changes through filter switches,
+            // sort changes, and reload — all of which shift either the count
+            // or the endpoints. Avoids materializing a [UUID] every diff.
+            .onChange(of: PhotoListSignature(photos)) { _, _ in
+                scrollActiveIntoView(proxy, animated: false)
+            }
+            .onAppear {
+                scrollActiveIntoView(proxy, animated: false)
+            }
+        }
+    }
+
+    private func scrollActiveIntoView(_ proxy: ScrollViewProxy, animated: Bool) {
+        guard let id = selection.activeID else { return }
+        withAnimation(animated ? .default : nil) {
+            proxy.scrollTo(id, anchor: .center)
         }
     }
 

@@ -185,7 +185,7 @@ final class ReportDatabase: Sendable {
 
     func fetchAllPhotos() throws -> [Photo] {
         try dbQueue.read { db in
-            try Photo.fetchAll(db)
+            try Photo.order(Column("dateCreated")).fetchAll(db)
         }
     }
 
