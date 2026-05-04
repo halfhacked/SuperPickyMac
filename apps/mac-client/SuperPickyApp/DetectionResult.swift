@@ -57,6 +57,13 @@ struct KeypointResult: Codable, Sendable {
         let t = InferenceConstants.keypointVisibilityThreshold
         return leftEye.visibility < t && rightEye.visibility < t && beak.visibility < t
     }
+
+    /// Maximum eye visibility — feeds RatingEngine's visibility-weight
+    /// degradation (`max(0.5, min(1.0, vis * 2))`). Mirrors superpicky's
+    /// `kp_result.best_eye_visibility` (`keypoint_detector.py:203`).
+    var bestEyeVisibility: Float {
+        max(leftEye.visibility, rightEye.visibility)
+    }
 }
 
 struct FlightResult: Codable, Sendable {

@@ -586,7 +586,24 @@ final class PipelineCoordinator: @unchecked Sendable {
         photo.isFlying = flight.isFlying
         photo.flightConfidence = flight.confidence
 
-        // Head-region sharpness (circular mask around eye, matches superpicky)
+        // Head-region sharpness (circular mask around eye, matches superpicky).
+        // Build a bird-crop-aligned segmentation mask so the head circle is
+        // intersected with the YOLO seg mask, matching the
+        // `cv2.bitwise_and(circle_mask, seg_mask)` step in
+        // `superpicky/core/keypoint_detector.py:_calculate_head_sharpness`.
+        let birdCropSegMask = Self.birdCropAlignedSegMask(
+            yoloMask: bird.mask,
+            inferImage: image,
+            bbox: bird.bbox,
+            birdCropSize: birdCrop.width
+        )
+        // YOLO bbox in inference-image pixel space — feeds HeadSharpness's
+        // no-beak radius fallback (matches superpicky's `box[2]/box[3]`
+        // branch in keypoint_detector.py:248-252).
+        let bboxPx = (
+            width:  Int((bird.bbox.width  * CGFloat(image.width )).rounded()),
+            height: Int((bird.bbox.height * CGFloat(image.height)).rounded())
+        )
         let headSharpness = HeadSharpness.score(
             birdCrop: birdCrop,
             leftEyeX: keypoints.leftEye.x, leftEyeY: keypoints.leftEye.y,
@@ -594,7 +611,9 @@ final class PipelineCoordinator: @unchecked Sendable {
             rightEyeX: keypoints.rightEye.x, rightEyeY: keypoints.rightEye.y,
             rightEyeVis: keypoints.rightEye.visibility,
             beakX: keypoints.beak.x, beakY: keypoints.beak.y,
-            beakVis: keypoints.beak.visibility
+            beakVis: keypoints.beak.visibility,
+            segMask: birdCropSegMask,
+            birdBboxSize: bboxPx
         ) ?? TenengradSharpness.score(image: birdCrop) // fallback to full-crop
 
         // `imageProps` (loaded at the top) also feeds the ISO sharpness
@@ -623,6 +642,17 @@ final class PipelineCoordinator: @unchecked Sendable {
             return (keypoints.rightEye.x, keypoints.rightEye.y)
         }()
 
+        // Head-circle radius for the focus-point .headFocus tier. Mirrors
+        // the radius HeadSharpness uses: eye-beak distance × 1.2 when the
+        // beak is visible, otherwise the bbox max-side × 0.15 fallback.
+        // Without this, every photo got the no-beak constant (0.15) for
+        // its head circle, which over-triggered .headFocus on ~most shots.
+        let headRadiusFraction = FocusPointDetector.headRadiusFraction(
+            beakVisibility: keypoints.beak.visibility,
+            eye: bestEye,
+            beak: (x: keypoints.beak.x, y: keypoints.beak.y)
+        )
+
         // Seg mask: YOLO outputs a square mask at model resolution (e.g. 160x160).
         // Infer dimensions from data size (sqrt of byte count for square masks).
         let segMask: Data? = bird.mask.isEmpty ? nil : bird.mask
@@ -634,9 +664,10 @@ final class PipelineCoordinator: @unchecked Sendable {
             if let props = imageProps {
                 return FocusPointDetector.computeWeights(
                     properties: props,
+                    filePath: fileURL.path,
                     birdBbox: bird.bbox,
                     eyeCenter: bestEye,
-                    headRadiusFraction: HeadSharpness.noBeakRadiusRatio,
+                    headRadiusFraction: headRadiusFraction,
                     segMask: segMask,
                     maskWidth: maskWidth,
                     maskHeight: maskHeight
@@ -648,7 +679,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                 filePath: fileURL.path,
                 birdBbox: bird.bbox,
                 eyeCenter: bestEye,
-                headRadiusFraction: HeadSharpness.noBeakRadiusRatio,
+                headRadiusFraction: headRadiusFraction,
                 segMask: segMask,
                 maskWidth: maskWidth,
                 maskHeight: maskHeight
@@ -661,6 +692,7 @@ final class PipelineCoordinator: @unchecked Sendable {
             sharpness: photo.sharpnessScore ?? 0,
             aesthetics: photo.aestheticsScore,
             allKeypointsHidden: keypoints.allKeypointsHidden,
+            bestEyeVisibility: keypoints.bestEyeVisibility,
             isOverexposed: photo.exposureStatus == ExposureStatus.overexposed.rawValue,
             isUnderexposed: photo.exposureStatus == ExposureStatus.underexposed.rawValue,
             focusSharpnessWeight: focusWeights.sharpness,
@@ -689,6 +721,96 @@ final class PipelineCoordinator: @unchecked Sendable {
         guard let iso, iso > Int(isoBase) else { return 1.0 }
         let penalty = isoPenaltyFactor * log2(Float(iso) / isoBase)
         return max(isoMinFactor, 1.0 - penalty)
+    }
+
+    /// Build a binary segmentation mask aligned with the bird crop produced
+    /// by `image.smartSquareBirdCrop(bbox:)`. Each output byte is 1 iff the
+    /// corresponding bird-crop pixel maps to a bird-pixel in the 160×160 YOLO
+    /// seg mask, accounting for letterboxing in both directions.
+    ///
+    /// Parity reference: superpicky's
+    /// `bird_crop_mask = bird_mask_orig[y_orig:y_orig+h, x_orig:x_orig+w]`
+    /// (`core/photo_processor.py:1742`). The Python path nearest-neighbor
+    /// upsamples the 160×160 YOLO mask to the original image resolution and
+    /// slices by bbox; we sample per pixel here so we can reuse the existing
+    /// `bird.mask` blob without an intermediate full-resolution buffer.
+    ///
+    /// Returns nil if mask data is malformed or the bird crop geometry is
+    /// degenerate.
+    static func birdCropAlignedSegMask(
+        yoloMask: Data,
+        inferImage: CGImage,
+        bbox: CGRect,
+        birdCropSize: Int,
+        paddingRatio: CGFloat = 0.15
+    ) -> [UInt8]? {
+        guard !yoloMask.isEmpty, birdCropSize > 0 else { return nil }
+        let maskSide = Int(Double(yoloMask.count).squareRoot().rounded())
+        guard maskSide > 0, maskSide * maskSide == yoloMask.count else { return nil }
+
+        let imgW = inferImage.width
+        let imgH = inferImage.height
+        guard imgW > 0, imgH > 0 else { return nil }
+
+        // Replicate `smartSquareBirdCrop`'s integer geometry so we can map
+        // bird-crop pixels back to inference-image pixels exactly.
+        let px1 = Int((bbox.origin.x * CGFloat(imgW)).rounded(.down))
+        let py1 = Int((bbox.origin.y * CGFloat(imgH)).rounded(.down))
+        let px2 = Int(((bbox.origin.x + bbox.size.width)  * CGFloat(imgW)).rounded(.up))
+        let py2 = Int(((bbox.origin.y + bbox.size.height) * CGFloat(imgH)).rounded(.up))
+        let bboxW = px2 - px1, bboxH = py2 - py1
+        guard bboxW > 0, bboxH > 0 else { return nil }
+        let maxSide = max(bboxW, bboxH)
+        let targetSide = Int(Double(maxSide) * (1.0 + Double(paddingRatio)))
+        let cx = (px1 + px2) / 2, cy = (py1 + py2) / 2
+        let half = targetSide / 2
+        let cropX1 = max(0, cx - half), cropY1 = max(0, cy - half)
+        let cropX2 = min(imgW, cx + half), cropY2 = min(imgH, cy + half)
+        let cropW = cropX2 - cropX1, cropH = cropY2 - cropY1
+        guard cropW > 0, cropH > 0 else { return nil }
+        let sqSize = max(cropW, cropH)
+        // Sanity-check against the actual CGImage we got back from
+        // smartSquareBirdCrop — drift here would silently desynchronize the
+        // mask from the pixels.
+        guard sqSize == birdCropSize else { return nil }
+        let offX = (sqSize - cropW) / 2, offY = (sqSize - cropH) / 2
+
+        // YOLO letterbox params: inference image is scaled to fit a
+        // `yoloInputSize × yoloInputSize` square with symmetric padding,
+        // and the mask is at `maskSide` resolution (160×160 by default,
+        // i.e. yoloInputSize/4).
+        let yoloSize = Float(InferenceConstants.yoloInputSize)
+        let origW = Float(imgW), origH = Float(imgH)
+        let scale = min(yoloSize / origW, yoloSize / origH)
+        let padLeft = (yoloSize - origW * scale) / 2
+        let padTop  = (yoloSize - origH * scale) / 2
+        let maskScale = Float(maskSide) / yoloSize
+
+        var out = [UInt8](repeating: 0, count: sqSize * sqSize)
+        yoloMask.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
+            let mask = raw.bindMemory(to: UInt8.self)
+            for y in 0..<sqSize {
+                let inCanvasY = y - offY
+                if inCanvasY < 0 || inCanvasY >= cropH { continue }
+                let infY = Float(cropY1 + inCanvasY)
+                let yoloY = infY * scale + padTop
+                let my = Int((yoloY * maskScale).rounded(.down))
+                guard my >= 0, my < maskSide else { continue }
+                let mRow = my * maskSide
+                let outRow = y * sqSize
+                for x in 0..<sqSize {
+                    let inCanvasX = x - offX
+                    if inCanvasX < 0 || inCanvasX >= cropW { continue }
+                    let infX = Float(cropX1 + inCanvasX)
+                    let yoloX = infX * scale + padLeft
+                    let mx = Int((yoloX * maskScale).rounded(.down))
+                    if mx >= 0, mx < maskSide {
+                        out[outRow + x] = mask[mRow + mx]
+                    }
+                }
+            }
+        }
+        return out
     }
 
     /// JSON-encode a value to a UTF-8 string for storage in the

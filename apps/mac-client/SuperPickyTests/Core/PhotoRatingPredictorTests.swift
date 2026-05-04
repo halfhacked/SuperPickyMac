@@ -28,6 +28,28 @@ import Foundation
         return p
     }
 
+    @Test func bestEyeVisibilityTakesMaxOfTwoEyes() {
+        let p = photo(leftEyeVis: 0.30, rightEyeVis: 0.85)
+        #expect(PhotoRatingPredictor.bestEyeVisibility(p) == 0.85)
+    }
+
+    @Test func bestEyeVisibilityTreatsNilAsZero() {
+        let p = photo(leftEyeVis: nil, rightEyeVis: 0.4)
+        #expect(PhotoRatingPredictor.bestEyeVisibility(p) == 0.4)
+    }
+
+    @Test func lowEyeVisibilityDegradesPredictedRating() {
+        // Both eyes barely visible (just above the 0.3 hidden floor so we
+        // skip the `allKeypointsHidden` short-circuit) — visibility weight
+        // = max(0.5, min(1.0, 0.31 * 2)) = 0.62 → 5★ * 0.62 ≈ 3.
+        let strong = photo(leftEyeVis: 0.9, rightEyeVis: 0.9)
+        let weak   = photo(leftEyeVis: 0.31, rightEyeVis: 0.31)
+        let strongStars = PhotoRatingPredictor.predict(photo: strong, config: config)!
+        let weakStars   = PhotoRatingPredictor.predict(photo: weak,   config: config)!
+        #expect(strongStars > weakStars)
+        #expect(weakStars >= 1)
+    }
+
     // MARK: - nil paths
 
     @Test func returnsNilWhenPhotoIsNil() {
