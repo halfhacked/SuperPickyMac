@@ -28,7 +28,7 @@ struct ContentView: View {
     @State private var minimumStars: Int = 0
     @State private var topBurstOnly: Bool = false
     @State private var pickedOnly: Bool = false
-    @State private var sortOrder: SortOrder = .filename
+    @State private var sortOrder: SortOrder = .captureDate
     @State private var sortAscending: Bool = true
     @State private var showExifPanel = true
     @State private var showFullscreen = false
