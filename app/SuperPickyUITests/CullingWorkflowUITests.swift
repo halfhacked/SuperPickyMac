@@ -548,23 +548,30 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
         return active.exists ? active.identifier : nil
     }
 
-    /// Identifier of the leftmost thumbnail in the visible viewport. The
-    /// LazyHStack only puts in-viewport items in the a11y tree, so this
-    /// query reliably returns the displayed-first thumbnail.
+    /// Identifier of the leftmost thumbnail in the visible viewport. Walks
+    /// a single `app.snapshot()` of the a11y tree — properties on
+    /// `XCUIElementSnapshot` are pure reads, no per-element re-query. The
+    /// previous implementation used `for i in 0..<thumbs.count {
+    /// thumbs.element(boundBy: i).<prop> }` which paid ~0.3 s per cell on
+    /// macOS-15 hosted runners; with ~35 cells × 3 callers (test23/24/25)
+    /// that was ~30 s of pure query overhead per culling-shard run.
     private func leftmostVisibleThumbnailID(in app: XCUIApplication) -> String? {
-        let thumbs = app.images.matching(NSPredicate(
-            format: "identifier BEGINSWITH 'Thumbnail_'"
-        ))
+        guard let root = try? app.snapshot() else { return nil }
         var minX = CGFloat.greatestFiniteMagnitude
         var result: String?
-        for i in 0..<thumbs.count {
-            let t = thumbs.element(boundBy: i)
-            guard t.exists, t.frame.size.width > 0 else { continue }
-            let x = t.frame.origin.x
-            if x.isFinite, x < minX {
-                minX = x
-                result = t.identifier
+        var stack: [XCUIElementSnapshot] = [root]
+        while let node = stack.popLast() {
+            if node.elementType == .image,
+               node.identifier.hasPrefix("Thumbnail_") {
+                let frame = node.frame
+                if frame.size.width > 0,
+                   frame.origin.x.isFinite,
+                   frame.origin.x < minX {
+                    minX = frame.origin.x
+                    result = node.identifier
+                }
             }
+            stack.append(contentsOf: node.children)
         }
         return result
     }
