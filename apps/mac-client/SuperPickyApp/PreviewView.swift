@@ -29,6 +29,14 @@ struct PreviewView: View {
                         Color.clear.onAppear { viewSize = geo.size }
                             .onChange(of: geo.size) { _, s in viewSize = s }
                     })
+                    .contextMenu {
+                        Button {
+                            FinderReveal.reveal(photo)
+                        } label: {
+                            Label(config.localized("Reveal in Finder"), systemImage: "folder")
+                        }
+                        .accessibilityIdentifier("RevealInFinder")
+                    }
                 InfoBarView(photo: photo, appState: appState, onCorrectSpecies: { name in
                     onCorrectSpecies?(photo.id, name)
                 })
