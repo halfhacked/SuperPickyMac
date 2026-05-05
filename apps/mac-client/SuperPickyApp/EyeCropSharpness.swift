@@ -11,6 +11,60 @@ struct HeadSharpness {
     static let noBeakRadiusRatio: Float = 0.15
     static let lowVisPenalty: Float = 0.8
 
+    /// The eye `score(...)` measures over, and which `SharpnessOverlay`
+    /// must draw to honestly visualize the metric.
+    struct EyePick {
+        let x: Float
+        let y: Float
+        /// True when neither eye crossed `visibilityThreshold` and we
+        /// fell back to the higher-visibility one. The metric applies
+        /// `lowVisPenalty` in this case.
+        let bothHidden: Bool
+    }
+
+    /// Pick the eye `score(...)` would measure over. Shared with
+    /// `SharpnessOverlay` so the debug overlay can't disagree with the
+    /// metric.
+    static func pickEye(
+        leftEyeX: Float?, leftEyeY: Float?, leftEyeVis: Float?,
+        rightEyeX: Float?, rightEyeY: Float?, rightEyeVis: Float?,
+        beakX: Float?, beakY: Float?
+    ) -> EyePick? {
+        let leftVis = leftEyeVis ?? 0
+        let rightVis = rightEyeVis ?? 0
+        let bothHidden = leftVis < visibilityThreshold && rightVis < visibilityThreshold
+        if bothHidden {
+            if leftVis >= rightVis, let x = leftEyeX, let y = leftEyeY {
+                return EyePick(x: x, y: y, bothHidden: true)
+            }
+            if let x = rightEyeX, let y = rightEyeY {
+                return EyePick(x: x, y: y, bothHidden: true)
+            }
+            return nil
+        }
+        let leftOK = leftVis >= visibilityThreshold
+        let rightOK = rightVis >= visibilityThreshold
+        // Both eyes visible + beak: pick whichever is further from the beak
+        // (matches superpicky's far-eye preference for occlusion robustness).
+        if leftOK && rightOK,
+           let lx = leftEyeX, let ly = leftEyeY,
+           let rx = rightEyeX, let ry = rightEyeY,
+           let bx = beakX, let by = beakY {
+            let leftDist = hypot(lx - bx, ly - by)
+            let rightDist = hypot(rx - bx, ry - by)
+            return leftDist >= rightDist
+                ? EyePick(x: lx, y: ly, bothHidden: false)
+                : EyePick(x: rx, y: ry, bothHidden: false)
+        }
+        if leftOK, let x = leftEyeX, let y = leftEyeY {
+            return EyePick(x: x, y: y, bothHidden: false)
+        }
+        if let x = rightEyeX, let y = rightEyeY {
+            return EyePick(x: x, y: y, bothHidden: false)
+        }
+        return nil
+    }
+
     /// Compute head-region sharpness of the bird crop using a circular mask centered on the best eye.
     /// Returns nil if crop is too small to measure.
     ///
@@ -38,42 +92,14 @@ struct HeadSharpness {
         let h = birdCrop.height
         guard w > 10 && h > 10 else { return nil }
 
-        let leftVis = leftEyeVis ?? 0
-        let rightVis = rightEyeVis ?? 0
+        guard let pick = pickEye(
+            leftEyeX: leftEyeX, leftEyeY: leftEyeY, leftEyeVis: leftEyeVis,
+            rightEyeX: rightEyeX, rightEyeY: rightEyeY, rightEyeVis: rightEyeVis,
+            beakX: beakX, beakY: beakY
+        ) else { return nil }
+
         let beakVisible = (beakVis ?? 0) >= visibilityThreshold
-
-        // Both eyes below visibility threshold: fallback with penalty
-        let bothHidden = leftVis < visibilityThreshold && rightVis < visibilityThreshold
-        let eye: (Float, Float)
-        if bothHidden {
-            // Use whichever eye has higher visibility as fallback
-            if leftVis >= rightVis, let x = leftEyeX, let y = leftEyeY {
-                eye = (x, y)
-            } else if let x = rightEyeX, let y = rightEyeY {
-                eye = (x, y)
-            } else {
-                return nil
-            }
-        } else {
-            // Pick eye further from beak (matches superpicky logic)
-            let leftOK = leftVis >= visibilityThreshold
-            let rightOK = rightVis >= visibilityThreshold
-            if leftOK && rightOK, let lx = leftEyeX, let ly = leftEyeY,
-               let rx = rightEyeX, let ry = rightEyeY,
-               let bx = beakX, let by = beakY {
-                let leftDist = hypot(lx - bx, ly - by)
-                let rightDist = hypot(rx - bx, ry - by)
-                eye = leftDist >= rightDist ? (lx, ly) : (rx, ry)
-            } else if leftOK, let x = leftEyeX, let y = leftEyeY {
-                eye = (x, y)
-            } else if let x = rightEyeX, let y = rightEyeY {
-                eye = (x, y)
-            } else {
-                return nil
-            }
-        }
-
-        let eyePx = (Int(eye.0 * Float(w)), Int(eye.1 * Float(h)))
+        let eyePx = (Int(pick.x * Float(w)), Int(pick.y * Float(h)))
 
         // Compute radius. Three-branch fallback matches superpicky's
         // _calculate_head_sharpness:
@@ -105,6 +131,6 @@ struct HeadSharpness {
             extraMask: segMask
         )
 
-        return bothHidden ? score * lowVisPenalty : score
+        return pick.bothHidden ? score * lowVisPenalty : score
     }
 }

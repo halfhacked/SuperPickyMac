@@ -43,6 +43,7 @@ struct ContentView: View {
     @State private var pendingDeleteID: UUID?
     @State private var showKeyboardHelp = false
     @State private var showThresholdCalibrator = false
+    @State private var showSharpnessOverlay = false
 
     private var filteredPhotos: [Photo] {
         var result = photos
@@ -80,7 +81,8 @@ struct ContentView: View {
                             brightnessAdjustment: brightnessAdj,
                             mouseInView: $mouseInPreview, viewSize: $previewSize,
                             appState: appState,
-                            onCorrectSpecies: onCorrectSpecies)
+                            onCorrectSpecies: onCorrectSpecies,
+                            showSharpnessOverlay: showSharpnessOverlay)
                     .onChange(of: selectedPhotoID) { _, newID in
                         guard let newID,
                               let idx = filteredPhotos.firstIndex(where: { $0.id == newID }) else {
@@ -270,6 +272,17 @@ struct ContentView: View {
                 }
                 .accessibilityIdentifier("ExportMenu")
                 .help(config.localized("Export photos (⌘E for picks)"))
+            }
+            ToolbarItem(placement: .automatic) {
+                Button {
+                    showSharpnessOverlay.toggle()
+                } label: {
+                    Image(systemName: showSharpnessOverlay
+                          ? "rectangle.dashed.badge.record"
+                          : "rectangle.dashed")
+                }
+                .accessibilityIdentifier("SharpnessOverlayToggle")
+                .help(config.localized("Show sharpness measurement region (bbox + head circle)"))
             }
             ToolbarItem(placement: .automatic) {
                 Button {
