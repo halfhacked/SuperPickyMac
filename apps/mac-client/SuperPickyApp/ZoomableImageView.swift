@@ -67,6 +67,9 @@ struct ZoomableImageView: View {
     let image: NSImage
     @Bindable var zoomState: ZoomState
     var brightnessAdjustment: Double = 0
+    /// Optional photo metadata for the sharpness-region overlay. Drawn
+    /// only when the toolbar toggle is on.
+    var sharpnessOverlayPhoto: Photo?
 
     @State private var dragStart: CGSize = .zero
 
@@ -75,6 +78,16 @@ struct ZoomableImageView: View {
             Image(nsImage: image)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
+                .overlay {
+                    // Overlay sits in the same aspect-fit box as the
+                    // image, so geo.size inside it matches the displayed
+                    // image's content rect. Subsequent .scaleEffect /
+                    // .offset apply equally to image and overlay so they
+                    // track together when the user zooms / pans.
+                    if let photo = sharpnessOverlayPhoto {
+                        SharpnessOverlay(photo: photo, imageSize: image.size)
+                    }
+                }
                 .brightness(brightnessAdjustment)
                 .scaleEffect(zoomState.scale)
                 .offset(zoomState.offset)
