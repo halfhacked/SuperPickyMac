@@ -93,6 +93,7 @@ struct ThumbnailCell: View {
     let isActive: Bool
     let isSelected: Bool
     let isDimmed: Bool
+    @Environment(CullingConfig.self) private var config
 
     static let accessibilityIDPrefix = "Thumbnail_"
 
@@ -167,6 +168,14 @@ struct ThumbnailCell: View {
         .animation(.easeInOut(duration: 0.15), value: isDimmed)
         .accessibilityIdentifier(Self.accessibilityID(for: photo))
         .accessibilityValue(a11ySelectionValue)
+        .contextMenu {
+            Button {
+                FinderReveal.reveal(photo)
+            } label: {
+                Label(config.localized("Reveal in Finder"), systemImage: "folder")
+            }
+            .accessibilityIdentifier("RevealInFinder")
+        }
     }
 }
 
