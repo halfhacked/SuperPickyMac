@@ -555,8 +555,17 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
     private func leftmostVisibleThumbnailID(in app: XCUIApplication) -> String? {
         let marker = app.descendants(matching: .any)
             .matching(identifier: A11y.leftmostThumbnail).firstMatch
-        guard marker.exists else { return nil }
+        let exists = marker.exists
         let value = marker.value as? String
+        if !exists || (value?.isEmpty ?? true) {
+            // DIAG (PR #84): the marker query returned nil twice on CI.
+            // Dump the a11y tree so we can see whether the marker is in
+            // the tree at all, under which element type, and with what
+            // value. Remove once the marker scheme lands green.
+            print("[DIAG-leftmost] marker.exists=\(exists) value=\(value ?? "<nil>")")
+            print("[DIAG-leftmost] app.debugDescription:\n\(app.debugDescription)")
+        }
+        guard exists else { return nil }
         return (value?.isEmpty ?? true) ? nil : value
     }
 
