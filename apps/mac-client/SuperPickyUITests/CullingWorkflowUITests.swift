@@ -454,4 +454,43 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
         dismissConfirmDialogIfPresent()
         XCTAssertTrue(preview.exists, "Preview should remain after Cmd+E")
     }
+
+    // MARK: - 50-59: Context menu
+
+    func test50_ThumbnailRightClick_RevealInFinderMenuItemExists() {
+        let app = Self.app!
+        let preview = app.images[A11y.photoPreview]
+        XCTAssertTrue(preview.waitForExistence(timeout: 10),
+                      "Photo preview must be visible before right-clicking thumbnails")
+
+        // Pick the first thumbnail in the strip — must arrow into view
+        // first so LazyHStack instantiates it (per A11y rule on lazy strips).
+        let firstThumbnail = app.images.matching(NSPredicate(format: "identifier BEGINSWITH 'Thumbnail_'")).firstMatch
+        XCTAssertTrue(firstThumbnail.waitForExistence(timeout: 5),
+                      "At least one thumbnail must exist")
+
+        firstThumbnail.rightClick()
+
+        let menuItem = app.menuItems[A11y.revealInFinderMenuItem]
+        XCTAssertTrue(menuItem.waitForExistence(timeout: 3),
+                      "Reveal in Finder menu item should appear on right-click")
+
+        // Dismiss without invoking — clicking would launch Finder during CI.
+        app.typeKey(.escape, modifierFlags: [])
+    }
+
+    func test51_PreviewRightClick_RevealInFinderMenuItemExists() {
+        let app = Self.app!
+        let preview = app.images[A11y.photoPreview]
+        XCTAssertTrue(preview.waitForExistence(timeout: 10),
+                      "Photo preview must be visible")
+
+        preview.rightClick()
+
+        let menuItem = app.menuItems[A11y.revealInFinderMenuItem]
+        XCTAssertTrue(menuItem.waitForExistence(timeout: 3),
+                      "Reveal in Finder menu item should appear on right-click")
+
+        app.typeKey(.escape, modifierFlags: [])
+    }
 }
