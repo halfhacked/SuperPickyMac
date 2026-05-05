@@ -2,7 +2,7 @@
 """Convert YOLO11l-seg bird detector to Core ML.
 
 Input:  ~/projects/SuperPicky/models/yolo11l-seg.pt
-Output: apps/mac-client/SuperPickyInference/Resources/Models/YOLOBirdDetector.mlpackage
+Output: app/SuperPickyInference/Resources/Models/YOLOBirdDetector.mlpackage
 
 CONVERSION NOTES (Phase 3 spike):
   - Direct ultralytics .export(format='coreml') fails on YOLO11 attention modules
@@ -39,7 +39,7 @@ sys.path.insert(0, str(Path.home() / 'projects/SuperPicky'))
 from ultralytics import YOLO
 
 MODEL_PATH = Path.home() / 'projects/SuperPicky/models/yolo11l-seg.pt'
-OUTPUT_DIR = Path(__file__).parent.parent / 'apps/mac-client/SuperPickyInference/Resources/Models'
+OUTPUT_DIR = Path(__file__).parent.parent / 'app/SuperPickyInference/Resources/Models'
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 assert MODEL_PATH.exists(), f"Model not found: {MODEL_PATH}"

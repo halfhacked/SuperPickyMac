@@ -2,7 +2,7 @@
 """Convert OSEA ResNet34 bird species classifier to Core ML.
 
 Input:  ~/projects/SuperPicky/models/model20240824.pth
-Output: apps/mac-client/SuperPickyInference/Resources/Models/OSEAClassifier.mlpackage
+Output: app/SuperPickyInference/Resources/Models/OSEAClassifier.mlpackage
 
 Architecture: torchvision.models.resnet34(num_classes=11000)
   - Preprocessing: Resize(256) → CenterCrop(224) → ImageNet normalize
@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path.home() / 'projects/SuperPicky'))
 sys.path.insert(0, str(Path.home() / 'projects/SuperPicky/birdid'))
 
 MODEL_PATH = Path.home() / 'projects/SuperPicky/models/model20240824.pth'
-OUTPUT_DIR = Path(__file__).parent.parent / 'apps/mac-client/SuperPickyInference/Resources/Models'
+OUTPUT_DIR = Path(__file__).parent.parent / 'app/SuperPickyInference/Resources/Models'
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 assert MODEL_PATH.exists(), f"Model not found: {MODEL_PATH}"

@@ -22,9 +22,9 @@ dist/
 # downloaded on first launch via ModelManager.
 python-server/models/*.pt
 python-server/models/*.pth
-apps/mac-client/SuperPickyInference/Resources/Models/*.mlmodelc/weights/weight.bin
+app/SuperPickyInference/Resources/Models/*.mlmodelc/weights/weight.bin
 # CoreML source packages (~420 MB total) — never committed
-apps/mac-client/SuperPickyInference/Resources/Models/*.mlpackage/
+app/SuperPickyInference/Resources/Models/*.mlpackage/
 
 # macOS
 .DS_Store
@@ -47,9 +47,9 @@ Picked/
 # test-photos runtime artifacts (per-folder DB + XMP sidecars written by the
 # app). Fixture JPGs are tracked; sidecars + DBs only appear if you point the
 # real app at the fixture directory.
-apps/mac-client/SuperPickyUITests/test-photos*/.report.db*
-apps/mac-client/SuperPickyUITests/test-photos*/.DS_Store
-apps/mac-client/SuperPickyUITests/test-photos*/*.xmp
+app/SuperPickyUITests/test-photos*/.report.db*
+app/SuperPickyUITests/test-photos*/.DS_Store
+app/SuperPickyUITests/test-photos*/*.xmp
 
 # Root-level scratch dir used for ad-hoc app runs against the fixtures.
 /test-photos/

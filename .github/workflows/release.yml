@@ -29,7 +29,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Build (Release)
-        working-directory: apps/mac-client
+        working-directory: app
         run: |
           xcodebuild build \
             -scheme SuperPicky \
@@ -40,12 +40,12 @@ jobs:
             CURRENT_PROJECT_VERSION="${{ steps.v.outputs.build }}"
 
       - name: Package .app into zip
-        working-directory: apps/mac-client
+        working-directory: app
         run: |
           APP="build/Build/Products/Release/SuperPicky.app"
           ZIP="SuperPicky-${{ steps.v.outputs.tag }}-mac.zip"
           ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
-          echo "ZIP_PATH=apps/mac-client/$ZIP" >> "$GITHUB_ENV"
+          echo "ZIP_PATH=app/$ZIP" >> "$GITHUB_ENV"
 
       - name: Create GitHub release
         env:

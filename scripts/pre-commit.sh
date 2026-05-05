@@ -4,7 +4,7 @@ echo "=== G1 Static + L1 Unit ==="
 
 # xcodebuild test implicitly builds, so lint can run in parallel with it.
 # Arch is fixed to arm64 via project settings — no flag needed.
-(cd apps/mac-client && xcodebuild test \
+(cd app && xcodebuild test \
     -scheme SuperPicky \
     -destination 'platform=macOS' \
     -only-testing:SuperPickyTests \
@@ -12,7 +12,7 @@ echo "=== G1 Static + L1 Unit ==="
 PID_TEST=$!
 
 if command -v swiftlint &>/dev/null; then
-    (cd apps/mac-client && swiftlint lint --strict 2>&1 | tail -20) &
+    (cd app && swiftlint lint --strict 2>&1 | tail -20) &
     PID_SWIFTLINT=$!
 else
     echo "SKIP: swiftlint not installed (brew install swiftlint)"

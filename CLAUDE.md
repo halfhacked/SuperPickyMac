@@ -29,10 +29,10 @@ Native macOS app for AI-powered bird photo culling.
 
 ```bash
 # Build
-cd apps/mac-client && xcodebuild build -scheme SuperPicky -destination 'platform=macOS'
+cd app && xcodebuild build -scheme SuperPicky -destination 'platform=macOS'
 
 # Test (L1 unit)
-cd apps/mac-client && xcodebuild test -scheme SuperPicky -destination 'platform=macOS' \
+cd app && xcodebuild test -scheme SuperPicky -destination 'platform=macOS' \
     -only-testing:SuperPickyTests
 
 # Re-convert CoreML models (requires ~/projects/SuperPicky/models/)

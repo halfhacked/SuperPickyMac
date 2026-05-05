@@ -2,7 +2,7 @@
 """Convert EfficientNet-B3 flight classifier to Core ML.
 
 Input:  ~/projects/SuperPicky/models/superFlier_efficientnet.pth
-Output: apps/mac-client/SuperPickyInference/Resources/Models/FlightDetector.mlpackage
+Output: app/SuperPickyInference/Resources/Models/FlightDetector.mlpackage
 
 Model architecture (must match FlightDetector._build_model() exactly):
   EfficientNet-B3 backbone + Dropout(0.2) + Linear(in_features, 1) + Sigmoid
@@ -21,7 +21,7 @@ import coremltools as ct
 import numpy as np
 
 MODEL_PATH = Path.home() / 'projects/SuperPicky/models/superFlier_efficientnet.pth'
-OUTPUT_DIR = Path(__file__).parent.parent / 'apps/mac-client/SuperPickyInference/Resources/Models'
+OUTPUT_DIR = Path(__file__).parent.parent / 'app/SuperPickyInference/Resources/Models'
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUT_PATH = OUTPUT_DIR / 'FlightDetector.mlpackage'
 

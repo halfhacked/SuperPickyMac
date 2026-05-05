@@ -21,7 +21,7 @@ jobs:
         run: brew install exiftool
 
       - name: Build & Test (L1 Unit)
-        working-directory: apps/mac-client
+        working-directory: app
         run: |
           xcodebuild test \
             -scheme SuperPicky \
@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: build-for-testing
-        working-directory: apps/mac-client
+        working-directory: app
         run: |
           xcodebuild build-for-testing \
             -scheme SuperPicky \
@@ -46,19 +46,19 @@ jobs:
 
       - name: Locate xctestrun
         id: xctestrun
-        working-directory: apps/mac-client
+        working-directory: app
         run: |
           f=$(find build/Build/Products -maxdepth 1 -name '*.xctestrun' | head -n 1)
           echo "name=$(basename "$f")" >> "$GITHUB_OUTPUT"
 
       - name: Package products
-        working-directory: apps/mac-client
+        working-directory: app
         run: tar -cf build.tar build/Build/Products
 
       - uses: actions/upload-artifact@v4
         with:
           name: ui-build
-          path: apps/mac-client/build.tar
+          path: app/build.tar
           retention-days: 1
 
   xcuitest:
@@ -103,14 +103,14 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: ui-build
-          path: apps/mac-client
+          path: app
 
       - name: Unpack build
-        working-directory: apps/mac-client
+        working-directory: app
         run: tar -xf build.tar
 
       - name: Run ${{ matrix.name }}
-        working-directory: apps/mac-client
+        working-directory: app
         env:
           XCTESTRUN: build/Build/Products/${{ needs.build-ui.outputs.xctestrun }}
         run: ${{ matrix.run }}

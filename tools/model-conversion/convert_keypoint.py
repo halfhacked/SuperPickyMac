@@ -2,7 +2,7 @@
 """Convert ResNet50 PartLocalizer keypoint model to Core ML.
 
 Input:  ~/projects/SuperPicky/models/cub200_keypoint_resnet50_slim.pth
-Output: apps/mac-client/SuperPickyInference/Resources/Models/KeypointDetector.mlpackage
+Output: app/SuperPickyInference/Resources/Models/KeypointDetector.mlpackage
 
 Model architecture (must match PartLocalizer in keypoint_detector.py exactly):
   ResNet50 backbone (fc replaced with Identity, in_features=2048)
@@ -27,7 +27,7 @@ import coremltools as ct
 import numpy as np
 
 MODEL_PATH = Path.home() / 'projects/SuperPicky/models/cub200_keypoint_resnet50_slim.pth'
-OUTPUT_DIR = Path(__file__).parent.parent / 'apps/mac-client/SuperPickyInference/Resources/Models'
+OUTPUT_DIR = Path(__file__).parent.parent / 'app/SuperPickyInference/Resources/Models'
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 IMG_SIZE = 416

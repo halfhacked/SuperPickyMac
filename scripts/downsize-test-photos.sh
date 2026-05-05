@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-cd "$(dirname "$0")/../apps/mac-client/SuperPickyUITests/test-photos"
+cd "$(dirname "$0")/../app/SuperPickyUITests/test-photos"
 
 for f in *.jpg; do
   magick "$f" -resize '2048x2048>' -quality 60 "/tmp/downsize_$f"

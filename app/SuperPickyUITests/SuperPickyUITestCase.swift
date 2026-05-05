@@ -64,7 +64,7 @@ class SuperPickyUITestCase: XCTestCase {
     }
 
     /// #filePath resolves to this source file, which sits at
-    /// apps/mac-client/SuperPickyUITests/. Fixtures live alongside it.
+    /// app/SuperPickyUITests/. Fixtures live alongside it.
     static var fixturesRoot: URL {
         URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     }
