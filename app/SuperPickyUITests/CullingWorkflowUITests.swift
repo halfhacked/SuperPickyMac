@@ -79,7 +79,10 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
         } else {
             sortMenu.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
         }
-        Thread.sleep(forTimeInterval: 0.6)
+        // Gate on the first item appearing rather than a blind sleep.
+        XCTAssertTrue(app.menuItems["Filename"].waitForExistence(timeout: 2) ||
+                      app.descendants(matching: .any)["Filename"].firstMatch.waitForExistence(timeout: 1),
+                      "Sort menu should open and offer 'Filename'")
 
         for label in ["Filename", "Date", "Rating", "Sharpness", "Aesthetics"] {
             XCTAssertTrue(app.menuItems[label].exists ||
@@ -137,7 +140,6 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
 
         // Raise brightness a few steps; the indicator is hidden when value == 0.
         for _ in 0..<3 { app.typeText("=") }
-        Thread.sleep(forTimeInterval: 0.3)
         let indicator = app.staticTexts["BrightnessIndicator"]
         XCTAssertTrue(indicator.waitForExistence(timeout: 2),
                       "Brightness indicator should appear after pressing =")
@@ -198,7 +200,6 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
         // F enters fullscreen
         preview.click()
         app.typeKey("f", modifierFlags: [])
-        Thread.sleep(forTimeInterval: 0.5)
 
         let fullscreen = app.otherElements["FullscreenViewer"]
         XCTAssertTrue(fullscreen.waitForExistence(timeout: 3),
@@ -206,9 +207,8 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
 
         // Escape exits fullscreen
         app.typeKey(.escape, modifierFlags: [])
-        Thread.sleep(forTimeInterval: 0.5)
-        XCTAssertFalse(fullscreen.exists,
-                       "Escape should close fullscreen")
+        XCTAssertTrue(fullscreen.waitForNonExistence(timeout: 2),
+                      "Escape should close fullscreen")
     }
 
     func test11_FullscreenArrowNavigation() {
@@ -238,11 +238,11 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
 
         // Double-click zoom toggle
         preview.doubleClick()
-        Thread.sleep(forTimeInterval: 1)
+        Thread.sleep(forTimeInterval: 0.3)
         XCTAssertTrue(preview.exists)
 
         preview.doubleClick()
-        Thread.sleep(forTimeInterval: 1)
+        Thread.sleep(forTimeInterval: 0.3)
         XCTAssertTrue(preview.exists)
     }
 
@@ -369,7 +369,6 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
         Thread.sleep(forTimeInterval: 0.3)
 
         app.typeKey(.delete, modifierFlags: [])
-        Thread.sleep(forTimeInterval: 0.6)
 
         // The app surfaces a confirmation alert with OK/Cancel. XCUIApplication
         // may see several "Cancel" buttons across windows/sheets; restrict
@@ -496,10 +495,9 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
         } else {
             sortMenu.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
         }
-        Thread.sleep(forTimeInterval: 0.6)
 
         let dateItem = app.menuItems["Date"].firstMatch
-        if dateItem.exists {
+        if dateItem.waitForExistence(timeout: 2) {
             dateItem.click()
         } else {
             app.descendants(matching: .any)["Date"].firstMatch.click()
@@ -584,7 +582,6 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
         // the "No Photos" alert; if picks exist, an NSSavePanel appears.
         // Either way, dismiss via the front-most dialog/sheet.
         app.typeKey("e", modifierFlags: .command)
-        Thread.sleep(forTimeInterval: 0.8)
         dismissConfirmDialogIfPresent()
         XCTAssertTrue(preview.exists, "Preview should remain after Cmd+E")
     }
