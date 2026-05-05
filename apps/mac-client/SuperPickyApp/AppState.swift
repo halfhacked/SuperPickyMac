@@ -187,6 +187,14 @@ final class AppState {
     /// already-loaded folder (where `isFolderSwitch` would otherwise be `false`).
     func loadPhotos(for folder: URL, skipHierarchy: Bool = false, deferSelection: Bool = false) {
         let isFolderSwitch = (currentFolder != folder)
+        // Sidebar re-click on the already-loaded folder: the in-memory
+        // photo set, indices, species hierarchy, undo stack, and DB cache
+        // are all still valid. Skip the full reload and just nudge the
+        // view layer to re-select display-first via filterToken.
+        if !isFolderSwitch && deferSelection {
+            applyFilter(autoSelectFirst: false)
+            return
+        }
         let shouldDeferSelection = isFolderSwitch || deferSelection
         currentFolder = folder
         cachedDB = nil
