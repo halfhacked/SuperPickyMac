@@ -349,6 +349,26 @@ import Foundation
                 "Same-folder re-click with deferSelection must bump filterToken so the view re-selects display-first")
     }
 
+    @Test func sameFolderReclickPreservesUndoStack() throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let ids = try seedPhotos(3, into: folder)
+
+        let app = AppState()
+        app.loadPhotos(for: folder)
+        app.setRating(ids: [ids[0]], rating: 5)
+        #expect(app.undoStackSizeForTesting() == 1,
+                "Setup: rating mutation should push one undo entry")
+
+        // Re-click the same folder via the user-initiated path. The
+        // pre-existing full-reload behavior wiped the undo stack on
+        // every loadPhotos call; the no-op fast path keeps it intact.
+        app.loadPhotos(for: folder, deferSelection: true)
+
+        #expect(app.undoStackSizeForTesting() == 1,
+                "Same-folder re-click must not wipe the undo stack")
+    }
+
     @Test func applyFilterAutoSelectFirstFalseLeavesSelectionCleared() throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
