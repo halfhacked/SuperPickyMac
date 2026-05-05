@@ -9,12 +9,18 @@ struct PreviewView: View {
     @Binding var viewSize: CGSize
     var appState: AppState? = nil
     var onCorrectSpecies: ((UUID, String) -> Void)?
+    /// Toolbar toggle: when true, overlays the YOLO bbox + head circle
+    /// the sharpness pipeline measures over.
+    var showSharpnessOverlay: Bool = false
     @Environment(CullingConfig.self) private var config
 
     var body: some View {
         VStack(spacing: 0) {
             if let photo {
-                AsyncPreviewImage(filePath: photo.filePath, zoomState: zoomState, brightnessAdjustment: brightnessAdjustment)
+                AsyncPreviewImage(filePath: photo.filePath,
+                                  zoomState: zoomState,
+                                  brightnessAdjustment: brightnessAdjustment,
+                                  sharpnessOverlayPhoto: showSharpnessOverlay ? photo : nil)
                     .accessibilityIdentifier("PhotoPreview")
                     .onContinuousHover { phase in
                         if case .active(let loc) = phase { mouseInView = loc }
@@ -46,6 +52,8 @@ struct AsyncPreviewImage: View {
     let filePath: String
     @Bindable var zoomState: ZoomState
     var brightnessAdjustment: Double = 0
+    /// Photo metadata for the sharpness overlay. Nil = overlay off.
+    var sharpnessOverlayPhoto: Photo? = nil
     @State private var image: NSImage?
     @State private var isFullRes = false
 
@@ -74,7 +82,10 @@ struct AsyncPreviewImage: View {
         ZStack {
             Color(nsColor: .controlBackgroundColor)
             if let image {
-                ZoomableImageView(image: image, zoomState: zoomState, brightnessAdjustment: brightnessAdjustment)
+                ZoomableImageView(image: image,
+                                   zoomState: zoomState,
+                                   brightnessAdjustment: brightnessAdjustment,
+                                   sharpnessOverlayPhoto: sharpnessOverlayPhoto)
             } else {
                 ProgressView()
             }
