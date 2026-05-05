@@ -548,25 +548,16 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
         return active.exists ? active.identifier : nil
     }
 
-    /// Identifier of the leftmost thumbnail in the visible viewport. The
-    /// LazyHStack only puts in-viewport items in the a11y tree, so this
-    /// query reliably returns the displayed-first thumbnail.
+    /// Identifier of the display-first thumbnail (i.e. `photos.first` in
+    /// the strip's data array). Reads the marker `accessibilityValue`
+    /// rendered by `ThumbnailStripView` — one direct query, no per-cell
+    /// iteration.
     private func leftmostVisibleThumbnailID(in app: XCUIApplication) -> String? {
-        let thumbs = app.images.matching(NSPredicate(
-            format: "identifier BEGINSWITH 'Thumbnail_'"
-        ))
-        var minX = CGFloat.greatestFiniteMagnitude
-        var result: String?
-        for i in 0..<thumbs.count {
-            let t = thumbs.element(boundBy: i)
-            guard t.exists, t.frame.size.width > 0 else { continue }
-            let x = t.frame.origin.x
-            if x.isFinite, x < minX {
-                minX = x
-                result = t.identifier
-            }
-        }
-        return result
+        let marker = app.descendants(matching: .any)
+            .matching(identifier: A11y.leftmostThumbnail).firstMatch
+        guard marker.exists else { return nil }
+        let value = marker.value as? String
+        return (value?.isEmpty ?? true) ? nil : value
     }
 
     // MARK: - 30-39: Export

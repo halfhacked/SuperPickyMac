@@ -13,6 +13,7 @@ enum A11y {
     static let speciesEditPanelEmptyAssigned = "SpeciesEditPanel_EmptyAssigned"
     static let selectionCounter = "SelectionCounter"
     static let revealInFinderMenuItem = "RevealInFinder"
+    static let leftmostThumbnail = "LeftmostThumbnail"
 
     /// Accessibility values used by ThumbnailCell — match
     /// `ThumbnailCell.a11ySelectionValue`.

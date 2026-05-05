@@ -50,6 +50,19 @@ struct ThumbnailStripView: View {
             }
             .background(ScrollWheelRedirector())
             .background(.bar)
+            .overlay(alignment: .topLeading) {
+                // a11y-only marker for finding the display-first thumbnail
+                // in O(1) from XCUITest. Test helpers used to iterate every
+                // visible cell to find leftmost-by-frame, which cost ~0.3 s
+                // per cell on macOS-15 hosted runners.
+                Color.clear
+                    .frame(width: 1, height: 1)
+                    .accessibilityIdentifier("LeftmostThumbnail")
+                    .accessibilityValue(
+                        photos.first.map(ThumbnailCell.accessibilityID(for:)) ?? ""
+                    )
+                    .allowsHitTesting(false)
+            }
             .onChange(of: selection.activeID) { _, _ in
                 scrollActiveIntoView(proxy, animated: true)
             }
