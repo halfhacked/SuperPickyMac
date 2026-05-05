@@ -587,16 +587,9 @@ final class PipelineCoordinator: @unchecked Sendable {
         photo.flightConfidence = flight.confidence
 
         // Head-region sharpness (circular mask around eye, matches superpicky).
-        //
-        // Sharpness needs a higher-resolution input than ML inference does.
-        // At the 1280 max-side inference resolution a distant bird's head
-        // crop is 80–150 px and 1-pixel focus blur becomes unobservable;
-        // raw gradient² values for two visibly distinct shots tie within
-        // 0.1 % (verified on DSC09838 vs DSC09846). Decode the embedded
-        // full-res preview just for the sharpness pass and reuse the
-        // already-normalized YOLO bbox. Falls back to the inference image
-        // when the hi-res decode isn't available (older RAW with no
-        // embedded preview).
+        // Decode at `RAWConverter.maxSharpnessSize` for discrimination;
+        // fall back to the inference image when the hi-res decode isn't
+        // available (older RAW with no embedded preview).
         let sharpnessSource: CGImage = rawConverter.decodeForSharpness(fileURL: fileURL) ?? image
         let sharpnessBirdCrop = sharpnessSource.smartSquareBirdCrop(bbox: bird.bbox) ?? birdCrop
 
