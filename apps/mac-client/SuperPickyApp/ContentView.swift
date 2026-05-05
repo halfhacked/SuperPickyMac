@@ -122,7 +122,6 @@ struct ContentView: View {
                                 .foregroundStyle(n <= minimumStars ? .primary : .secondary)
                                 .onTapGesture {
                                     minimumStars = minimumStars == n ? 0 : n
-                                    selectFirstFiltered()
                                 }
                         }
                     }
@@ -133,7 +132,6 @@ struct ContentView: View {
 
                     Button {
                         topBurstOnly.toggle()
-                        selectFirstFiltered()
                     } label: {
                         Image(systemName: topBurstOnly ? "crown.fill" : "crown")
                             .font(.system(size: 10))
@@ -145,7 +143,6 @@ struct ContentView: View {
 
                     Button {
                         pickedOnly.toggle()
-                        selectFirstFiltered()
                     } label: {
                         Image(systemName: pickedOnly ? "flag.fill" : "flag")
                             .font(.system(size: 10))
@@ -166,7 +163,6 @@ struct ContentView: View {
                                     sortOrder = order
                                     sortAscending = (order == .filename || order == .captureDate)
                                 }
-                                selectFirstFiltered()
                             } label: {
                                 HStack {
                                     Text(order.rawValue)
@@ -321,18 +317,6 @@ struct ContentView: View {
         .onChange(of: selectedPhotoID) { _, _ in
             brightnessAdj = 0
         }
-        .task(id: appState.filterToken) {
-            selectFirstFiltered()
-        }
-    }
-
-    /// Move the active selection to the first photo of the currently
-    /// displayed `filteredPhotos` (or clear it if none). Called whenever
-    /// the displayed list changes via filter or sort, so the visible
-    /// "first photo" matches the user's display order rather than the
-    /// raw `appState.photos` backing order.
-    private func selectFirstFiltered() {
-        selectedPhotoID = filteredPhotos.first?.id
     }
 
     private func handleKey(_ key: KeyboardMonitor.KeyEvent) -> Bool {
@@ -383,7 +367,6 @@ struct ContentView: View {
            let digit = char.wholeNumberValue,
            (0...5).contains(digit) {
             minimumStars = digit
-            selectFirstFiltered()
             return true
         }
 

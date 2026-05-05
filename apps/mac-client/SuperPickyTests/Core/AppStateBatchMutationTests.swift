@@ -315,38 +315,6 @@ import Foundation
         #expect(app.selection.activeID == p2.id)
     }
 
-    @Test func loadPhotosOnFolderSwitchDefersSelectionAndBumpsFilterToken() throws {
-        let folder = try makeTempFolder()
-        defer { try? FileManager.default.removeItem(at: folder) }
-        _ = try seedPhotos(3, into: folder)
-
-        let app = AppState()
-        let initialToken = app.filterToken
-        app.loadPhotos(for: folder)
-
-        #expect(app.selection.activeID == nil,
-                "Folder switch should defer selection to the view layer")
-        #expect(app.filterToken != initialToken,
-                "Folder switch should bump filterToken so the view can react")
-    }
-
-    @Test func applyFilterAutoSelectFirstFalseLeavesSelectionCleared() throws {
-        let folder = try makeTempFolder()
-        defer { try? FileManager.default.removeItem(at: folder) }
-        _ = try seedPhoto(filename: "eagle.CR3", species: match("eagle"), into: folder)
-        _ = try seedPhoto(filename: "hawk.CR3", species: match("hawk"), into: folder)
-
-        let app = AppState()
-        app.loadPhotos(for: folder)
-        app.selection.clear()
-        app.sidebarSelection = .species("hawk")
-        app.applyFilter(autoSelectFirst: false)
-
-        #expect(app.photos.count == 1)
-        #expect(app.selection.activeID == nil,
-                "autoSelectFirst:false should leave selection cleared for the view to fill in")
-    }
-
     // MARK: - Undo restores species
 
     @Test func undoRestoresAssignedSpeciesAfterBatchEdit() throws {

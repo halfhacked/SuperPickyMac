@@ -163,7 +163,7 @@ struct MainView: View {
             case .folder(let url):
                 appState.loadPhotos(for: url)
             case .rating, .flying, .picks, .species, .burstGroup, .singles:
-                appState.applyFilter(autoSelectFirst: false)
+                appState.applyFilter()
             case nil:
                 break
             }
