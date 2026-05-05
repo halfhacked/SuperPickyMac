@@ -549,24 +549,16 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
     }
 
     /// Identifier of the display-first thumbnail (i.e. `photos.first` in
-    /// the strip's data array). Reads the marker `accessibilityValue`
-    /// rendered by `ThumbnailStripView` — one direct query, no per-cell
-    /// iteration.
+    /// the strip's data array). Reads the marker rendered by
+    /// `ThumbnailStripView` — one direct query, no per-cell iteration.
+    /// The marker is a Text whose content carries the identifier, so
+    /// `.label` (not `.value`) is the right accessor.
     private func leftmostVisibleThumbnailID(in app: XCUIApplication) -> String? {
         let marker = app.descendants(matching: .any)
             .matching(identifier: A11y.leftmostThumbnail).firstMatch
-        let exists = marker.exists
-        let value = marker.value as? String
-        if !exists || (value?.isEmpty ?? true) {
-            // DIAG (PR #84): the marker query returned nil twice on CI.
-            // Dump the a11y tree so we can see whether the marker is in
-            // the tree at all, under which element type, and with what
-            // value. Remove once the marker scheme lands green.
-            print("[DIAG-leftmost] marker.exists=\(exists) value=\(value ?? "<nil>")")
-            print("[DIAG-leftmost] app.debugDescription:\n\(app.debugDescription)")
-        }
-        guard exists else { return nil }
-        return (value?.isEmpty ?? true) ? nil : value
+        guard marker.exists else { return nil }
+        let label = marker.label
+        return label.isEmpty ? nil : label
     }
 
     // MARK: - 30-39: Export

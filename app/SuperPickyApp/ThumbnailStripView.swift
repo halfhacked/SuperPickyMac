@@ -54,17 +54,18 @@ struct ThumbnailStripView: View {
                 // a11y-only marker for finding the display-first thumbnail
                 // in O(1) from XCUITest. Test helpers used to iterate every
                 // visible cell to find leftmost-by-frame, which cost ~0.3 s
-                // per cell on macOS-15 hosted runners. Color.clear has no
-                // a11y representation by default, so accessibilityElement()
-                // forces it into the tree as a queryable leaf.
-                Color.clear
+                // per cell on macOS-15 hosted runners.
+                //
+                // Text (not Color.clear) because Color.clear +
+                // .accessibilityElement() + .accessibilityValue(...) surfaces
+                // an empty value on macOS XCUITest (verified via DIAG dump
+                // showing marker.exists=true but value="" on PR #84). Text
+                // reliably exposes its content as the a11y label.
+                Text(photos.first.map(ThumbnailCell.accessibilityID(for:)) ?? "")
                     .frame(width: 1, height: 1)
+                    .opacity(0)
                     .allowsHitTesting(false)
-                    .accessibilityElement(children: .ignore)
                     .accessibilityIdentifier("LeftmostThumbnail")
-                    .accessibilityValue(
-                        photos.first.map(ThumbnailCell.accessibilityID(for:)) ?? ""
-                    )
             }
             .onChange(of: selection.activeID) { _, _ in
                 scrollActiveIntoView(proxy, animated: true)
