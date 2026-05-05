@@ -182,8 +182,12 @@ final class AppState {
     /// Load photos from the database for the selected folder.
     /// Preserves current filter and selection when possible.
     /// Pass `skipHierarchy: true` during incremental processing to avoid O(n²) rebuilds.
-    func loadPhotos(for folder: URL, skipHierarchy: Bool = false) {
+    /// Pass `deferSelection: true` from a user-initiated sidebar click so the
+    /// view layer can pick the displayed-first photo even when re-clicking the
+    /// already-loaded folder (where `isFolderSwitch` would otherwise be `false`).
+    func loadPhotos(for folder: URL, skipHierarchy: Bool = false, deferSelection: Bool = false) {
         let isFolderSwitch = (currentFolder != folder)
+        let shouldDeferSelection = isFolderSwitch || deferSelection
         currentFolder = folder
         cachedDB = nil
         undoStack = []
@@ -198,9 +202,10 @@ final class AppState {
             }
 
             // Re-apply current filter instead of resetting to all.
-            // Folder switch defers selection to the view layer so the
-            // first photo picked respects the user's current sort order.
-            applyFilter(autoSelectFirst: !isFolderSwitch)
+            // Folder switch (or any user-driven sidebar click) defers
+            // selection to the view layer so the first photo picked
+            // respects the user's current sort order.
+            applyFilter(autoSelectFirst: !shouldDeferSelection)
 
             if isFolderSwitch {
                 let paths = allPhotos.map(\.filePath)
@@ -219,7 +224,7 @@ final class AppState {
             allPhotos = []
             allPhotoIndex = [:]
             speciesEntries = []
-            applyFilter(autoSelectFirst: !isFolderSwitch)
+            applyFilter(autoSelectFirst: !shouldDeferSelection)
         }
     }
 

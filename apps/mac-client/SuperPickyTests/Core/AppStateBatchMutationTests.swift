@@ -330,6 +330,25 @@ import Foundation
                 "Folder switch should bump filterToken so the view can react")
     }
 
+    @Test func loadPhotosWithDeferSelectionBumpsTokenOnSameFolderReclick() throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        _ = try seedPhotos(3, into: folder)
+
+        let app = AppState()
+        app.loadPhotos(for: folder)
+        let tokenAfterInitialLoad = app.filterToken
+
+        // Simulate a sidebar re-click on the already-loaded folder. The
+        // sidebar selection wraps a `.folder(URL)` so the URL is the same;
+        // without `deferSelection` this is a no-op for selection state and
+        // the view's auto-select-first never fires.
+        app.loadPhotos(for: folder, deferSelection: true)
+
+        #expect(app.filterToken != tokenAfterInitialLoad,
+                "Same-folder re-click with deferSelection must bump filterToken so the view re-selects display-first")
+    }
+
     @Test func applyFilterAutoSelectFirstFalseLeavesSelectionCleared() throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
