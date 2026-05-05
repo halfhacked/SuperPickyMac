@@ -68,6 +68,10 @@ final class AppState {
     private let logger = Logger(subsystem: "com.halfhacked.superpicky", category: "AppState")
 
     var sidebarSelection: SidebarSelection?
+    /// Bumped whenever the displayed photo list changes due to a sidebar
+    /// filter or folder switch. ContentView observes this to reset the
+    /// active selection to the first photo in its current display sort.
+    var filterToken: Int = 0
     let selection = PhotoSelection()
 
     /// Back-compat accessor. Reads/writes `selection.activeID`. New code
@@ -178,8 +182,12 @@ final class AppState {
     /// Load photos from the database for the selected folder.
     /// Preserves current filter and selection when possible.
     /// Pass `skipHierarchy: true` during incremental processing to avoid O(n²) rebuilds.
-    func loadPhotos(for folder: URL, skipHierarchy: Bool = false) {
+    /// Pass `deferSelection: true` from a user-initiated sidebar click so the
+    /// view layer can pick the displayed-first photo even when re-clicking the
+    /// already-loaded folder (where `isFolderSwitch` would otherwise be `false`).
+    func loadPhotos(for folder: URL, skipHierarchy: Bool = false, deferSelection: Bool = false) {
         let isFolderSwitch = (currentFolder != folder)
+        let shouldDeferSelection = isFolderSwitch || deferSelection
         currentFolder = folder
         cachedDB = nil
         undoStack = []
@@ -193,8 +201,11 @@ final class AppState {
                 buildSpeciesHierarchy()
             }
 
-            // Re-apply current filter instead of resetting to all
-            applyFilter()
+            // Re-apply current filter instead of resetting to all.
+            // Folder switch (or any user-driven sidebar click) defers
+            // selection to the view layer so the first photo picked
+            // respects the user's current sort order.
+            applyFilter(autoSelectFirst: !shouldDeferSelection)
 
             if isFolderSwitch {
                 let paths = allPhotos.map(\.filePath)
@@ -211,10 +222,9 @@ final class AppState {
         } catch {
             logger.error("loadPhotos failed: \(error)")
             allPhotos = []
-            photos = []
             allPhotoIndex = [:]
-            filteredPhotoIndex = [:]
             speciesEntries = []
+            applyFilter(autoSelectFirst: !shouldDeferSelection)
         }
     }
 
@@ -617,7 +627,13 @@ final class AppState {
     }
 
     /// Filter photos by sidebar selection.
-    func applyFilter() {
+    ///
+    /// When `autoSelectFirst` is `true` (the default), the legacy behavior
+    /// of selecting `photos.first` whenever no selection survives reconcile
+    /// stays. When `false`, selection is left as-is and `filterToken` is
+    /// bumped so the view layer can pick the displayed-first photo using
+    /// its own sort order.
+    func applyFilter(autoSelectFirst: Bool = true) {
         switch sidebarSelection {
         case .folder:
             photos = allPhotos
@@ -640,8 +656,12 @@ final class AppState {
         }
         rebuildFilteredPhotoIndex()
         selection.reconcile(with: photos)
-        if selection.activeID == nil, let first = photos.first {
-            selection.click(first.id, photos: photos)
+        if autoSelectFirst {
+            if selection.activeID == nil, let first = photos.first {
+                selection.click(first.id, photos: photos)
+            }
+        } else {
+            filterToken += 1
         }
     }
 }

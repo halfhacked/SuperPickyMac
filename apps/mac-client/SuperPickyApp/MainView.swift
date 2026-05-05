@@ -161,9 +161,9 @@ struct MainView: View {
         .onChange(of: appState.sidebarSelection) { _, newValue in
             switch newValue {
             case .folder(let url):
-                appState.loadPhotos(for: url)
+                appState.loadPhotos(for: url, deferSelection: true)
             case .rating, .flying, .picks, .species, .burstGroup, .singles:
-                appState.applyFilter()
+                appState.applyFilter(autoSelectFirst: false)
             case nil:
                 break
             }
