@@ -8,14 +8,15 @@ struct RAWConverter: Sendable {
     private static let maxInferenceSize = 1280
 
     /// Max pixel dimension for sharpness measurement. The 1280 inference
-    /// crop is undersampled for sharpness — at that resolution a distant
-    /// bird's head circle is 80–150 px and 1-pixel focus blur is
-    /// unobservable. Decoding to ~5800 picks up the embedded full-res
-    /// JPEG preview that modern bodies (Sony A1/A7Rx/A9, Canon R5/R6,
-    /// Nikon Z9) write into ARW/CR3/NEF — fast enough to run per photo
-    /// and recovers the ~65% raw-gradient gap we see between visually
-    /// distinct shots that tied at 1280.
-    static let maxSharpnessSize = 5800
+    /// crop is undersampled — at that resolution a distant bird's head
+    /// circle is 80–150 px and 1-pixel focus blur is unobservable; two
+    /// visibly distinct shots tie within 0.1 %.
+    ///
+    /// Sized for libjpeg-turbo's scaled IDCT: for a Sony A1 5616-px
+    /// source, ≤3510 keeps the decoder on the 3/4-scale path; the next
+    /// step (7/8) costs substantially more wall time for negligible
+    /// discrimination gain.
+    static let maxSharpnessSize = 3500
 
     /// Decoded thumbnail plus the EXIF/TIFF property dictionary read from
     /// the same CGImageSource. `processOnePhoto` needs both for every
