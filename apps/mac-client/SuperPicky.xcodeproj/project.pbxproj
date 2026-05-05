@@ -287,6 +287,8 @@
 		E0160F8B17617703E31466F2 /* species_list_CN-12.json in Resources */ = {isa = PBXBuildFile; fileRef = A9EBF634334BADAF97C8EBD3 /* species_list_CN-12.json */; };
 		E0B05DE538CC0A9CECAB49DD /* species_list_RO.json in Resources */ = {isa = PBXBuildFile; fileRef = 630E0E89318F8DD9B239C3CF /* species_list_RO.json */; };
 		E0EE37CCF733B5B791B59CC5 /* SourceListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C1BBBB42C2CD216C1D02DAF /* SourceListView.swift */; };
+		74D486A7467148B4AB966177 /* FinderReveal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 332E27F28CB24062B2D1F396 /* FinderReveal.swift */; };
+		2380DF8702044FDB8C3A2C7B /* FinderRevealTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF09D112F74C4947928E0032 /* FinderRevealTests.swift */; };
 		E1FCA59C8FC8E5512E0AA81B /* species_list_CN-34.json in Resources */ = {isa = PBXBuildFile; fileRef = EBDE1BB7D41B36A0E8FCD82B /* species_list_CN-34.json */; };
 		E2EF039AD03AF4B1634A1B8E /* species_list_US-KS.json in Resources */ = {isa = PBXBuildFile; fileRef = E2E8038D8ACEA4821EB52B46 /* species_list_US-KS.json */; };
 		E35151E7C480D8AA62F668A2 /* species_list_ZA.json in Resources */ = {isa = PBXBuildFile; fileRef = F032247F3FF943B296C8ECF3 /* species_list_ZA.json */; };
@@ -505,6 +507,8 @@
 		69576E5469D18F7A15647585 /* EyeCropSharpness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EyeCropSharpness.swift; sourceTree = "<group>"; };
 		6BAE259F49B382A29C715A18 /* species_list_CN-13.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "species_list_CN-13.json"; sourceTree = "<group>"; };
 		6C1BBBB42C2CD216C1D02DAF /* SourceListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceListView.swift; sourceTree = "<group>"; };
+		332E27F28CB24062B2D1F396 /* FinderReveal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderReveal.swift; sourceTree = "<group>"; };
+		CF09D112F74C4947928E0032 /* FinderRevealTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderRevealTests.swift; sourceTree = "<group>"; };
 		6C752379CFE1D005A0F3C8D1 /* species_list_GB.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = species_list_GB.json; sourceTree = "<group>"; };
 		6D03B7B3D939AB0A665F70A8 /* SpeciesHierarchyIncrementalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeciesHierarchyIncrementalTests.swift; sourceTree = "<group>"; };
 		6DC3715223CF6A27524FF960 /* AestheticsModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AestheticsModelTests.swift; sourceTree = "<group>"; };
@@ -737,6 +741,7 @@
 			children = (
 				B692D00B454892AE77C8C7E2 /* AssignedSpeciesTests.swift */,
 				D1FE12CD3456789012345678 /* NavigationStateMonitorTests.swift */,
+				CF09D112F74C4947928E0032 /* FinderRevealTests.swift */,
 				B3FE12CD3456789012345678 /* PreviewCacheTests.swift */,
 				B7FE12CD3456789012345678 /* ImageCacheBudgetTests.swift */,
 				B8FE12CD3456789012345678 /* PreviewLoadPolicyTests.swift */,
@@ -844,6 +849,7 @@
 				9E0746DF7299012FFAB245AC /* ReverseGeocoder.swift */,
 				7D33DE9FFC32E245ECAD4536 /* ScrollWheelRedirector.swift */,
 				2035E1F0D51979F7D9BD4857 /* SettingsView.swift */,
+				332E27F28CB24062B2D1F396 /* FinderReveal.swift */,
 				6C1BBBB42C2CD216C1D02DAF /* SourceListView.swift */,
 				C4D16716BD00EB694FAEF0DB /* SpeciesAssignmentEditor.swift */,
 				6DDC8E8C649AF2E099E54AB6 /* SpeciesHierarchyBuilder.swift */,
@@ -1517,6 +1523,7 @@
 				DDE8E519157564DD655F575A /* AestheticsModelTests.swift in Sources */,
 				7CF4E498D7CA0C66F2559AFE /* AssignedSpeciesTests.swift in Sources */,
 				C1FE12CD3456789012345678 /* NavigationStateMonitorTests.swift in Sources */,
+				2380DF8702044FDB8C3A2C7B /* FinderRevealTests.swift in Sources */,
 				A3FE12CD3456789012345678 /* PreviewCacheTests.swift in Sources */,
 				A7FE12CD3456789012345678 /* ImageCacheBudgetTests.swift in Sources */,
 				A8FE12CD3456789012345678 /* PreviewLoadPolicyTests.swift in Sources */,
@@ -1632,6 +1639,7 @@
 				D3AB1B683EDBD7F05D14C18C /* ReverseGeocoder.swift in Sources */,
 				1E365AD68087DE165D07CA7E /* ScrollWheelRedirector.swift in Sources */,
 				72593C01A639B74395F129D0 /* SettingsView.swift in Sources */,
+				74D486A7467148B4AB966177 /* FinderReveal.swift in Sources */,
 				E0EE37CCF733B5B791B59CC5 /* SourceListView.swift in Sources */,
 				3BB13D2BC4F7884AA4BB4DBA /* SpeciesAssignmentEditor.swift in Sources */,
 				06B5974B68BDC4BE7D30DD44 /* SpeciesHierarchyBuilder.swift in Sources */,
