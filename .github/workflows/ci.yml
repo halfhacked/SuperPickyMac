@@ -83,16 +83,19 @@ jobs:
               xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/CalibratorUITests
               xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/KeyboardHelpUITests
           - name: processing
-            # Folder ingestion + compare-view side flow.
+            # Folder ingestion + compare-view + filmstrip multi-select.
+            # BatchSelection rides the processing shard because culling alone
+            # was the long pole at ~5m15s; rebalancing brings max-wallclock
+            # to ~4m. BatchSelection uses its own (small) species fixture so
+            # it doesn't share state with Processing/Compare here.
             run: |
               xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/ProcessingFlowUITests
               xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/CompareViewUITests
+              xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/BatchSelectionUITests
           - name: culling
-            # Main culling workflow — sidebar, toolbar, keyboard shortcuts,
-            # filmstrip multi-select.
+            # Main culling workflow — sidebar, toolbar, keyboard shortcuts.
             run: |
               xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/CullingWorkflowUITests
-              xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' -only-testing:SuperPickyUITests/BatchSelectionUITests
           - name: species
             # Species edit panel feature as one logical unit.
             run: |
