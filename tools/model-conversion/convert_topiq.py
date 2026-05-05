@@ -2,7 +2,7 @@
 """Convert TOPIQ/CFANet aesthetics model to Core ML.
 
 Input:  ~/projects/SuperPicky/models/cfanet_iaa_ava_res50-3cd62bb3.pth
-Output: apps/mac-client/SuperPickyInference/Resources/Models/AestheticsModel.mlpackage
+Output: app/SuperPickyInference/Resources/Models/AestheticsModel.mlpackage
 
 Architecture: CFANet (ResNet50 backbone + Transformer cross-attention)
   - Input: 384×384 RGB (normalized to [0,1] in forward pass)
@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path.home() / 'projects/SuperPicky'))
 sys.path.insert(0, str(Path.home() / 'projects/SuperPicky/birdid'))
 
 MODEL_PATH = Path.home() / 'projects/SuperPicky/models/cfanet_iaa_ava_res50-3cd62bb3.pth'
-OUTPUT_DIR = Path(__file__).parent.parent / 'apps/mac-client/SuperPickyInference/Resources/Models'
+OUTPUT_DIR = Path(__file__).parent.parent / 'app/SuperPickyInference/Resources/Models'
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 assert MODEL_PATH.exists(), f"Model not found: {MODEL_PATH}"

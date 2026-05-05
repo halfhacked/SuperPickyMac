@@ -27,7 +27,7 @@ which requires:
 ## Step-by-step verification
 
 ```bash
-cd ~/projects/SuperPickyMac/.claude/worktrees/inspiring-agnesi/apps/mac-client
+cd ~/projects/SuperPickyMac/.claude/worktrees/inspiring-agnesi/app
 
 # 1. Clean + rebuild so the v5 migration runs on a fresh DB.
 rm -rf ~/Library/Application\ Support/com.superpicky.mac/ModelCache/avonet.db*

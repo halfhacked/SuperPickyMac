@@ -105,7 +105,7 @@ def cjk_count(text: str) -> int:
 def main() -> int:
     default_target = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
-        "..", "apps", "mac-client", "SuperPickyInference", "Resources",
+        "..", "app", "SuperPickyInference", "Resources",
         "bird_reference.sqlite",
     )
     parser = argparse.ArgumentParser(description=__doc__)

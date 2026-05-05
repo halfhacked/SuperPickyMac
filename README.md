@@ -15,7 +15,7 @@ SuperPicky Mac is a native macOS port of **[SuperPicky](https://gitcode.com/Jame
 
 ```bash
 # Build
-cd apps/mac-client
+cd app
 xcodebuild build -scheme SuperPicky -destination 'platform=macOS'
 
 # Run

@@ -20,7 +20,7 @@ rm -f "$FOLDER/.report.db"
 # Build
 echo ""
 echo "=== Building ==="
-cd "$(dirname "$0")/../apps/mac-client"
+cd "$(dirname "$0")/../app"
 xcodebuild -scheme SuperPicky -destination 'platform=macOS' -configuration Debug build 2>&1 | tail -1
 
 # Find the built app

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Adds `pinyin` and `pinyin_initials` columns to BirdCountInfo in
-# apps/mac-client/SuperPickyInference/Resources/bird_reference.sqlite,
+# app/SuperPickyInference/Resources/bird_reference.sqlite,
 # populating them by joining ~/projects/superpicky/ioc/birdname.db#birds
 # on scientific_name == latin_name. Full pinyin is the syllables
 # concatenated without spaces; initials is the first letter of each
@@ -17,7 +17,7 @@ import sys
 def main() -> int:
     default_target = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
-        "..", "apps", "mac-client", "SuperPickyInference", "Resources",
+        "..", "app", "SuperPickyInference", "Resources",
         "bird_reference.sqlite",
     )
     default_source = os.path.expanduser("~/projects/superpicky/ioc/birdname.db")

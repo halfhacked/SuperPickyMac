@@ -116,7 +116,7 @@ was chosen.
 - **After any change to a model file** (new `.mlpackage`, re-conversion).
 - **After any change to preprocessing** — either `PipelineCoordinator`
   or any of the CoreML wrappers in
-  `apps/mac-client/SuperPickyInference/Models/`.
+  `app/SuperPickyInference/Models/`.
 - **After any `InferenceClient` contract change**.
 - **Before shipping a release.**
 
