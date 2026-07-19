@@ -149,19 +149,12 @@ final class ProcessingFlowUITests: XCTestCase {
         let folderName = (Self.testDir! as NSString).lastPathComponent
         let folderLabel = Self.app.staticTexts[folderName]
 
-        // Right-click folder to get context menu — retry once if menu doesn't appear (CI timing)
-        folderLabel.rightClick()
         let removeItem = Self.app.menuItems["Remove"]
-        if !removeItem.waitForExistence(timeout: 5) {
-            // Dismiss any stale state and retry
-            Self.app.typeKey(.escape, modifierFlags: [])
-            sleep(1)
-            folderLabel.rightClick()
-            guard removeItem.waitForExistence(timeout: 5) else {
-                XCTFail("Context menu with 'Remove' did not appear after retry")
-                return
-            }
-        }
+        XCTAssertTrue(
+            Self.app.openContextMenu(on: folderLabel, exposing: removeItem),
+            "Context menu with 'Remove' should appear"
+        )
+        guard removeItem.exists else { return }
         removeItem.click()
         sleep(1)
 

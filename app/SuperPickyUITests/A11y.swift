@@ -9,6 +9,7 @@ enum A11y {
     static let exifPanel = "ExifPanel"
     static let exifToggle = "ExifToggle"
     static let photoCounter = "PhotoCounter"
+    static let thumbnailStrip = "ThumbnailStrip"
     static let speciesEditPanelSearchField = "SpeciesEditPanel_SearchField"
     static let speciesEditPanelEmptyAssigned = "SpeciesEditPanel_EmptyAssigned"
     static let selectionCounter = "SelectionCounter"
