@@ -4,7 +4,14 @@ import Foundation
 
 @Suite struct XMPWriterTests {
 
-    // MARK: - Helper
+    // MARK: - Helpers
+
+    private func withTempDir(_ body: (URL) throws -> Void) throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try body(dir)
+    }
 
     private func makePhoto(
         filename: String = "IMG_1234.CR3",
@@ -107,31 +114,236 @@ import Foundation
     // MARK: - Write to disk
 
     @Test func writeToDisk() throws {
-        let tempDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: tempDir) }
+        try withTempDir { tempDir in
+            let filePath = tempDir.appendingPathComponent("IMG_5678.CR3").path
+            let photo = makePhoto(
+                filename: "IMG_5678.CR3",
+                filePath: filePath,
+                starRating: 5,
+                speciesCommonName: "Peregrine Falcon",
+                speciesScientificName: "Falco peregrinus",
+                isFlying: true
+            )
 
-        let filePath = tempDir.appendingPathComponent("IMG_5678.CR3").path
-        let photo = makePhoto(
-            filename: "IMG_5678.CR3",
-            filePath: filePath,
-            starRating: 5,
-            speciesCommonName: "Peregrine Falcon",
-            speciesScientificName: "Falco peregrinus",
-            isFlying: true
-        )
+            let sidecarURL = try XMPWriter.write(photo: photo)
+            #expect(FileManager.default.fileExists(atPath: sidecarURL.path))
 
-        let sidecarURL = try XMPWriter.write(photo: photo)
-        #expect(FileManager.default.fileExists(atPath: sidecarURL.path))
+            let content = try String(contentsOf: sidecarURL, encoding: .utf8)
+            #expect(content.contains("xmp:Rating=\"5\""))
+            #expect(content.contains("<rdf:li>Peregrine Falcon</rdf:li>"))
+            #expect(content.contains("<rdf:li>Falco peregrinus</rdf:li>"))
+            #expect(content.contains("<rdf:li>In Flight</rdf:li>"))
+            #expect(content.contains("<rdf:li>Bird|Peregrine Falcon</rdf:li>"))
+            #expect(content.contains("<rdf:li>Behavior|In Flight</rdf:li>"))
+        }
+    }
 
-        let content = try String(contentsOf: sidecarURL, encoding: .utf8)
-        #expect(content.contains("xmp:Rating=\"5\""))
-        #expect(content.contains("<rdf:li>Peregrine Falcon</rdf:li>"))
-        #expect(content.contains("<rdf:li>Falco peregrinus</rdf:li>"))
-        #expect(content.contains("<rdf:li>In Flight</rdf:li>"))
-        #expect(content.contains("<rdf:li>Bird|Peregrine Falcon</rdf:li>"))
-        #expect(content.contains("<rdf:li>Behavior|In Flight</rdf:li>"))
+    @Test func writePreservesExistingLightroomMetadataAndKeywords() throws {
+        try withTempDir { tempDir in
+            let filePath = tempDir.appendingPathComponent("IMG_5678.CR3").path
+            let sidecarURL = tempDir.appendingPathComponent("IMG_5678.xmp")
+            let existing = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <x:xmpmeta xmlns:x="adobe:ns:meta/">
+              <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+                <rdf:Description
+                  xmlns:xmp="http://ns.adobe.com/xap/1.0/"
+                  xmlns:dc="http://purl.org/dc/elements/1.1/"
+                  xmlns:crs="http://ns.adobe.com/camera-raw-settings/1.0/"
+                  xmp:Rating="1"
+                  crs:Exposure2012="+0.75">
+                  <dc:subject>
+                    <rdf:Bag>
+                      <rdf:li>Portfolio</rdf:li>
+                    </rdf:Bag>
+                  </dc:subject>
+                  <crs:ToneCurvePV2012>
+                    <rdf:Seq>
+                      <rdf:li>0, 0</rdf:li>
+                      <rdf:li>255, 255</rdf:li>
+                    </rdf:Seq>
+                  </crs:ToneCurvePV2012>
+                </rdf:Description>
+              </rdf:RDF>
+            </x:xmpmeta>
+            """
+            try Data(existing.utf8).write(to: sidecarURL)
+
+            let photo = makePhoto(
+                filename: "IMG_5678.CR3",
+                filePath: filePath,
+                starRating: 5,
+                speciesCommonName: "Peregrine Falcon",
+                speciesScientificName: "Falco peregrinus"
+            )
+
+            _ = try XMPWriter.write(photo: photo)
+
+            let content = try String(contentsOf: sidecarURL, encoding: .utf8)
+            #expect(content.contains("xmp:Rating=\"5\""))
+            #expect(content.contains("crs:Exposure2012=\"+0.75\""))
+            #expect(content.contains("<crs:ToneCurvePV2012>"))
+            #expect(content.contains("<rdf:li>Portfolio</rdf:li>"))
+            #expect(content.contains("<rdf:li>Peregrine Falcon</rdf:li>"))
+        }
+    }
+
+    @Test func subsequentWritesReplaceOnlySuperPickyKeywords() throws {
+        try withTempDir { tempDir in
+            let filePath = tempDir.appendingPathComponent("IMG_5678.CR3").path
+            let sidecarURL = tempDir.appendingPathComponent("IMG_5678.xmp")
+            let existing = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <x:xmpmeta xmlns:x="adobe:ns:meta/">
+              <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+                <rdf:Description xmlns:dc="http://purl.org/dc/elements/1.1/">
+                  <dc:subject>
+                    <rdf:Bag>
+                      <rdf:li>Portfolio</rdf:li>
+                    </rdf:Bag>
+                  </dc:subject>
+                </rdf:Description>
+              </rdf:RDF>
+            </x:xmpmeta>
+            """
+            try Data(existing.utf8).write(to: sidecarURL)
+
+            var photo = makePhoto(
+                filename: "IMG_5678.CR3",
+                filePath: filePath,
+                starRating: 4,
+                speciesCommonName: "Robin",
+                speciesScientificName: "Turdus migratorius"
+            )
+            _ = try XMPWriter.write(photo: photo)
+
+            photo.speciesCommonName = "Osprey"
+            photo.speciesScientificName = "Pandion haliaetus"
+            _ = try XMPWriter.write(photo: photo)
+
+            let content = try String(contentsOf: sidecarURL, encoding: .utf8)
+            #expect(content.contains("<rdf:li>Portfolio</rdf:li>"))
+            #expect(content.contains("<rdf:li>Osprey</rdf:li>"))
+            #expect(content.contains("<rdf:li>Pandion haliaetus</rdf:li>"))
+            #expect(!content.contains("<rdf:li>Robin</rdf:li>"))
+            #expect(!content.contains("<rdf:li>Turdus migratorius</rdf:li>"))
+            #expect(!content.contains("<rdf:li>Bird|Robin</rdf:li>"))
+        }
+    }
+
+    @Test func existingMatchingKeywordRemainsUserOwned() throws {
+        try withTempDir { tempDir in
+            let filePath = tempDir.appendingPathComponent("IMG_5678.CR3").path
+            let sidecarURL = tempDir.appendingPathComponent("IMG_5678.xmp")
+            let existing = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <x:xmpmeta xmlns:x="adobe:ns:meta/">
+              <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+                <rdf:Description xmlns:dc="http://purl.org/dc/elements/1.1/">
+                  <dc:subject>
+                    <rdf:Bag>
+                      <rdf:li>Robin</rdf:li>
+                    </rdf:Bag>
+                  </dc:subject>
+                </rdf:Description>
+              </rdf:RDF>
+            </x:xmpmeta>
+            """
+            try Data(existing.utf8).write(to: sidecarURL)
+
+            var photo = makePhoto(
+                filename: "IMG_5678.CR3",
+                filePath: filePath,
+                starRating: 4,
+                speciesCommonName: "Robin",
+                speciesScientificName: "Turdus migratorius"
+            )
+            _ = try XMPWriter.write(photo: photo)
+
+            photo.speciesCommonName = "Osprey"
+            photo.speciesScientificName = "Pandion haliaetus"
+            _ = try XMPWriter.write(photo: photo)
+
+            let content = try String(contentsOf: sidecarURL, encoding: .utf8)
+            #expect(content.contains("<rdf:li>Robin</rdf:li>"))
+            #expect(content.contains("<rdf:li>Osprey</rdf:li>"))
+            #expect(!content.contains("<rdf:li>Turdus migratorius</rdf:li>"))
+        }
+    }
+
+    @Test func writeUpdatesLocationWithoutRemovingDevelopSettings() throws {
+        try withTempDir { tempDir in
+            let filePath = tempDir.appendingPathComponent("IMG_5678.CR3").path
+            let sidecarURL = tempDir.appendingPathComponent("IMG_5678.xmp")
+            let existing = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <x:xmpmeta xmlns:x="adobe:ns:meta/">
+              <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+                <rdf:Description
+                  xmlns:photoshop="http://ns.adobe.com/photoshop/1.0/"
+                  xmlns:crs="http://ns.adobe.com/camera-raw-settings/1.0/"
+                  crs:Contrast2012="+20"
+                  photoshop:City="Old City"/>
+              </rdf:RDF>
+            </x:xmpmeta>
+            """
+            try Data(existing.utf8).write(to: sidecarURL)
+
+            var photo = makePhoto(filename: "IMG_5678.CR3", filePath: filePath, starRating: 4)
+            photo.locationCity = "New City"
+            photo.locationCountryCode = "US"
+            _ = try XMPWriter.write(photo: photo)
+
+            let content = try String(contentsOf: sidecarURL, encoding: .utf8)
+            #expect(content.contains("crs:Contrast2012=\"+20\""))
+            #expect(content.contains("photoshop:City=\"New City\""))
+            #expect(content.contains("<Iptc4xmpCore:CountryCode>US</Iptc4xmpCore:CountryCode>"))
+            #expect(!content.contains("Old City"))
+        }
+    }
+
+    @Test func unsupportedKeywordContainerIsNotOverwritten() throws {
+        try withTempDir { tempDir in
+            let filePath = tempDir.appendingPathComponent("IMG_5678.CR3").path
+            let sidecarURL = tempDir.appendingPathComponent("IMG_5678.xmp")
+            let existing = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <x:xmpmeta xmlns:x="adobe:ns:meta/">
+              <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+                <rdf:Description xmlns:dc="http://purl.org/dc/elements/1.1/">
+                  <dc:subject>Portfolio</dc:subject>
+                </rdf:Description>
+              </rdf:RDF>
+            </x:xmpmeta>
+            """
+            try Data(existing.utf8).write(to: sidecarURL)
+            let photo = makePhoto(
+                filename: "IMG_5678.CR3",
+                filePath: filePath,
+                starRating: 5,
+                speciesCommonName: "Osprey"
+            )
+
+            #expect(throws: (any Error).self) {
+                _ = try XMPWriter.write(photo: photo)
+            }
+            #expect(try String(contentsOf: sidecarURL, encoding: .utf8) == existing)
+        }
+    }
+
+    @Test func malformedExistingSidecarIsNotOverwritten() throws {
+        try withTempDir { tempDir in
+            let filePath = tempDir.appendingPathComponent("IMG_5678.CR3").path
+            let sidecarURL = tempDir.appendingPathComponent("IMG_5678.xmp")
+            let existing = "<not-valid-xmp"
+            try Data(existing.utf8).write(to: sidecarURL)
+            let photo = makePhoto(filename: "IMG_5678.CR3", filePath: filePath, starRating: 5)
+
+            #expect(throws: (any Error).self) {
+                _ = try XMPWriter.write(photo: photo)
+            }
+            #expect(try String(contentsOf: sidecarURL, encoding: .utf8) == existing)
+        }
     }
 
     // MARK: - Valid XML structure
