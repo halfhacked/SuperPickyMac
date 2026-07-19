@@ -1,11 +1,17 @@
 import Foundation
 import CoreGraphics
+import Accelerate
 
 struct ExposureResult: Sendable {
     let isOverexposed: Bool
     let isUnderexposed: Bool
     let overexposedRatio: Float
     let underexposedRatio: Float
+
+    static let empty = ExposureResult(
+        isOverexposed: false, isUnderexposed: false,
+        overexposedRatio: 0, underexposedRatio: 0
+    )
 }
 
 struct ExposureDetector: Sendable {
@@ -15,7 +21,7 @@ struct ExposureDetector: Sendable {
         let totalPixels = width * height
 
         guard totalPixels > 0 else {
-            return ExposureResult(isOverexposed: false, isUnderexposed: false, overexposedRatio: 0, underexposedRatio: 0)
+            return .empty
         }
 
         let colorSpace = CGColorSpaceCreateDeviceGray()
@@ -25,16 +31,30 @@ struct ExposureDetector: Sendable {
             bitsPerComponent: 8, bytesPerRow: width,
             space: colorSpace, bitmapInfo: CGImageAlphaInfo.none.rawValue
         ) else {
-            return ExposureResult(isOverexposed: false, isUnderexposed: false, overexposedRatio: 0, underexposedRatio: 0)
+            return .empty
         }
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
 
-        var overCount = 0
-        var underCount = 0
-        for pixel in pixels {
-            if pixel >= 235 { overCount += 1 }
-            if pixel <= 15 { underCount += 1 }
+        var histogram = [vImagePixelCount](repeating: 0, count: 256)
+        let histogramError = pixels.withUnsafeMutableBytes { pixelBytes in
+            var buffer = vImage_Buffer(
+                data: pixelBytes.baseAddress!,
+                height: vImagePixelCount(height),
+                width: vImagePixelCount(width),
+                rowBytes: width
+            )
+            return histogram.withUnsafeMutableBufferPointer { bins in
+                vImageHistogramCalculation_Planar8(
+                    &buffer, bins.baseAddress!, vImage_Flags(kvImageNoFlags)
+                )
+            }
         }
+        guard histogramError == kvImageNoError else {
+            return .empty
+        }
+
+        let overCount = histogram[235...255].reduce(0, +)
+        let underCount = histogram[0...15].reduce(0, +)
 
         let overRatio = Float(overCount) / Float(totalPixels)
         let underRatio = Float(underCount) / Float(totalPixels)

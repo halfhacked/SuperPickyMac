@@ -129,8 +129,131 @@ public final class SpeciesFilter: @unchecked Sendable {
         }
         allowedCacheLock.unlock()
 
-        var chain: [SpeciesFilterLevel] = []
         let gps = queryAvonet(lat: lat, lon: lon)
+        let chain = makeSpeciesChain(lat: lat, lon: lon, gps: gps)
+
+        allowedCacheLock.lock()
+        chainCache[key] = chain
+        allowedCacheLock.unlock()
+        return chain
+    }
+
+    /// Populate the chain cache for a folder's unique GPS cells with one
+    /// distributions-table scan. `distributions.worldid` is not indexed in
+    /// the downloaded Avonet DB; issuing the normal query once per cell scans
+    /// all 3.3M rows repeatedly.
+    public func prewarmAllowedSpeciesChains(_ cells: [(lat: Double, lon: Double)]) {
+        var coordinateByKey: [UInt64: (lat: Double, lon: Double)] = [:]
+        coordinateByKey.reserveCapacity(cells.count)
+        for cell in cells {
+            let key = GPSCell.key(lat: cell.lat, lon: cell.lon)
+            if coordinateByKey[key] == nil {
+                coordinateByKey[key] = cell
+            }
+        }
+
+        allowedCacheLock.lock()
+        let cachedKeys = coordinateByKey.keys.filter { chainCache[$0] != nil }
+        for key in cachedKeys {
+            coordinateByKey.removeValue(forKey: key)
+        }
+        allowedCacheLock.unlock()
+        guard !coordinateByKey.isEmpty else { return }
+
+        guard let db = avonetDB else {
+            fallbackToPerCellQueries(coordinateByKey.values)
+            return
+        }
+
+        let placesSQL = """
+            SELECT worldid
+            FROM places
+            WHERE ? BETWEEN south AND north
+              AND ? BETWEEN west AND east
+        """
+        var placesStatement: OpaquePointer?
+        guard sqlite3_prepare_v2(db, placesSQL, -1, &placesStatement, nil) == SQLITE_OK,
+              let placesStatement else {
+            logger.error("Failed to prepare batched Avonet places query")
+            fallbackToPerCellQueries(coordinateByKey.values)
+            return
+        }
+        defer { sqlite3_finalize(placesStatement) }
+
+        var cellKeysByWorldID: [Int64: [UInt64]] = [:]
+        for (key, coordinate) in coordinateByKey {
+            sqlite3_reset(placesStatement)
+            sqlite3_clear_bindings(placesStatement)
+            sqlite3_bind_double(placesStatement, 1, coordinate.lat)
+            sqlite3_bind_double(placesStatement, 2, coordinate.lon)
+            while sqlite3_step(placesStatement) == SQLITE_ROW {
+                let worldID = sqlite3_column_int64(placesStatement, 0)
+                cellKeysByWorldID[worldID, default: []].append(key)
+            }
+        }
+
+        var gpsByCell: [UInt64: Set<Int>] = [:]
+        let worldIDs = Array(cellKeysByWorldID.keys)
+        if !worldIDs.isEmpty {
+            let placeholders = Array(repeating: "?", count: worldIDs.count).joined(separator: ",")
+            let distributionsSQL = """
+                SELECT d.worldid, sm.cls
+                FROM distributions d
+                JOIN sp_cls_map sm ON d.species = sm.species
+                WHERE d.worldid IN (\(placeholders))
+            """
+            var distributionsStatement: OpaquePointer?
+            guard sqlite3_prepare_v2(
+                db, distributionsSQL, -1, &distributionsStatement, nil
+            ) == SQLITE_OK, let distributionsStatement else {
+                logger.error("Failed to prepare batched Avonet distributions query")
+                fallbackToPerCellQueries(coordinateByKey.values)
+                return
+            }
+            defer { sqlite3_finalize(distributionsStatement) }
+
+            for (index, worldID) in worldIDs.enumerated() {
+                sqlite3_bind_int64(distributionsStatement, Int32(index + 1), worldID)
+            }
+            while sqlite3_step(distributionsStatement) == SQLITE_ROW {
+                let worldID = sqlite3_column_int64(distributionsStatement, 0)
+                let classID = Int(sqlite3_column_int(distributionsStatement, 1))
+                for key in cellKeysByWorldID[worldID] ?? [] {
+                    gpsByCell[key, default: []].insert(classID)
+                }
+            }
+        }
+
+        var resolved: [UInt64: [SpeciesFilterLevel]] = [:]
+        resolved.reserveCapacity(coordinateByKey.count)
+        for (key, coordinate) in coordinateByKey {
+            let gps = gpsByCell[key].flatMap { $0.isEmpty ? nil : $0 }
+            resolved[key] = makeSpeciesChain(
+                lat: coordinate.lat, lon: coordinate.lon, gps: gps
+            )
+        }
+
+        allowedCacheLock.lock()
+        for (key, chain) in resolved {
+            chainCache[key] = chain
+        }
+        allowedCacheLock.unlock()
+    }
+
+    /// Fallback when the batched query can't run (missing DB or prepare
+    /// failure): populate the cache one cell at a time via the normal path.
+    private func fallbackToPerCellQueries(
+        _ coordinates: Dictionary<UInt64, (lat: Double, lon: Double)>.Values
+    ) {
+        for coordinate in coordinates {
+            _ = allowedSpeciesChain(lat: coordinate.lat, lon: coordinate.lon)
+        }
+    }
+
+    private func makeSpeciesChain(
+        lat: Double, lon: Double, gps: Set<Int>?
+    ) -> [SpeciesFilterLevel] {
+        var chain: [SpeciesFilterLevel] = []
         if let gps, !gps.isEmpty {
             chain.append(.init(kind: .gps, classIDs: gps))
         }
@@ -141,10 +264,6 @@ public final class SpeciesFilter: @unchecked Sendable {
             chain.append(.init(kind: .country, classIDs: countrySet))
         }
         chain.append(.init(kind: .global, classIDs: nil))
-
-        allowedCacheLock.lock()
-        chainCache[key] = chain
-        allowedCacheLock.unlock()
         return chain
     }
 

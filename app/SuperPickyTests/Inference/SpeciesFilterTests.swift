@@ -1,4 +1,5 @@
 import Foundation
+import SQLite3
 import Testing
 @testable import SuperPickyInference
 
@@ -43,6 +44,34 @@ struct SpeciesFilterTests {
     /// here is the "flat fallback" branch.
     private func bundle(for dir: URL) -> Bundle {
         return Bundle(url: dir) ?? Bundle(path: dir.path)!
+    }
+
+    private func makeAvonetFixture(in dir: URL) throws -> URL {
+        let url = dir.appendingPathComponent("avonet.db")
+        var db: OpaquePointer?
+        guard sqlite3_open(url.path, &db) == SQLITE_OK, let db else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        defer { sqlite3_close(db) }
+        let sql = """
+            CREATE TABLE places
+                (worldid INTEGER PRIMARY KEY, west REAL, south REAL, east REAL, north REAL);
+            CREATE TABLE distributions
+                (id INTEGER PRIMARY KEY, species TEXT, worldid INTEGER);
+            CREATE TABLE sp_cls_map
+                (species TEXT PRIMARY KEY, cls INTEGER);
+            INSERT INTO places VALUES
+                (1, -123.0, 47.0, -122.0, 48.0),
+                (2, -115.0, 50.0, -113.0, 52.0);
+            INSERT INTO sp_cls_map VALUES
+                ('mallar3', 2), ('ostric2', 0), ('emu1', 1);
+            INSERT INTO distributions VALUES
+                (1, 'mallar3', 1), (2, 'ostric2', 1), (3, 'emu1', 2);
+        """
+        guard sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        return url
     }
 
     @Test("Parses the wrapped {country_code, species[]} shape")
@@ -100,6 +129,31 @@ struct SpeciesFilterTests {
         // fallback, but a different cache key).
         let elsewhere = filter.allowedClassIDs(lat: 51.0, lon: -114.0)
         #expect(elsewhere != first)
+    }
+
+    @Test("Batch prewarm populates independent GPS chains")
+    func batchPrewarm() throws {
+        let dir = try makeEbirdFixture()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let filter = try SpeciesFilter(
+            avonetPath: makeAvonetFixture(in: dir),
+            ebirdBundle: bundle(for: dir)
+        )
+
+        filter.prewarmAllowedSpeciesChains([
+            (47.6, -122.3),
+            (51.0, -114.0),
+            (47.61, -122.31),
+        ])
+
+        let seattleGPS = filter.allowedSpeciesChain(
+            lat: 47.6, lon: -122.3
+        ).first { $0.kind == .gps }?.classIDs
+        let calgaryGPS = filter.allowedSpeciesChain(
+            lat: 51.0, lon: -114.0
+        ).first { $0.kind == .gps }?.classIDs
+        #expect(seattleGPS == [0, 2])
+        #expect(calgaryGPS == [1])
     }
 
     @Test("Missing mapping JSON raises on init")

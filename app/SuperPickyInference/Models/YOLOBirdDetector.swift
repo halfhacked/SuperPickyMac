@@ -20,6 +20,7 @@
 import CoreML
 import CoreGraphics
 import Foundation
+import Accelerate
 import os
 
 public final class YOLOBirdDetector: @unchecked Sendable {
@@ -235,19 +236,23 @@ public final class YOLOBirdDetector: @unchecked Sendable {
 
     /// Decode per-detection mask: mask_coefs (32) × prototypes (32×160×160) → sigmoid → threshold.
     /// Returns 160×160 uint8 array (0=background, 1=bird).
-    private static func decodeMask(coefs: [Float], protos: UnsafePointer<Float>) -> Data {
-        let h = maskH, w = maskW
-        var result = [UInt8](repeating: 0, count: h * w)
-        let hw = h * w
-        for y in 0..<h {
-            for x in 0..<w {
-                var val: Float = 0
-                let pixel = y * w + x
-                for k in 0..<numMaskCoefs {
-                    val += coefs[k] * protos[k * hw + pixel]
-                }
-                result[pixel] = (1.0 / (1.0 + exp(-val))) > 0.5 ? 1 : 0
-            }
+    static func decodeMask(coefs: [Float], protos: UnsafePointer<Float>) -> Data {
+        let pixelCount = maskH * maskW
+        var logits = [Float](repeating: 0, count: pixelCount)
+        coefs.withUnsafeBufferPointer { coefficients in
+            vDSP_mmul(
+                coefficients.baseAddress!, 1,
+                protos, 1,
+                &logits, 1,
+                1, vDSP_Length(pixelCount), vDSP_Length(numMaskCoefs)
+            )
+        }
+
+        // sigmoid(x) > 0.5 is exactly x > 0, so thresholding logits avoids
+        // 25,600 scalar exp() calls per detection.
+        var result = [UInt8](repeating: 0, count: pixelCount)
+        for pixel in 0..<pixelCount {
+            result[pixel] = logits[pixel] > 0 ? 1 : 0
         }
         return Data(result)
     }

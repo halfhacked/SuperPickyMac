@@ -5,16 +5,41 @@ import SuperPickyInference
 import UniformTypeIdentifiers
 import os
 
+private final class RawReadLimiter: @unchecked Sendable {
+    private let semaphore: DispatchSemaphore
+
+    init(limit: Int) {
+        semaphore = DispatchSemaphore(value: limit)
+    }
+
+    func withPermit<T>(_ operation: () throws -> T) rethrows -> T {
+        semaphore.wait()
+        defer { semaphore.signal() }
+        return try operation()
+    }
+
+    func withPermitUnlessCancelled<T>(_ operation: () -> T) -> T? {
+        while semaphore.wait(timeout: .now() + .milliseconds(20)) == .timedOut {
+            if Task.isCancelled { return nil }
+        }
+        defer { semaphore.signal() }
+        guard !Task.isCancelled else { return nil }
+        return operation()
+    }
+}
+
 @Observable
 final class PipelineCoordinator: @unchecked Sendable {
     private let inferenceClient: InferenceClient
     private let ratingEngine = RatingEngine()
     private let exposureDetector = ExposureDetector()
-    private let burstDetector = BurstDetector()
     private let rawConverter = RAWConverter()
     private let scanner = DirectoryScanner()
     private let reverseGeocoder = ReverseGeocoder()
     private let logger = Logger(subsystem: "com.halfhacked.superpicky", category: "Pipeline")
+    private let rawReadLimiter = RawReadLimiter(limit: maxConcurrentMLWork)
+    private let initialMetadataBatchSize: Int
+    private let metadataBatchSize: Int
 
     var totalCount = 0
     var processedCount = 0
@@ -25,7 +50,8 @@ final class PipelineCoordinator: @unchecked Sendable {
     /// flight) may be in flight simultaneously. Compute-unit split pins
     /// Aesthetics to GPU and OSEA/Keypoint/Flight to ANE so several photos'
     /// work can truly overlap across engines. Post-processing (DB, burst
-    /// state, UI callback) still runs strictly in timestamp order.
+    /// state and UI callbacks) run in ingestion order; burst reconciliation
+    /// is applied once in exact capture-time order after ingestion.
     ///
     /// 6 is the sweet spot on an M3 Max / 64 GB machine: swept 3→4→5→6→8
     /// against the full `~/photo` bench and measured 46 / 39 / 39 / 36 / 37 s
@@ -34,8 +60,14 @@ final class PipelineCoordinator: @unchecked Sendable {
     /// (commit 9e38fe2); 8 regresses slightly on memory pressure.
     private static let maxConcurrentMLWork = 6
 
-    init(inferenceClient: InferenceClient) {
+    init(
+        inferenceClient: InferenceClient,
+        initialMetadataBatchSize: Int = 64,
+        metadataBatchSize: Int = 512
+    ) {
         self.inferenceClient = inferenceClient
+        self.initialMetadataBatchSize = max(1, initialMetadataBatchSize)
+        self.metadataBatchSize = max(1, metadataBatchSize)
     }
 
     func process(
@@ -56,11 +88,6 @@ final class PipelineCoordinator: @unchecked Sendable {
         let pipelineStart = DispatchTime.now()
 
         // Build a local BurstDetector with the user-configured thresholds.
-        // Default init on the class-level `burstDetector` only supplied
-        // hardcoded 500 ms / min 2 / hash 12; wiring it here lets the
-        // Advanced Settings sliders (burstFps / burstMinCount /
-        // burstHashTolerance) actually influence processing.
-        //
         // Time threshold derives from the configured burst FPS plus a 1.5×
         // tolerance — at 20 fps this gives 75 ms (tight), at 10 fps this
         // gives 150 ms, and a floor of 50 ms prevents divide-by-zero.
@@ -71,6 +98,7 @@ final class PipelineCoordinator: @unchecked Sendable {
             similarityThreshold: Float(burstHashTolerance)
         )
 
+        let scanStart = DispatchTime.now()
         let scannedFiles: [URL]
         do {
             scannedFiles = try scanner.scan(folder: folder)
@@ -78,92 +106,7 @@ final class PipelineCoordinator: @unchecked Sendable {
             logger.error("Failed to scan folder: \(error)")
             return
         }
-
-        // Pre-pass: read timestamp + GPS per file in parallel. Sort by
-        // timestamp so burst detection can run incrementally (each photo
-        // compared only against the previous); files without timestamps
-        // sort to the end by filename.
-        struct PrePassInfo: Sendable {
-            let url: URL
-            let timestamp: Double?
-            let gps: (lat: Double, lon: Double)?
-        }
-        // Cap concurrency: Apple's RawCamera.bundle LRU cache is not
-        // thread-safe under unbounded RAW `CGImageSourceCopyPropertiesAtIndex`
-        // fan-out (SIGSEGV in `_value_entry_release`). Beyond ~6 threads the
-        // XMP parser mutex serializes anyway, so the cap costs nothing.
-        let prePassWidth = Self.maxConcurrentMLWork
-        let filesWithTime: [PrePassInfo] = await withTaskGroup(
-            of: (Int, PrePassInfo).self,
-            returning: [PrePassInfo].self
-        ) { group in
-            var results = [PrePassInfo](
-                repeating: PrePassInfo(url: URL(fileURLWithPath: ""), timestamp: nil, gps: nil),
-                count: scannedFiles.count
-            )
-            var nextIdx = 0
-            let initial = min(prePassWidth, scannedFiles.count)
-            while nextIdx < initial {
-                let idx = nextIdx
-                let url = scannedFiles[idx]
-                group.addTask {
-                    let result = BurstDetector.readPreciseTimestampAndGPS(filePath: url.path)
-                    return (idx, PrePassInfo(url: url, timestamp: result.timestamp, gps: result.gps))
-                }
-                nextIdx += 1
-            }
-            for await (idx, info) in group {
-                results[idx] = info
-                if nextIdx < scannedFiles.count {
-                    let nIdx = nextIdx
-                    let url = scannedFiles[nIdx]
-                    group.addTask {
-                        let result = BurstDetector.readPreciseTimestampAndGPS(filePath: url.path)
-                        return (nIdx, PrePassInfo(url: url, timestamp: result.timestamp, gps: result.gps))
-                    }
-                    nextIdx += 1
-                }
-            }
-            return results
-        }
-        let files = filesWithTime.sorted { a, b in
-            switch (a.timestamp, b.timestamp) {
-            case let (ta?, tb?): return ta < tb
-            case (_?, nil): return true
-            case (nil, _?): return false
-            case (nil, nil): return a.url.lastPathComponent < b.url.lastPathComponent
-            }
-        }.map(\.url)
-
-        // One pass: timestampByPath + gpsByPath + unique-cells dedup for
-        // the SpeciesFilter pre-warm. Without pre-warming, the first six
-        // concurrent identifies all cache-miss the Avonet SQLite lookup
-        // simultaneously and serialize on the FULLMUTEX lock.
-        var timestampByPath: [String: Double] = [:]
-        var gpsByPath: [String: (lat: Double, lon: Double)] = [:]
-        var seenCells = Set<UInt64>()
-        var uniqueCells: [(lat: Double, lon: Double)] = []
-        timestampByPath.reserveCapacity(filesWithTime.count)
-        gpsByPath.reserveCapacity(filesWithTime.count)
-        for info in filesWithTime {
-            if let ts = info.timestamp { timestampByPath[info.url.path] = ts }
-            guard let gps = info.gps else { continue }
-            gpsByPath[info.url.path] = gps
-            if seenCells.insert(GPSCell.key(lat: gps.lat, lon: gps.lon)).inserted {
-                uniqueCells.append(gps)
-            }
-        }
-        await inferenceClient.prewarmGPSCells(uniqueCells)
-
-        totalCount = files.count
-        processedCount = 0
-
-        // Memory budget note: model wrappers run `autoreleasepool { ... }`
-        // inside their predict() methods to release MLMultiArray /
-        // MLFeatureProvider temporaries at each photo boundary. We also
-        // cycle the runtime loop once per iteration via Task.yield() below
-        // so ARC gets a scheduled chance to release temporaries between
-        // photos.
+        let scanEnd = DispatchTime.now()
 
         let db: ReportDatabase
         do {
@@ -173,17 +116,41 @@ final class PipelineCoordinator: @unchecked Sendable {
             return
         }
 
-        // Batch skip-check: one SELECT up-front instead of N round-trips.
-        let existingPaths = (try? db.fetchAllFilePaths()) ?? []
+        // Resume work only needs metadata and ML for paths not already in
+        // the report DB. The UI is seeded from the DB before this method is
+        // called, so replaying one callback per existing photo adds no value.
+        let existingDates = (try? db.fetchAllFileDates()) ?? [:]
+        let existingPaths = Set(existingDates.keys)
+        let pendingFiles = scannedFiles.filter { !existingPaths.contains($0.path) }
+        totalCount = scannedFiles.count
+        processedCount = scannedFiles.count - pendingFiles.count
+        if processedCount > 0 {
+            await onPhotoProcessed?(nil)
+        }
+        logger.notice(
+            "pipeline.inventory scan=\(String(format: "%.0f", Double(scanEnd.uptimeNanoseconds - scanStart.uptimeNanoseconds) / 1_000_000), privacy: .public)ms total=\(self.totalCount, privacy: .public) existing=\(self.processedCount, privacy: .public) pending=\(pendingFiles.count, privacy: .public)"
+        )
 
-        // Running burst state for incremental detection. Photos arrive in
-        // timestamp order, so a single comparison against the last photo in
-        // `burstPhotos` decides whether the new photo extends the candidate
-        // burst or starts a new one.
-        var burstPhotos: [Photo] = []
-        var burstID: UUID?
-        var lastTimestamp: Double?
-        var lastPHash: UInt64?
+        let scannedPaths = Set(scannedFiles.map(\.path))
+        let pendingPaths = Set(pendingFiles.map(\.path))
+
+        // Metadata is prepared in bounded batches. The first small batch
+        // reaches ML quickly; while ML consumes it, the next larger batch
+        // reads timestamp/GPS and prewarms Avonet in parallel. A shared gate
+        // keeps total RawCamera reads at the proven-safe concurrency of six.
+        var timestampByPath: [String: Double] = [:]
+        var gpsByPath: [String: (lat: Double, lon: Double)] = [:]
+        var pHashByPath: [String: UInt64] = [:]
+        timestampByPath.reserveCapacity(pendingFiles.count)
+        gpsByPath.reserveCapacity(pendingFiles.count)
+        pHashByPath.reserveCapacity(pendingFiles.count)
+
+        // Memory budget note: model wrappers run `autoreleasepool { ... }`
+        // inside their predict() methods to release MLMultiArray /
+        // MLFeatureProvider temporaries at each photo boundary. We also
+        // cycle the runtime loop once per iteration via Task.yield() below
+        // so ARC gets a scheduled chance to release temporaries between
+        // photos.
 
         // Parallel write-behind across N serial lanes. Writes for the
         // same photo must stay in one lane (initial save + burst-flag
@@ -208,10 +175,8 @@ final class PipelineCoordinator: @unchecked Sendable {
             }
         }
 
-        // Finalizer for one photo. Runs serially in timestamp order (one at
-        // a time) so the incremental burst state, DB writes, and UI callback
-        // stay coherent regardless of which order the concurrent ML tasks
-        // actually complete.
+        // Finalizer for one photo. Burst assignment is intentionally deferred
+        // until every processed photo can be ordered by capture timestamp.
         func finalize(url: URL, workTask: Task<MLWorkResult, Error>) async {
             if Task.isCancelled {
                 workTask.cancel()
@@ -226,10 +191,16 @@ final class PipelineCoordinator: @unchecked Sendable {
                 photo = result.photo
                 pHashFromDecoded = result.pHash
                 imageSize = result.imageSize
+                if let pHashFromDecoded {
+                    pHashByPath[url.path] = pHashFromDecoded
+                }
             } catch {
                 logger.error("Failed to process \(url.lastPathComponent): \(error)")
                 photo = Photo(filename: url.lastPathComponent,
                               filePath: url.path, folderPath: folder.path)
+                if let timestamp = timestampByPath[url.path] {
+                    photo.dateCreated = Date(timeIntervalSince1970: timestamp)
+                }
                 photo.starRating = 0
             }
 
@@ -247,153 +218,137 @@ final class PipelineCoordinator: @unchecked Sendable {
                 _ = try? XMPWriter.write(photo: p)
             }
             processedCount += 1
-            let elapsedMs = Double(DispatchTime.now().uptimeNanoseconds - startedAt.uptimeNanoseconds) / 1_000_000
+            let elapsedMs = Self.elapsedMilliseconds(since: startedAt)
             let species = photo.speciesCommonName ?? "unidentified"
             let conf = photo.speciesConfidence.map { String(format: "%.2f", $0) } ?? "-"
             let sizeStr = imageSize.map { "\($0.width)x\($0.height)" } ?? "-"
             logger.info("processed \(url.lastPathComponent, privacy: .public) size=\(sizeStr, privacy: .public) elapsed=\(String(format: "%.0f", elapsedMs), privacy: .public)ms stars=\(photo.starRating, privacy: .public) species=\(species, privacy: .public) conf=\(conf, privacy: .public)")
-
-            if burstDetectionEnabled {
-                let ts = timestampByPath[url.path]
-                let pHash: UInt64? = ts != nil ? pHashFromDecoded : nil
-
-                let extendsBurst: Bool = {
-                    guard let ts, let lt = lastTimestamp else { return false }
-                    let gapMs = (ts - lt) * 1000
-                    guard gapMs <= burstDetector.timeThresholdMs else { return false }
-                    // Short-circuit: two frames arriving within one-ish
-                    // shutter interval (≤100 ms) are treated as same burst
-                    // regardless of pHash — at 20 fps a wing flap between
-                    // consecutive shots can push hamming above threshold
-                    // even though the scene obviously hasn't changed.
-                    if gapMs <= 100 { return true }
-                    guard let p = pHash, let lp = lastPHash else { return false }
-                    return Float(BurstDetector.hammingDistance(lp, p)) <= burstDetector.similarityThreshold
-                }()
-
-                if !extendsBurst {
-                    burstPhotos.removeAll(keepingCapacity: true)
-                    burstID = nil
-                }
-                burstPhotos.append(photo)
-
-                if burstPhotos.count >= burstDetector.minBurstCount {
-                    let groupID = burstID ?? UUID()
-                    burstID = groupID
-                    let bestID = Self.selectBest(in: burstPhotos)
-                    let donor = Self.speciesDonor(in: burstPhotos)
-
-                    var updated: [Photo] = []
-                    for i in burstPhotos.indices {
-                        let newBest = (burstPhotos[i].id == bestID)
-                        let shouldInherit = donor != nil
-                            && !burstPhotos[i].hasSpecies
-                            && burstPhotos[i].id != donor!.id
-                        let flagsChanged = burstPhotos[i].burstGroupID != groupID
-                            || burstPhotos[i].isBurstBest != newBest
-                        if flagsChanged || shouldInherit {
-                            burstPhotos[i].burstGroupID = groupID
-                            burstPhotos[i].isBurstBest = newBest
-                            if shouldInherit, let donor {
-                                burstPhotos[i].inheritSpecies(from: donor)
-                            }
-                            let toSave = burstPhotos[i]
-                            let burstGPS = gpsByPath[toSave.filePath]
-                            let rewriteXMP = shouldInherit
-                            writeBehind(key: toSave.filePath) { [logger, reverseGeocoder = self.reverseGeocoder] in
-                                var p = toSave
-                                // GRDB save is a full REPLACE; re-apply location so
-                                // the burst update doesn't clobber it.
-                                if let gps = burstGPS,
-                                   let loc = await reverseGeocoder.resolve(lat: gps.lat, lon: gps.lon) {
-                                    p.applyLocation(loc)
-                                }
-                                do { try db.save(&p) } catch {
-                                    logger.error("Failed to save burst update: \(error)")
-                                }
-                                // Only rewrite the sidecar when species
-                                // actually changed — burst-flag-only
-                                // updates don't surface in XMP.
-                                if rewriteXMP { _ = try? XMPWriter.write(photo: p) }
-                            }
-                            updated.append(burstPhotos[i])
-                        }
-                    }
-
-                    if let idx = burstPhotos.firstIndex(where: { $0.id == photo.id }) {
-                        photo = burstPhotos[idx]
-                    }
-                    for p in updated where p.id != photo.id {
-                        await onPhotoProcessed?(p)
-                    }
-                }
-
-                if ts != nil { lastTimestamp = ts }
-                if pHash != nil { lastPHash = pHash }
-            }
 
             await onPhotoProcessed?(photo)
         }
 
         // Bounded queue of in-flight ML tasks. Tasks run concurrently (up to
         // `maxConcurrentMLWork`); `finalize` awaits them strictly in the
-        // submission order, so the serial post-processing phase sees photos
-        // in timestamp order.
+        // submission order. Exact timestamp ordering is applied once, during
+        // the final burst reconciliation.
         var inflight: [(URL, Task<MLWorkResult, Error>)] = []
 
-        for fileURL in files {
-            if Task.isCancelled { break }
+        var nextBatchStart = 0
+        var metadataTask: Task<MetadataBatch?, Never>?
 
-            currentFilename = fileURL.lastPathComponent
-
-            if existingPaths.contains(fileURL.path) {
-                // Resumption: already-processed photos are in DB from an
-                // earlier run. Skip ML, but drain in-flight first and
-                // reset the incremental burst window so a new photo
-                // after the skip doesn't accidentally extend a burst
-                // that pre-dates the skip. Cross-skip bursts aren't
-                // detected — a known gap the streaming pipeline will
-                // close.
-                while let first = inflight.first {
-                    inflight.removeFirst()
-                    await finalize(url: first.0, workTask: first.1)
+        func prepareNextMetadataBatch() -> Task<MetadataBatch?, Never>? {
+            guard nextBatchStart < pendingFiles.count else { return nil }
+            let batchSize = nextBatchStart == 0
+                ? initialMetadataBatchSize
+                : metadataBatchSize
+            let end = min(nextBatchStart + batchSize, pendingFiles.count)
+            let urls = Array(pendingFiles[nextBatchStart..<end])
+            nextBatchStart = end
+            return Task.detached(priority: .userInitiated) { [self] in
+                let started = DispatchTime.now()
+                let infos = await self.loadMetadata(for: urls)
+                guard !Task.isCancelled else { return nil }
+                let metadataMs = Self.elapsedMilliseconds(since: started)
+                var seenCells = Set<UInt64>()
+                var cells: [(lat: Double, lon: Double)] = []
+                for info in infos {
+                    guard let gps = info.gps else { continue }
+                    if seenCells.insert(GPSCell.key(lat: gps.lat, lon: gps.lon)).inserted {
+                        cells.append(gps)
+                    }
                 }
-                processedCount += 1
-                burstPhotos.removeAll(keepingCapacity: true)
-                burstID = nil
-                lastTimestamp = nil
-                lastPHash = nil
-                await onPhotoProcessed?(nil)
-                continue
-            }
-
-            while inflight.count >= Self.maxConcurrentMLWork {
-                let first = inflight.removeFirst()
-                await finalize(url: first.0, workTask: first.1)
-            }
-
-            let capturedFolder = folder.path
-            let preGPS = gpsByPath[fileURL.path]
-            let task = Task.detached(priority: .userInitiated) { [self] in
-                try await self.processMLWork(
-                    fileURL: fileURL,
-                    folderPath: capturedFolder,
-                    ratingConfig: ratingConfig,
-                    exposureEnabled: exposureEnabled,
-                    exposureThreshold: exposureThreshold,
-                    flightDetectionEnabled: flightDetectionEnabled,
-                    preGPS: preGPS
+                let prewarmStart = DispatchTime.now()
+                await self.inferenceClient.prewarmGPSCells(cells)
+                guard !Task.isCancelled else { return nil }
+                return MetadataBatch(
+                    infos: infos,
+                    metadataMs: metadataMs,
+                    prewarmMs: Self.elapsedMilliseconds(since: prewarmStart),
+                    gpsCellCount: cells.count
                 )
             }
-            inflight.append((fileURL, task))
+        }
+
+        metadataTask = prepareNextMetadataBatch()
+        var metadataBatchIndex = 0
+        while let currentMetadataTask = metadataTask {
+            if Task.isCancelled {
+                currentMetadataTask.cancel()
+                _ = await currentMetadataTask.value
+                metadataTask = nil
+                break
+            }
+
+            let batch = await withTaskCancellationHandler {
+                await currentMetadataTask.value
+            } onCancel: {
+                currentMetadataTask.cancel()
+            }
+            guard let batch else {
+                metadataTask = nil
+                break
+            }
+            metadataTask = prepareNextMetadataBatch()
+            metadataBatchIndex += 1
+            if metadataBatchIndex == 1 {
+                logger.notice(
+                    "pipeline.firstBatch metadata=\(String(format: "%.0f", batch.metadataMs), privacy: .public)ms files=\(batch.infos.count, privacy: .public) gpsCells=\(batch.gpsCellCount, privacy: .public) prewarm=\(String(format: "%.1f", batch.prewarmMs), privacy: .public)ms"
+                )
+            }
+
+            for info in batch.infos {
+                if let timestamp = info.timestamp {
+                    timestampByPath[info.url.path] = timestamp
+                }
+                if let gps = info.gps {
+                    gpsByPath[info.url.path] = gps
+                }
+
+                if Task.isCancelled { break }
+                let fileURL = info.url
+                currentFilename = fileURL.lastPathComponent
+
+                while inflight.count >= Self.maxConcurrentMLWork {
+                    let first = inflight.removeFirst()
+                    await finalize(url: first.0, workTask: first.1)
+                }
+
+                let capturedFolder = folder.path
+                let preGPS = info.gps
+                let task = Task.detached(priority: .userInitiated) { [self] in
+                    try await self.processMLWork(
+                        fileURL: fileURL,
+                        folderPath: capturedFolder,
+                        ratingConfig: ratingConfig,
+                        exposureEnabled: exposureEnabled,
+                        exposureThreshold: exposureThreshold,
+                        flightDetectionEnabled: flightDetectionEnabled,
+                        preGPS: preGPS
+                    )
+                }
+                inflight.append((fileURL, task))
+            }
         }
 
         // Cancellation: cancel inflight, skip final drain.
-        // Write-behind chain keeps running in the background so already-
-        // finalized photos still save.
         if Task.isCancelled {
+            metadataTask?.cancel()
+            _ = await metadataTask?.value
             for (_, task) in inflight { task.cancel() }
             inflight.removeAll()
+            await allWriteBehindLanes()
+            if burstDetectionEnabled {
+                await reconcileBursts(
+                    db: db,
+                    scannedPaths: scannedPaths,
+                    pendingPaths: pendingPaths,
+                    existingDates: existingDates,
+                    timestampByPath: timestampByPath,
+                    pHashByPath: pHashByPath,
+                    detector: burstDetector,
+                    onPhotoProcessed: onPhotoProcessed
+                )
+            }
             let count = self.processedCount
             logger.notice("pipeline.cancelled after=\(String(format: "%.0f", Double(DispatchTime.now().uptimeNanoseconds - pipelineStart.uptimeNanoseconds) / 1_000_000), privacy: .public)ms processed=\(count, privacy: .public)")
             return
@@ -407,11 +362,205 @@ final class PipelineCoordinator: @unchecked Sendable {
         let mlEnd = DispatchTime.now()
 
         await allWriteBehindLanes()
+        if burstDetectionEnabled {
+            await reconcileBursts(
+                db: db,
+                scannedPaths: scannedPaths,
+                pendingPaths: pendingPaths,
+                existingDates: existingDates,
+                timestampByPath: timestampByPath,
+                pHashByPath: pHashByPath,
+                detector: burstDetector,
+                onPhotoProcessed: onPhotoProcessed
+            )
+        }
         let wbEnd = DispatchTime.now()
 
         let mlMs = Double(mlEnd.uptimeNanoseconds - pipelineStart.uptimeNanoseconds) / 1_000_000
         let wbTailMs = Double(wbEnd.uptimeNanoseconds - mlEnd.uptimeNanoseconds) / 1_000_000
         logger.notice("pipeline.finished ml=\(String(format: "%.0f", mlMs), privacy: .public)ms wbTail=\(String(format: "%.0f", wbTailMs), privacy: .public)ms total=\(String(format: "%.0f", mlMs + wbTailMs), privacy: .public)ms")
+    }
+
+    private func loadMetadata(for urls: [URL]) async -> [PrePassInfo] {
+        await withTaskGroup(
+            of: (Int, PrePassInfo?).self,
+            returning: [PrePassInfo].self
+        ) { group in
+            var results = [PrePassInfo?](
+                repeating: nil,
+                count: urls.count
+            )
+
+            func addTask(for index: Int) {
+                let url = urls[index]
+                group.addTask { [rawReadLimiter] in
+                    guard let result = rawReadLimiter.withPermitUnlessCancelled({
+                        BurstDetector.readPreciseTimestampAndGPS(filePath: url.path)
+                    }) else { return (index, nil) }
+                    return (
+                        index,
+                        PrePassInfo(
+                            url: url,
+                            timestamp: result.timestamp,
+                            gps: result.gps
+                        )
+                    )
+                }
+            }
+
+            var nextIndex = 0
+            let initial = min(Self.maxConcurrentMLWork, urls.count)
+            while nextIndex < initial {
+                addTask(for: nextIndex)
+                nextIndex += 1
+            }
+            for await (index, info) in group {
+                results[index] = info
+                if !Task.isCancelled, nextIndex < urls.count {
+                    addTask(for: nextIndex)
+                    nextIndex += 1
+                }
+            }
+            return results.compactMap { $0 }
+        }
+    }
+
+    private func reconcileBursts(
+        db: ReportDatabase,
+        scannedPaths: Set<String>,
+        pendingPaths: Set<String>,
+        existingDates: [String: Date],
+        timestampByPath: [String: Double],
+        pHashByPath: [String: UInt64],
+        detector: BurstDetector,
+        onPhotoProcessed: (@Sendable (Photo?) async -> Void)?
+    ) async {
+        let allPhotos: [Photo]
+        do {
+            allPhotos = try db.fetchAllPhotos()
+        } catch {
+            logger.error("Failed to load photos for burst reconciliation: \(error)")
+            return
+        }
+
+        let photosByPath = Dictionary(
+            uniqueKeysWithValues: allPhotos
+                .filter { scannedPaths.contains($0.filePath) }
+                .map { ($0.filePath, $0) }
+        )
+        var sequence: [BurstSequenceEntry] = []
+        sequence.reserveCapacity(photosByPath.count)
+        for (path, date) in existingDates where scannedPaths.contains(path) {
+            sequence.append(BurstSequenceEntry(
+                path: path,
+                timestamp: date.timeIntervalSince1970,
+                photo: nil
+            ))
+        }
+        for path in pendingPaths {
+            guard let photo = photosByPath[path] else { continue }
+            sequence.append(BurstSequenceEntry(
+                path: path,
+                timestamp: timestampByPath[path],
+                photo: photo
+            ))
+        }
+        sequence.sort {
+            switch ($0.timestamp, $1.timestamp) {
+            case let (lhs?, rhs?) where lhs != rhs: return lhs < rhs
+            case (_?, nil): return true
+            case (nil, _?): return false
+            default:
+                let lhsName = URL(fileURLWithPath: $0.path).lastPathComponent
+                let rhsName = URL(fileURLWithPath: $1.path).lastPathComponent
+                return lhsName < rhsName
+            }
+        }
+
+        var candidate: [Photo] = []
+        var lastTimestamp: Double?
+        var lastPHash: UInt64?
+        var updates: [Photo] = []
+        var xmpUpdates: [Photo] = []
+
+        func flushCandidate() {
+            defer {
+                candidate.removeAll(keepingCapacity: true)
+                lastTimestamp = nil
+                lastPHash = nil
+            }
+            guard candidate.count >= detector.minBurstCount else { return }
+
+            let groupID = UUID()
+            let bestID = Self.selectBest(in: candidate)
+            let donor = Self.speciesDonor(in: candidate)
+            for index in candidate.indices {
+                candidate[index].burstGroupID = groupID
+                candidate[index].isBurstBest = candidate[index].id == bestID
+                if let donor,
+                   !candidate[index].hasSpecies,
+                   candidate[index].id != donor.id {
+                    candidate[index].inheritSpecies(from: donor)
+                    xmpUpdates.append(candidate[index])
+                }
+                updates.append(candidate[index])
+            }
+        }
+
+        for entry in sequence {
+            guard let photo = entry.photo else {
+                flushCandidate()
+                continue
+            }
+            guard let timestamp = entry.timestamp else {
+                flushCandidate()
+                candidate.append(photo)
+                flushCandidate()
+                continue
+            }
+
+            let pHash = pHashByPath[entry.path]
+            let extendsBurst: Bool
+            if let previousTimestamp = lastTimestamp {
+                let gapMs = (timestamp - previousTimestamp) * 1000
+                if gapMs > detector.timeThresholdMs {
+                    extendsBurst = false
+                } else if gapMs <= 100 {
+                    extendsBurst = true
+                } else if let pHash, let lastPHash {
+                    extendsBurst = Float(
+                        BurstDetector.hammingDistance(lastPHash, pHash)
+                    ) <= detector.similarityThreshold
+                } else {
+                    extendsBurst = false
+                }
+            } else {
+                extendsBurst = false
+            }
+
+            if !extendsBurst {
+                flushCandidate()
+            }
+            candidate.append(photo)
+            lastTimestamp = timestamp
+            lastPHash = pHash
+        }
+        flushCandidate()
+
+        guard !updates.isEmpty else { return }
+        do {
+            try db.saveAll(&updates)
+        } catch {
+            logger.error("Failed to save burst reconciliation: \(error)")
+            return
+        }
+        for photo in xmpUpdates {
+            _ = try? XMPWriter.write(photo: photo)
+        }
+        for photo in updates {
+            await onPhotoProcessed?(photo)
+        }
+        logger.notice("pipeline.bursts reconciled=\(updates.count, privacy: .public)")
     }
 
     /// Best photo in a burst: highest combined sharpness + aesthetics score.
@@ -438,6 +587,31 @@ final class PipelineCoordinator: @unchecked Sendable {
         var photo: Photo
         var pHash: UInt64?
         var imageSize: (width: Int, height: Int)?
+    }
+
+    private struct PrePassInfo: Sendable {
+        let url: URL
+        let timestamp: Double?
+        let gps: (lat: Double, lon: Double)?
+    }
+
+    private struct MetadataBatch: Sendable {
+        let infos: [PrePassInfo]
+        let metadataMs: Double
+        let prewarmMs: Double
+        let gpsCellCount: Int
+    }
+
+    private struct BurstSequenceEntry {
+        let path: String
+        let timestamp: Double?
+        let photo: Photo?
+    }
+
+    private struct SharpnessPreparation: Sendable {
+        let birdCrop: CGImage
+        let segmentationMask: [UInt8]?
+        let bboxSize: (width: Int, height: Int)
     }
 
     /// Pure async ML work: decode + identify + aesthetics / keypoints /
@@ -492,7 +666,9 @@ final class PipelineCoordinator: @unchecked Sendable {
         // re-opening the source for properties after the thumbnail decode
         // used to cost ~4 ms / photo.
         let decodeStart = DispatchTime.now()
-        let decoded = try rawConverter.decode(fileURL: fileURL)
+        let decoded = try rawReadLimiter.withPermit {
+            try rawConverter.decode(fileURL: fileURL)
+        }
         let image = decoded.image
         let imageProps = decoded.properties
         let decodeMs = Self.elapsedMs(since: decodeStart)
@@ -559,6 +735,18 @@ final class PipelineCoordinator: @unchecked Sendable {
             return
         }
 
+        // High-resolution decode and mask alignment are independent of the
+        // three post-detection models. Start them now so CPU/JPEG work overlaps
+        // GPU inference instead of extending the per-photo critical path.
+        async let sharpnessPreparation = Self.prepareSharpness(
+            rawReadLimiter: rawReadLimiter,
+            rawConverter: rawConverter,
+            fileURL: fileURL,
+            inferenceImage: image,
+            bird: bird,
+            fallbackCrop: birdCrop
+        )
+
         let postMlStart = DispatchTime.now()
         async let aestheticsResponse = inferenceClient.aesthetics(image: image)
         async let keypointResult = inferenceClient.keypoints(image: birdCrop)
@@ -590,40 +778,18 @@ final class PipelineCoordinator: @unchecked Sendable {
         // Decode at `RAWConverter.maxSharpnessSize` for discrimination;
         // fall back to the inference image when the hi-res decode isn't
         // available (older RAW with no embedded preview).
-        let sharpnessSource: CGImage = rawConverter.decodeForSharpness(fileURL: fileURL) ?? image
-        let sharpnessBirdCrop = sharpnessSource.smartSquareBirdCrop(bbox: bird.bbox) ?? birdCrop
-
-        // Build a bird-crop-aligned segmentation mask so the head circle is
-        // intersected with the YOLO seg mask, matching the
-        // `cv2.bitwise_and(circle_mask, seg_mask)` step in
-        // `superpicky/core/keypoint_detector.py:_calculate_head_sharpness`.
-        // The mask alignment uses the same source image the bird crop was
-        // taken from — at hi-res the YOLO letterbox math still resolves
-        // correctly because the aspect ratio matches the inference image.
-        let birdCropSegMask = Self.birdCropAlignedSegMask(
-            yoloMask: bird.mask,
-            inferImage: sharpnessSource,
-            bbox: bird.bbox,
-            birdCropSize: sharpnessBirdCrop.width
-        )
-        // YOLO bbox in sharpness-source pixel space — feeds HeadSharpness's
-        // no-beak radius fallback (matches superpicky's `box[2]/box[3]`
-        // branch in keypoint_detector.py:248-252).
-        let bboxPx = (
-            width:  Int((bird.bbox.width  * CGFloat(sharpnessSource.width )).rounded()),
-            height: Int((bird.bbox.height * CGFloat(sharpnessSource.height)).rounded())
-        )
+        let sharpness = await sharpnessPreparation
         let headSharpness = HeadSharpness.score(
-            birdCrop: sharpnessBirdCrop,
+            birdCrop: sharpness.birdCrop,
             leftEyeX: keypoints.leftEye.x, leftEyeY: keypoints.leftEye.y,
             leftEyeVis: keypoints.leftEye.visibility,
             rightEyeX: keypoints.rightEye.x, rightEyeY: keypoints.rightEye.y,
             rightEyeVis: keypoints.rightEye.visibility,
             beakX: keypoints.beak.x, beakY: keypoints.beak.y,
             beakVis: keypoints.beak.visibility,
-            segMask: birdCropSegMask,
-            birdBboxSize: bboxPx
-        ) ?? TenengradSharpness.score(image: sharpnessBirdCrop) // fallback to full-crop
+            segMask: sharpness.segmentationMask,
+            birdBboxSize: sharpness.bboxSize
+        ) ?? TenengradSharpness.score(image: sharpness.birdCrop) // fallback to full-crop
 
         // `imageProps` (loaded at the top) also feeds the ISO sharpness
         // factor and the focus-point weighting below — one CGImageSource
@@ -715,9 +881,41 @@ final class PipelineCoordinator: @unchecked Sendable {
         logger.debug("photo.ml decode=\(decodeMs, privacy: .public)ms pHash=\(pHashMs, privacy: .public)ms postMl=\(postMlMs, privacy: .public)ms total=\(photoMs, privacy: .public)ms")
     }
 
+    private static func prepareSharpness(
+        rawReadLimiter: RawReadLimiter,
+        rawConverter: RAWConverter,
+        fileURL: URL,
+        inferenceImage: CGImage,
+        bird: BirdDetection,
+        fallbackCrop: CGImage
+    ) -> SharpnessPreparation {
+        let source = rawReadLimiter.withPermit {
+            rawConverter.decodeForSharpness(fileURL: fileURL)
+        } ?? inferenceImage
+        let crop = source.smartSquareBirdCrop(bbox: bird.bbox) ?? fallbackCrop
+        let segmentationMask = birdCropAlignedSegMask(
+            yoloMask: bird.mask,
+            inferImage: source,
+            bbox: bird.bbox,
+            birdCropSize: crop.width
+        )
+        return SharpnessPreparation(
+            birdCrop: crop,
+            segmentationMask: segmentationMask,
+            bboxSize: (
+                width: Int((bird.bbox.width * CGFloat(source.width)).rounded()),
+                height: Int((bird.bbox.height * CGFloat(source.height)).rounded())
+            )
+        )
+    }
+
     private static func elapsedMs(since start: DispatchTime) -> String {
+        String(format: "%.1f", elapsedMilliseconds(since: start))
+    }
+
+    private static func elapsedMilliseconds(since start: DispatchTime) -> Double {
         let ns = DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds
-        return String(format: "%.1f", Double(ns) / 1_000_000)
+        return Double(ns) / 1_000_000
     }
 
     /// ISO sharpness normalization: 5% penalty per ISO doubling above 800.
