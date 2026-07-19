@@ -28,8 +28,12 @@ class SuperPickyUITestCase: XCTestCase {
     }
 
     override class func tearDown() {
-        app.terminate()
-        try? FileManager.default.removeItem(atPath: testDir)
+        app?.terminate()
+        if let testDir {
+            try? FileManager.default.removeItem(atPath: testDir)
+        }
+        app = nil
+        testDir = nil
         super.tearDown()
     }
 
