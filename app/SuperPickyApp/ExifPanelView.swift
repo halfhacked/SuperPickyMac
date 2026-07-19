@@ -9,7 +9,7 @@ struct ExifPanelView: View {
     let photo: Photo
     /// Autocomplete backend — defaults to "no matches" so previews and
     /// unit tests don't need the CoreML species database wired up.
-    var searchSpecies: (_ query: String) -> [SpeciesMatch] = { _ in [] }
+    var searchSpecies: (_ query: String) async -> [SpeciesMatch] = { _ in [] }
 
     @State private var exifData: EXIFData?
     @State private var searchQuery: String = ""
@@ -294,13 +294,22 @@ struct ExifPanelView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 4)
         .padding(.bottom, 4)
-        .onChange(of: searchQuery) { _, newValue in
-            let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        .task(id: searchQuery) {
+            let trimmed = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else {
                 searchResults = []
                 return
             }
-            searchResults = searchSpecies(trimmed)
+
+            do {
+                try await Task.sleep(nanoseconds: 75_000_000)
+            } catch {
+                return
+            }
+
+            let matches = await searchSpecies(trimmed)
+            guard !Task.isCancelled else { return }
+            searchResults = matches
                 .filter { !assignedIDs.contains($0.speciesID) }
         }
     }
@@ -500,9 +509,27 @@ struct ExifPanelView: View {
 
     private func commitSearchQuery() {
         let trimmed = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, let match = searchResults.first else { return }
-        appState.addSpecies(ids: targetIDs, species: match)
-        searchQuery = ""
-        searchResults = []
+        guard !trimmed.isEmpty else { return }
+        if let match = searchResults.first {
+            appState.addSpecies(ids: targetIDs, species: match)
+            searchQuery = ""
+            searchResults = []
+            return
+        }
+
+        let ids = targetIDs
+        let excludedIDs = assignedIDs
+        Task { @MainActor in
+            let matches = await searchSpecies(trimmed)
+            guard searchQuery.trimmingCharacters(in: .whitespacesAndNewlines) == trimmed,
+                  let match = matches.first(where: {
+                      !excludedIDs.contains($0.speciesID)
+                  }) else {
+                return
+            }
+            appState.addSpecies(ids: ids, species: match)
+            searchQuery = ""
+            searchResults = []
+        }
     }
 }
