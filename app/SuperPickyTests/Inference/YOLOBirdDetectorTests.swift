@@ -100,6 +100,28 @@ struct YOLOBirdDetectorTests {
         #expect(abs(scale2 - 640.0 / 320.0) < 1e-4)
         #expect(abs(scale1 - scale2) > 0.1)
     }
+
+    @Test func maskDecodeThresholdsDotProductAtZero() {
+        let pixelCount = 160 * 160
+        var coefficients = [Float](repeating: 0, count: 32)
+        coefficients[0] = 1
+        var prototypes = [Float](repeating: 0, count: 32 * pixelCount)
+        for pixel in 0..<pixelCount {
+            prototypes[pixel] = pixel.isMultiple(of: 2) ? 1 : -1
+        }
+
+        let mask = prototypes.withUnsafeBufferPointer {
+            YOLOBirdDetector.decodeMask(
+                coefs: coefficients, protos: $0.baseAddress!
+            )
+        }
+
+        #expect(mask.count == pixelCount)
+        #expect(mask[0] == 1)
+        #expect(mask[1] == 0)
+        #expect(mask[pixelCount - 2] == 1)
+        #expect(mask[pixelCount - 1] == 0)
+    }
 }
 
 // MARK: - Helpers

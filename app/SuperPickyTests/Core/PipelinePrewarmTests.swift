@@ -11,9 +11,13 @@ final class RecordingInferenceClient: InferenceClient, @unchecked Sendable {
     var identifyBirds: [BirdDetection] = []
     private let lock = NSLock()
     private var _prewarmCalls: [[(lat: Double, lon: Double)]] = []
+    private var _identifiedPaths: [String] = []
 
     var prewarmCalls: [[(lat: Double, lon: Double)]] {
         lock.withLock { _prewarmCalls }
+    }
+    var identifiedPaths: [String] {
+        lock.withLock { _identifiedPaths }
     }
 
     func detect(image: CGImage) async throws -> DetectionResult {
@@ -33,7 +37,8 @@ final class RecordingInferenceClient: InferenceClient, @unchecked Sendable {
         FlightResult(isFlying: false, confidence: 0.1)
     }
     func identify(filePath: String, topK: Int, preDecodedImage: CGImage?, preGPS: (lat: Double, lon: Double)?) async throws -> IdentifyResponse {
-        IdentifyResponse(species: [], birds: identifyBirds, totalDetected: identifyBirds.count)
+        lock.withLock { _identifiedPaths.append(filePath) }
+        return IdentifyResponse(species: [], birds: identifyBirds, totalDetected: identifyBirds.count)
     }
     func prewarmGPSCells(_ cells: [(lat: Double, lon: Double)]) async {
         lock.withLock { _prewarmCalls.append(cells) }
@@ -114,6 +119,170 @@ final class RecordingInferenceClient: InferenceClient, @unchecked Sendable {
 
         #expect(client.prewarmCalls.count == 1)
         #expect(client.prewarmCalls[0].isEmpty)
+    }
+
+    @Test func resumePrepassesAndIdentifiesOnlyPendingFiles() async throws {
+        let dir = try tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let existingURL = dir.appendingPathComponent("existing.jpg")
+        let pendingURL = dir.appendingPathComponent("pending.jpg")
+        createJPEG(at: existingURL, gps: (47.6062, -122.3321))
+        createJPEG(at: pendingURL, gps: (46.9781, -124.1579))
+
+        let scanned = try DirectoryScanner().scan(folder: dir)
+        let scannedExisting = try #require(
+            scanned.first { $0.lastPathComponent == existingURL.lastPathComponent }
+        )
+        let scannedPending = try #require(
+            scanned.first { $0.lastPathComponent == pendingURL.lastPathComponent }
+        )
+        let db = try ReportDatabase(folderPath: dir)
+        var existing = Photo(
+            filename: scannedExisting.lastPathComponent,
+            filePath: scannedExisting.path,
+            folderPath: dir.path
+        )
+        try db.save(&existing)
+
+        let client = RecordingInferenceClient()
+        let pipeline = PipelineCoordinator(inferenceClient: client)
+        let config = RatingEngine.Config(sharpnessThreshold: 380, aestheticsThreshold: 4.8)
+        await pipeline.process(
+            folder: dir, ratingConfig: config,
+            exposureEnabled: false, exposureThreshold: 0.10
+        )
+
+        #expect(pipeline.totalCount == 2)
+        #expect(pipeline.processedCount == 2)
+        #expect(client.identifiedPaths == [scannedPending.path])
+        #expect(client.prewarmCalls.count == 1)
+        let warmedKeys = Set(client.prewarmCalls[0].map {
+            GPSCell.key(lat: $0.lat, lon: $0.lon)
+        })
+        #expect(warmedKeys == [
+            GPSCell.key(lat: 46.9781, lon: -124.1579)
+        ])
+    }
+
+    @Test func resumePreservesExistingPhotoAsBurstBoundary() async throws {
+        let dir = try tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        for name in ["a.jpg", "b.jpg", "c.jpg"] {
+            createJPEG(at: dir.appendingPathComponent(name), gps: nil)
+        }
+        let scanned = try DirectoryScanner().scan(folder: dir)
+        let existingURL = try #require(
+            scanned.first { $0.lastPathComponent == "b.jpg" }
+        )
+        let properties = try #require(
+            ImageProperties.load(filePath: existingURL.path)
+        )
+        let captureTimestamp = try #require(
+            BurstDetector.parseTimestamp(from: properties)
+        )
+
+        let db = try ReportDatabase(folderPath: dir)
+        var existing = Photo(
+            filename: existingURL.lastPathComponent,
+            filePath: existingURL.path,
+            folderPath: dir.path,
+            dateCreated: Date(timeIntervalSince1970: captureTimestamp)
+        )
+        try db.save(&existing)
+
+        let client = RecordingInferenceClient()
+        client.identifyBirds = [
+            BirdDetection(
+                bbox: CGRect(x: 0.1, y: 0.1, width: 0.5, height: 0.5),
+                confidence: 0.95,
+                mask: Data()
+            )
+        ]
+        let pipeline = PipelineCoordinator(inferenceClient: client)
+        let config = RatingEngine.Config(
+            sharpnessThreshold: 100, aestheticsThreshold: 2
+        )
+        await pipeline.process(
+            folder: dir, ratingConfig: config,
+            exposureEnabled: false, exposureThreshold: 0.10
+        )
+
+        let photos = try db.fetchAllPhotos()
+        let pending = photos.filter { $0.filename != "b.jpg" }
+        #expect(pending.count == 2)
+        #expect(pending.allSatisfy { $0.burstGroupID == nil })
+    }
+
+    @Test func coldRunPrewarmsMetadataInIncrementalBatches() async throws {
+        let dir = try tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        for (index, gps) in [
+            (47.6062, -122.3321),
+            (46.9781, -124.1579),
+            (45.5152, -122.6784),
+        ].enumerated() {
+            createJPEG(
+                at: dir.appendingPathComponent("\(index).jpg"),
+                gps: gps
+            )
+        }
+
+        let client = RecordingInferenceClient()
+        let pipeline = PipelineCoordinator(
+            inferenceClient: client,
+            initialMetadataBatchSize: 1,
+            metadataBatchSize: 1
+        )
+        let config = RatingEngine.Config(
+            sharpnessThreshold: 380,
+            aestheticsThreshold: 4.8
+        )
+        await pipeline.process(
+            folder: dir,
+            ratingConfig: config,
+            exposureEnabled: false,
+            exposureThreshold: 0.10
+        )
+
+        #expect(client.prewarmCalls.count == 3)
+        #expect(client.identifiedPaths.count == 3)
+    }
+
+    @Test func burstCanSpanMetadataBatchBoundary() async throws {
+        let dir = try tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        createJPEG(at: dir.appendingPathComponent("a.jpg"), gps: nil)
+        createJPEG(at: dir.appendingPathComponent("b.jpg"), gps: nil)
+
+        let client = RecordingInferenceClient()
+        client.identifyBirds = [
+            BirdDetection(
+                bbox: CGRect(x: 0.1, y: 0.1, width: 0.5, height: 0.5),
+                confidence: 0.95,
+                mask: Data()
+            )
+        ]
+        let pipeline = PipelineCoordinator(
+            inferenceClient: client,
+            initialMetadataBatchSize: 1,
+            metadataBatchSize: 1
+        )
+        let config = RatingEngine.Config(
+            sharpnessThreshold: 100,
+            aestheticsThreshold: 2
+        )
+        await pipeline.process(
+            folder: dir,
+            ratingConfig: config,
+            exposureEnabled: false,
+            exposureThreshold: 0.10
+        )
+
+        let photos = try ReportDatabase(folderPath: dir).fetchAllPhotos()
+        #expect(photos.count == 2)
+        #expect(photos[0].burstGroupID != nil)
+        #expect(photos[0].burstGroupID == photos[1].burstGroupID)
+        #expect(photos.filter(\.isBurstBest).count == 1)
     }
 }
 

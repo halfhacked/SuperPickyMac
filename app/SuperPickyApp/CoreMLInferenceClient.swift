@@ -95,16 +95,9 @@ final class CoreMLInferenceClient: InferenceClient, @unchecked Sendable {
     /// all cache-miss on the Avonet SQLite FULLMUTEX at once.
     func prewarmGPSCells(_ cells: [(lat: Double, lon: Double)]) async {
         guard let filter = speciesFilter, !cells.isEmpty else { return }
-        await withTaskGroup(of: Void.self) { group in
-            for cell in cells {
-                let lat = cell.lat
-                let lon = cell.lon
-                group.addTask {
-                    _ = filter.allowedSpeciesChain(lat: lat, lon: lon)
-                }
-            }
-            for await _ in group {}
-        }
+        await Task.detached(priority: .utility) {
+            filter.prewarmAllowedSpeciesChains(cells)
+        }.value
     }
 
     func identify(
