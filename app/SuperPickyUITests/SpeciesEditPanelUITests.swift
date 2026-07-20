@@ -230,23 +230,8 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
     /// true and the click being dispatched — the click then fails with
     /// "Not hittable". Always using a coordinate click at the reported
     /// centre bypasses the a11y hit test entirely.
-    ///
-    /// `openPanelOnEagle()` collapses metadata just before these taps, which
-    /// re-flows the candidates list; a coordinate click issued mid-reflow
-    /// lands on the button's old position and is silently dropped. Wait for
-    /// the frame to settle (two equal samples) before clicking so the hit
-    /// lands where the button actually is. A settle can't corrupt shared
-    /// state the way a blind retry-click can (a retry double-toggles when the
-    /// first click was merely delayed, not dropped).
     private func tapButton(_ element: XCUIElement) {
         guard element.exists else { return }
-        var last = element.frame
-        for _ in 0..<10 {
-            Thread.sleep(forTimeInterval: 0.1)
-            let now = element.frame
-            if now == last { break }
-            last = now
-        }
         element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
     }
 
@@ -368,9 +353,24 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
 
         let add = app.buttons[A11y.speciesEditAdd("goleag")]
         XCTAssertTrue(add.waitForExistence(timeout: 3))
-        tapButton(add)
-
         let remove = app.buttons[A11y.speciesEditRemove("goleag")]
+
+        // test44 is the first Add-click of the shared species suite, so it
+        // absorbs the cold first-interaction drop the hosted runner applies
+        // before the app is frontmost: on 184e4b5 this line failed while
+        // every later test — warmed by test44 having run — passed. Retry the
+        // Add only when it was genuinely *dropped* (goleag still a Candidate,
+        // so Add is still present) after a settle long enough that a merely
+        // delayed click would already have landed. We never click Add while
+        // Remove is present, so this can't double-toggle goleag and corrupt
+        // the eagle state the later tests share (the failure mode a blind
+        // coordinate retry caused earlier in this PR).
+        tapButton(add)
+        if !remove.waitForExistence(timeout: 3) {
+            Thread.sleep(forTimeInterval: 0.8)
+            if add.exists { tapButton(add) }
+        }
+
         XCTAssertTrue(remove.waitForExistence(timeout: 2),
                       "After Add_goleag click, goleag should move to Assigned (Remove_goleag present)")
         XCTAssertFalse(app.buttons[A11y.speciesEditAdd("goleag")].exists)

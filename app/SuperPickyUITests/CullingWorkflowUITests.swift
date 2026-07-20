@@ -76,7 +76,7 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
         // warm-up and failed, while test23/test24 — which do this exact
         // preview-click + arrow-key warm-up — drove the same inline sort
         // control successfully every run. The keyboard events force
-        // activation so the following openMenu press lands.
+        // activation so the following sort-toggle click lands.
         let preview = app.images[A11y.photoPreview]
         XCTAssertTrue(preview.waitForExistence(timeout: 10))
         preview.click()
@@ -85,9 +85,32 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
 
         let sortMenu = app.buttons["SortMenu"]
         XCTAssertTrue(sortMenu.waitForExistence(timeout: 5), "SortMenu element should exist")
+
+        // Open the inline sort options with a plain click, the same way the
+        // other .plain toolbar toggles are driven (test06 TopBurstFilter,
+        // test25 PickedFilter). The popup-oriented openMenu is wrong for a
+        // toggle: its press -> click -> space retry ladder double-toggles
+        // showSortOptions shut when a cold hosted click is *delayed* rather
+        // than dropped (the delayed press and the retry click both land),
+        // which is why test05 failed cold while the warm test24 passed.
+        // Re-click only when the panel is confirmed still closed after a
+        // settle a delayed click would have landed within — never re-click an
+        // already-open panel, so this cannot toggle it back shut.
         let filenameItem = app.buttons["Filename"]
-        XCTAssertTrue(app.openMenu(from: sortMenu, exposing: filenameItem),
-                      "Sort menu should open and offer 'Filename'")
+        var opened = filenameItem.waitForExistence(timeout: 0.5)
+        if !opened {
+            sortMenu.click()
+            opened = filenameItem.waitForExistence(timeout: 3)
+            if !opened {
+                Thread.sleep(forTimeInterval: 0.8)
+                opened = filenameItem.exists
+                if !opened, sortMenu.exists {
+                    sortMenu.click()
+                    opened = filenameItem.waitForExistence(timeout: 3)
+                }
+            }
+        }
+        XCTAssertTrue(opened, "Sort menu should open and offer 'Filename'")
 
         for label in ["Filename", "Date", "Rating", "Sharpness", "Aesthetics"] {
             XCTAssertTrue(app.buttons[label].exists,
