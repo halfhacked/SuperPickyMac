@@ -203,3 +203,4 @@
 "Editing %lld photos" = "正在编辑 %lld 张照片";
 "%lld selected" = "已选 %lld 张";
 "(%lld selected)" = "(已选 %lld 张)";
+"Some species edits couldn't be saved" = "部分鸟种修改未能保存";

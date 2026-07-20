@@ -33,6 +33,27 @@ import Foundation
         )
     }
 
+    private func signature(_ entries: [SpeciesEntry]) -> [String] {
+        entries.map { entry in
+            let bursts = entry.burstGroups
+                .map { "\($0.id.uuidString):\($0.count):\($0.pickCount):\($0.bestFilename ?? "")" }
+                .sorted()
+                .joined(separator: ",")
+            return [
+                entry.id,
+                entry.scientificName ?? "",
+                entry.name,
+                entry.cnName ?? "",
+                String(entry.count),
+                String(entry.picks),
+                String(entry.singlePhotos),
+                String(entry.singlePicks),
+                String(entry.isUnidentified),
+                bursts,
+            ].joined(separator: "|")
+        }.sorted()
+    }
+
     // MARK: - add
 
     @Test func addToEmptyCreatesBucket() {
@@ -179,5 +200,114 @@ import Foundation
         #expect(entries[0].isUnidentified == true)
         entries = SpeciesHierarchyBuilder.applyIncremental(entries: entries, removing: b)
         #expect(entries.isEmpty)
+    }
+
+    // MARK: - exact batch species changes
+
+    @Test func batchSpeciesChangeMatchesFullBuildForMultiSpeciesSingle() {
+        let eagle = match("eagle")
+        let hawk = match("hawk")
+        let owl = match("owl")
+        let original = photo(species: [eagle, hawk])
+        let untouched = photo(species: [eagle])
+        var updated = original
+        updated.assignedSpecies = [hawk, owl]
+
+        let incremental = SpeciesHierarchyBuilder.applySpeciesChanges(
+            entries: SpeciesHierarchyBuilder.build(from: [original, untouched]),
+            changes: [SpeciesHierarchyChange(previous: original, updated: updated)]
+        )
+        let rebuilt = SpeciesHierarchyBuilder.build(from: [updated, untouched])
+
+        #expect(signature(incremental) == signature(rebuilt))
+    }
+
+    @Test func batchSpeciesChangeMatchesFullBuildForCompleteBurst() {
+        let groupID = UUID()
+        let eagle = match("eagle")
+        let hawk = match("hawk")
+        var first = photo(species: [eagle], burstGroupID: groupID)
+        var second = photo(species: [eagle], burstGroupID: groupID)
+        let third = photo(species: [hawk], burstGroupID: groupID)
+        first.filename = "first.jpg"
+        first.isBurstBest = true
+        first.isPick = true
+        second.filename = "second.jpg"
+
+        var updatedFirst = first
+        var updatedSecond = second
+        updatedFirst.assignedSpecies = [eagle, hawk]
+        updatedSecond.assignedSpecies = [eagle, hawk]
+
+        let initialPhotos = [first, second, third]
+        let updatedPhotos = [updatedFirst, updatedSecond, third]
+        let incremental = SpeciesHierarchyBuilder.applySpeciesChanges(
+            entries: SpeciesHierarchyBuilder.build(from: initialPhotos),
+            changes: zip(initialPhotos, updatedPhotos).map {
+                SpeciesHierarchyChange(previous: $0.0, updated: $0.1)
+            }
+        )
+        let rebuilt = SpeciesHierarchyBuilder.build(from: updatedPhotos)
+
+        #expect(signature(incremental) == signature(rebuilt))
+    }
+
+    @Test func batchSpeciesRenameUpdatesBucketMetadata() {
+        let original = photo(species: [
+            match("eagle", common: "Wrong Eagle", scientific: "Aquila")
+        ])
+        var updated = original
+        updated.assignedSpecies = [
+            match("eagle", common: "Golden Eagle", scientific: "Aquila")
+        ]
+
+        let incremental = SpeciesHierarchyBuilder.applySpeciesChanges(
+            entries: SpeciesHierarchyBuilder.build(from: [original]),
+            changes: [SpeciesHierarchyChange(previous: original, updated: updated)]
+        )
+        let rebuilt = SpeciesHierarchyBuilder.build(from: [updated])
+
+        #expect(signature(incremental) == signature(rebuilt))
+        #expect(incremental.first?.name == "Golden Eagle")
+    }
+
+    @Test func batchPrimaryReorderDoesNotChangeHierarchy() {
+        let eagle = match("eagle")
+        let hawk = match("hawk")
+        let original = photo(species: [eagle, hawk])
+        var updated = original
+        updated.assignedSpecies = [hawk, eagle]
+
+        let initial = SpeciesHierarchyBuilder.build(from: [original])
+        let incremental = SpeciesHierarchyBuilder.applySpeciesChanges(
+            entries: initial,
+            changes: [SpeciesHierarchyChange(previous: original, updated: updated)]
+        )
+
+        #expect(signature(incremental) == signature(initial))
+    }
+
+    @Test func batchBurstRemovalMatchesFullBuildAndCreatesUnidentifiedBucket() {
+        let groupID = UUID()
+        let eagle = match("eagle")
+        let first = photo(species: [eagle], burstGroupID: groupID)
+        let second = photo(species: [eagle], burstGroupID: groupID)
+        var updatedFirst = first
+        var updatedSecond = second
+        updatedFirst.assignedSpecies = []
+        updatedSecond.assignedSpecies = []
+
+        let original = [first, second]
+        let updated = [updatedFirst, updatedSecond]
+        let incremental = SpeciesHierarchyBuilder.applySpeciesChanges(
+            entries: SpeciesHierarchyBuilder.build(from: original),
+            changes: zip(original, updated).map {
+                SpeciesHierarchyChange(previous: $0.0, updated: $0.1)
+            }
+        )
+        let rebuilt = SpeciesHierarchyBuilder.build(from: updated)
+
+        #expect(signature(incremental) == signature(rebuilt))
+        #expect(incremental.first(where: \.isUnidentified)?.burstGroups.first?.count == 2)
     }
 }

@@ -1,5 +1,10 @@
 import Foundation
 
+struct SpeciesHierarchyChange {
+    let previous: Photo
+    let updated: Photo
+}
+
 /// Pure computation: groups photos into species hierarchy entries.
 ///
 /// A photo may carry multiple species in its `assignedSpecies` list; the
@@ -18,6 +23,17 @@ struct SpeciesHierarchyBuilder {
     /// value. Rendered as `isUnidentified: true` with `speciesID == nil` in
     /// the emitted `SpeciesEntry`.
     private static let unidentifiedKey = "__unidentified__"
+
+    private struct BucketDelta {
+        var count = 0
+        var picks = 0
+        var singlePhotos = 0
+        var singlePicks = 0
+        var metadata: SpeciesMatch?
+        var replacesMetadata = false
+        var upsertedBursts: [UUID: BurstGroupEntry] = [:]
+        var removedBursts: Set<UUID> = []
+    }
 
     static func build(
         from photos: [Photo],
@@ -115,6 +131,173 @@ struct SpeciesHierarchyBuilder {
             )
         }
         return sorted(entries: entries, by: sortOrder, displayName: displayName, locale: locale)
+    }
+
+    /// Apply a batch of species-only photo changes without rebuilding from the
+    /// full library. For every touched burst, `changes` must include all of its
+    /// members (unchanged members included) so burst membership remains exact.
+    static func applySpeciesChanges(
+        entries: [SpeciesEntry],
+        changes: [SpeciesHierarchyChange],
+        sortOrder: SpeciesSortOrder = .name,
+        displayName: (SpeciesEntry) -> String = { $0.name },
+        locale: Locale = .current
+    ) -> [SpeciesEntry] {
+        guard !changes.isEmpty else { return entries }
+
+        var deltas: [String: BucketDelta] = [:]
+        var changesByBurst: [UUID: [SpeciesHierarchyChange]] = [:]
+
+        for change in changes {
+            let beforeMatches = matchesByKey(for: change.previous)
+            let afterMatches = matchesByKey(for: change.updated)
+            let beforeKeys = bucketKeys(for: beforeMatches)
+            let afterKeys = bucketKeys(for: afterMatches)
+
+            for key in beforeKeys.union(afterKeys) {
+                let wasMember = beforeKeys.contains(key)
+                let isMember = afterKeys.contains(key)
+                var delta = deltas[key, default: BucketDelta()]
+                delta.count += (isMember ? 1 : 0) - (wasMember ? 1 : 0)
+                delta.picks += (isMember && change.updated.isPick ? 1 : 0)
+                    - (wasMember && change.previous.isPick ? 1 : 0)
+
+                if change.previous.burstGroupID == nil && change.updated.burstGroupID == nil {
+                    delta.singlePhotos += (isMember ? 1 : 0) - (wasMember ? 1 : 0)
+                    delta.singlePicks += (isMember && change.updated.isPick ? 1 : 0)
+                        - (wasMember && change.previous.isPick ? 1 : 0)
+                }
+
+                if let after = afterMatches[key] {
+                    if let before = beforeMatches[key],
+                       hierarchyMetadataDiffers(before, after) {
+                        delta.metadata = after
+                        delta.replacesMetadata = true
+                    } else if delta.metadata == nil {
+                        delta.metadata = after
+                    }
+                }
+                deltas[key] = delta
+            }
+
+            if let groupID = change.updated.burstGroupID ?? change.previous.burstGroupID {
+                changesByBurst[groupID, default: []].append(change)
+            }
+        }
+
+        for (groupID, groupChanges) in changesByBurst {
+            let beforeKeys = groupChanges.reduce(into: Set<String>()) { result, change in
+                result.formUnion(bucketKeys(for: matchesByKey(for: change.previous)))
+            }
+            let afterKeys = groupChanges.reduce(into: Set<String>()) { result, change in
+                result.formUnion(bucketKeys(for: matchesByKey(for: change.updated)))
+            }
+            let updatedPhotos = groupChanges.map(\.updated)
+            let best = updatedPhotos.first { $0.isBurstBest }
+            let burst = BurstGroupEntry(
+                id: groupID,
+                count: updatedPhotos.count,
+                pickCount: updatedPhotos.lazy.filter(\.isPick).count,
+                bestFilename: best?.filename ?? updatedPhotos.first?.filename
+            )
+
+            for key in beforeKeys.union(afterKeys) {
+                var delta = deltas[key, default: BucketDelta()]
+                if afterKeys.contains(key) {
+                    delta.upsertedBursts[groupID] = burst
+                    delta.removedBursts.remove(groupID)
+                } else {
+                    delta.upsertedBursts.removeValue(forKey: groupID)
+                    delta.removedBursts.insert(groupID)
+                }
+                deltas[key] = delta
+            }
+        }
+
+        var entriesByKey = Dictionary(
+            uniqueKeysWithValues: entries.map { (($0.speciesID ?? unidentifiedKey), $0) }
+        )
+        for (key, delta) in deltas {
+            let existing = entriesByKey[key]
+            let count = max(0, (existing?.count ?? 0) + delta.count)
+            guard count > 0 else {
+                entriesByKey.removeValue(forKey: key)
+                continue
+            }
+
+            var burstsByID = Dictionary(
+                uniqueKeysWithValues: (existing?.burstGroups ?? []).map { ($0.id, $0) }
+            )
+            for groupID in delta.removedBursts {
+                burstsByID.removeValue(forKey: groupID)
+            }
+            for (groupID, burst) in delta.upsertedBursts {
+                burstsByID[groupID] = burst
+            }
+
+            let isUnidentified = key == unidentifiedKey
+            let scientificName = delta.replacesMetadata
+                ? delta.metadata?.scientificName
+                : existing?.scientificName ?? delta.metadata?.scientificName
+            let name: String
+            if isUnidentified {
+                name = String(localized: "Unidentified")
+            } else if delta.replacesMetadata {
+                name = delta.metadata?.commonName
+                    ?? delta.metadata?.scientificName
+                    ?? existing?.name
+                    ?? key
+            } else {
+                name = existing?.name
+                    ?? delta.metadata?.commonName
+                    ?? delta.metadata?.scientificName
+                    ?? key
+            }
+            let cnName = delta.replacesMetadata
+                ? delta.metadata?.cnName
+                : existing?.cnName ?? delta.metadata?.cnName
+
+            entriesByKey[key] = SpeciesEntry(
+                speciesID: isUnidentified ? nil : key,
+                scientificName: scientificName,
+                name: name,
+                cnName: cnName,
+                count: count,
+                picks: max(0, (existing?.picks ?? 0) + delta.picks),
+                burstGroups: burstsByID.values.sorted { $0.count > $1.count },
+                singlePhotos: max(0, (existing?.singlePhotos ?? 0) + delta.singlePhotos),
+                singlePicks: max(0, (existing?.singlePicks ?? 0) + delta.singlePicks),
+                isUnidentified: isUnidentified
+            )
+        }
+
+        return sorted(
+            entries: Array(entriesByKey.values),
+            by: sortOrder,
+            displayName: displayName,
+            locale: locale
+        )
+    }
+
+    private static func matchesByKey(for photo: Photo) -> [String: SpeciesMatch] {
+        var result: [String: SpeciesMatch] = [:]
+        for match in photo.assignedSpecies where result[match.speciesID] == nil {
+            result[match.speciesID] = match
+        }
+        return result
+    }
+
+    private static func bucketKeys(for matches: [String: SpeciesMatch]) -> Set<String> {
+        matches.isEmpty ? [unidentifiedKey] : Set(matches.keys)
+    }
+
+    private static func hierarchyMetadataDiffers(
+        _ before: SpeciesMatch,
+        _ after: SpeciesMatch
+    ) -> Bool {
+        before.scientificName != after.scientificName
+            || before.commonName != after.commonName
+            || before.cnName != after.cnName
     }
 
     /// Apply a single-photo delta — `remove` an old primary-bucket
