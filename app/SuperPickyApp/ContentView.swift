@@ -30,6 +30,7 @@ struct ContentView: View {
     @State private var pickedOnly: Bool = false
     @State private var sortOrder: SortOrder = .captureDate
     @State private var sortAscending: Bool = true
+    @State private var showSortOptions = false
     @State private var showExifPanel = true
     @State private var showFullscreen = false
     @State private var zoomState = ZoomState()
@@ -157,34 +158,40 @@ struct ContentView: View {
 
                     Divider().frame(height: 12)
 
-                    Menu {
-                        ForEach(SortOrder.allCases, id: \.self) { order in
-                            Button {
-                                if sortOrder == order {
-                                    sortAscending.toggle()
-                                } else {
-                                    sortOrder = order
-                                    sortAscending = (order == .filename || order == .captureDate)
-                                }
-                                selectFirstFiltered()
-                            } label: {
-                                HStack {
-                                    Text(order.rawValue)
-                                    if sortOrder == order {
-                                        Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
-                                    }
-                                }
-                            }
-                        }
+                    Button {
+                        showSortOptions.toggle()
                     } label: {
                         Image(systemName: "arrow.up.arrow.down")
                             .font(.system(size: 10))
                             .foregroundStyle(sortOrder == .filename && sortAscending ? .secondary : .primary)
                     }
-                    .menuStyle(.borderlessButton)
+                    .buttonStyle(.plain)
                     .fixedSize()
                     .help(config.localized("Sort photos"))
                     .accessibilityIdentifier("SortMenu")
+                    .popover(isPresented: $showSortOptions, arrowEdge: .bottom) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(SortOrder.allCases, id: \.self) { order in
+                                Button {
+                                    applySort(order)
+                                    showSortOptions = false
+                                } label: {
+                                    HStack {
+                                        Text(order.rawValue)
+                                        Spacer(minLength: 12)
+                                        if sortOrder == order {
+                                            Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
+                                        }
+                                    }
+                                    .frame(minWidth: 120, alignment: .leading)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityIdentifier(order.rawValue)
+                            }
+                        }
+                        .padding(10)
+                    }
 
                     Spacer()
 
@@ -333,6 +340,16 @@ struct ContentView: View {
     /// raw `appState.photos` backing order.
     private func selectFirstFiltered() {
         selectedPhotoID = filteredPhotos.first?.id
+    }
+
+    private func applySort(_ order: SortOrder) {
+        if sortOrder == order {
+            sortAscending.toggle()
+        } else {
+            sortOrder = order
+            sortAscending = (order == .filename || order == .captureDate)
+        }
+        selectFirstFiltered()
     }
 
     private func handleKey(_ key: KeyboardMonitor.KeyEvent) -> Bool {

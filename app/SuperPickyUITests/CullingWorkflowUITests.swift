@@ -70,18 +70,15 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
 
     func test05_SortMenuOffersFiveOrders() {
         let app = Self.app!
-        // SwiftUI Menu renders as a popUpButton on macOS, not a plain
-        // Button. The identifier is applied to the Menu's label.
-        let sortMenu = app.descendants(matching: .any).matching(identifier: "SortMenu").firstMatch
+        let sortMenu = app.buttons["SortMenu"]
         XCTAssertTrue(sortMenu.waitForExistence(timeout: 5), "SortMenu element should exist")
-        let filenameItem = app.descendants(matching: .any)["Filename"].firstMatch
+        let filenameItem = app.buttons["Filename"]
         XCTAssertTrue(app.openMenu(from: sortMenu, exposing: filenameItem),
                       "Sort menu should open and offer 'Filename'")
 
         for label in ["Filename", "Date", "Rating", "Sharpness", "Aesthetics"] {
-            XCTAssertTrue(app.menuItems[label].exists ||
-                          app.descendants(matching: .any)[label].exists,
-                          "Sort menu should offer '\(label)'")
+            XCTAssertTrue(app.buttons[label].exists,
+                         "Sort menu should offer '\(label)'")
         }
         // Dismiss without changing selection so later tests see default order.
         app.typeKey(.escape, modifierFlags: [])
@@ -478,12 +475,11 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
         // Open the sort menu and click "Date" — toggles ascending if
         // already Date, else switches to Date. Either way the displayed
         // list's leftmost shifts and selection must follow.
-        let sortMenu = app.descendants(matching: .any)
-            .matching(identifier: "SortMenu").firstMatch
+        let sortMenu = app.buttons["SortMenu"]
         XCTAssertTrue(sortMenu.waitForExistence(timeout: 5),
                       "SortMenu should be present")
 
-        let dateItem = app.descendants(matching: .any)["Date"].firstMatch
+        let dateItem = app.buttons["Date"]
         XCTAssertTrue(app.openMenu(from: sortMenu, exposing: dateItem),
                       "Sort menu should open and offer 'Date'")
         dateItem.click()
