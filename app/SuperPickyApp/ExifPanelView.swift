@@ -12,6 +12,8 @@ struct ExifPanelView: View {
     var searchSpecies: (_ query: String) -> [SpeciesMatch] = { _ in [] }
 
     @State private var exifData: EXIFData?
+    @State private var isMetadataExpanded = true
+    @State private var isCandidatesExpanded = true
     @State private var searchQuery: String = ""
     @State private var searchResults: [SpeciesMatch] = []
     @FocusState private var searchFieldFocused: Bool
@@ -52,19 +54,25 @@ struct ExifPanelView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                exifSections
-                speciesSections
+        VStack(spacing: 0) {
+            metadataToggle
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    if isMetadataExpanded {
+                        exifSections
+                    }
+                    speciesSections
+                }
+                .padding(.vertical, 8)
             }
-            .padding(.vertical, 8)
+            .accessibilityIdentifier("ExifPanel")
         }
         .frame(width: 280)
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .shadow(color: .black.opacity(0.2), radius: 8, x: -2, y: 2)
         .padding(8)
-        .accessibilityIdentifier("ExifPanel")
         // Re-fire on assignedSpeciesJSON changes too: keywords come from the
         // XMP sidecar, which the species edit panel rewrites on every edit.
         // Swap atomically — clearing exifData between photos flashes the
@@ -83,6 +91,30 @@ struct ExifPanelView: View {
     }
 
     // MARK: - EXIF sections
+
+    private var metadataToggle: some View {
+        Button {
+            isMetadataExpanded.toggle()
+        } label: {
+            HStack(spacing: 6) {
+                Text(config.localized("Metadata"))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+                    .tracking(0.8)
+                    .textCase(.uppercase)
+                Spacer()
+                Image(systemName: isMetadataExpanded ? "chevron.down" : "chevron.right")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .contentShape(Rectangle())
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("ExifMetadataToggle")
+        .accessibilityValue(isMetadataExpanded ? "expanded" : "collapsed")
+    }
 
     @ViewBuilder
     private var exifSections: some View {
@@ -236,14 +268,42 @@ struct ExifPanelView: View {
     private var candidatesSection: some View {
         let available = availableCandidates
         if !available.isEmpty {
-            sectionHeader(config.localized("OSEA Candidates"))
-            VStack(alignment: .leading, spacing: 2) {
-                ForEach(available, id: \.speciesID) { match in
-                    candidateRow(match: match)
+            VStack(spacing: 0) {
+                Divider()
+                    .padding(.horizontal, 12)
+                Button {
+                    isCandidatesExpanded.toggle()
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(config.localized("OSEA Candidates"))
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.tertiary)
+                            .tracking(0.8)
+                            .textCase(.uppercase)
+                        Spacer()
+                        Image(systemName: isCandidatesExpanded ? "chevron.down" : "chevron.right")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .contentShape(Rectangle())
+                    .padding(.horizontal, 12)
+                    .padding(.top, 8)
+                    .padding(.bottom, 4)
                 }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("SpeciesEditPanel_CandidatesToggle")
+                .accessibilityValue(isCandidatesExpanded ? "expanded" : "collapsed")
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 4)
+
+            if isCandidatesExpanded {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(available, id: \.speciesID) { match in
+                        candidateRow(match: match)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
+            }
         }
     }
 
