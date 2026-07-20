@@ -70,28 +70,27 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
 
     func test05_SortMenuOffersFiveOrders() {
         let app = Self.app!
-        // Warm the app frontmost before opening the sort menu. On the
-        // hosted runner the first *cold* coordinate interaction of a test is
-        // dropped before AppKit brings the app frontmost (the baseline
-        // Menu-based test05 failed this way at 671079f), so issue a keyboard
-        // event first — typeKey forces activation. Mirrors test24, the sort
-        // test that opens the menu reliably on CI.
+        // Warm the app frontmost before opening the sort control. On the
+        // hosted runner the first interactions of a cold test are dropped
+        // before AppKit brings the app frontmost: at 184e4b5 test05 had no
+        // warm-up and failed, while test23/test24 — which do this exact
+        // preview-click + arrow-key warm-up — drove the same inline sort
+        // control successfully every run. The keyboard events force
+        // activation so the following openMenu press lands.
         let preview = app.images[A11y.photoPreview]
         XCTAssertTrue(preview.waitForExistence(timeout: 10))
         preview.click()
         for _ in 0..<3 { app.typeKey(.rightArrow, modifierFlags: []) }
         Thread.sleep(forTimeInterval: 0.4)
 
-        // SwiftUI Menu renders as a popUpButton on macOS, not a plain
-        // Button, and its choices are menuItems.
-        let sortMenu = app.descendants(matching: .any).matching(identifier: "SortMenu").firstMatch
+        let sortMenu = app.buttons["SortMenu"]
         XCTAssertTrue(sortMenu.waitForExistence(timeout: 5), "SortMenu element should exist")
-        let filenameItem = app.menuItems["Filename"]
+        let filenameItem = app.buttons["Filename"]
         XCTAssertTrue(app.openMenu(from: sortMenu, exposing: filenameItem),
                       "Sort menu should open and offer 'Filename'")
 
         for label in ["Filename", "Date", "Rating", "Sharpness", "Aesthetics"] {
-            XCTAssertTrue(app.menuItems[label].exists,
+            XCTAssertTrue(app.buttons[label].exists,
                          "Sort menu should offer '\(label)'")
         }
         // Dismiss without changing selection so later tests see default order.
@@ -489,11 +488,11 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
         // Open the sort menu and click "Date" — toggles ascending if
         // already Date, else switches to Date. Either way the displayed
         // list's leftmost shifts and selection must follow.
-        let sortMenu = app.descendants(matching: .any).matching(identifier: "SortMenu").firstMatch
+        let sortMenu = app.buttons["SortMenu"]
         XCTAssertTrue(sortMenu.waitForExistence(timeout: 5),
                       "SortMenu should be present")
 
-        let dateItem = app.menuItems["Date"]
+        let dateItem = app.buttons["Date"]
         XCTAssertTrue(app.openMenu(from: sortMenu, exposing: dateItem),
                       "Sort menu should open and offer 'Date'")
         dateItem.click()
