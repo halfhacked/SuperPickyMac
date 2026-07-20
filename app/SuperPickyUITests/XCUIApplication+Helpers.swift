@@ -8,13 +8,19 @@ extension XCUIApplication {
     /// that clicks PhotoPreview or assumes a rendered preview should
     /// `await` this before running.
     func waitUntilProcessed(timeout: TimeInterval = 15) {
-        _ = images.firstMatch.waitForExistence(timeout: timeout)
+        XCTAssertTrue(
+            images.firstMatch.waitForExistence(timeout: timeout),
+            "waitUntilProcessed: no image entered the a11y tree within \(timeout)s — the shared-app setUp never rendered a thumbnail."
+        )
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             if progressIndicators.count == 0 { break }
             Thread.sleep(forTimeInterval: 0.5)
         }
-        _ = images[A11y.photoPreview].waitForExistence(timeout: timeout)
+        XCTAssertTrue(
+            images[A11y.photoPreview].waitForExistence(timeout: timeout),
+            "waitUntilProcessed: PhotoPreview ('\(A11y.photoPreview)') did not enter the a11y tree within \(timeout)s — the auto-selected photo never finished its full-res decode."
+        )
         Thread.sleep(forTimeInterval: 1)
     }
 }
