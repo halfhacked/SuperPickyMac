@@ -2,7 +2,9 @@ import Testing
 import Foundation
 @testable import SuperPicky
 
-@Suite(.serialized) struct AppStateBatchMutationTests {
+@Suite(.serialized)
+@MainActor
+struct AppStateBatchMutationTests {
 
     private func makeTempFolder() throws -> URL {
         let folder = FileManager.default.temporaryDirectory
@@ -51,16 +53,16 @@ import Foundation
 
     // MARK: - setPick(ids:)
 
-    @Test func setPickPicksAllWhenAnyUnpicked() throws {
+    @Test func setPickPicksAllWhenAnyUnpicked() async throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let ids = try seedPhotos(3, into: folder)
         let app = AppState()
         app.loadPhotos(for: folder)
 
-        app.setPick(ids: [ids[0]])
+        await app.setPick(ids: [ids[0]]).value
         let mixed = Set(ids[0...2])
-        app.setPick(ids: mixed)
+        await app.setPick(ids: mixed).value
 
         let db = try ReportDatabase(folderPath: folder)
         for id in ids {
@@ -68,7 +70,7 @@ import Foundation
         }
     }
 
-    @Test func setPickUnpicksAllWhenAllPicked() throws {
+    @Test func setPickUnpicksAllWhenAllPicked() async throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let ids = try seedPhotos(3, into: folder)
@@ -76,8 +78,8 @@ import Foundation
         app.loadPhotos(for: folder)
 
         let s = Set(ids)
-        app.setPick(ids: s)
-        app.setPick(ids: s)
+        await app.setPick(ids: s).value
+        await app.setPick(ids: s).value
 
         let db = try ReportDatabase(folderPath: folder)
         for id in ids {
@@ -85,31 +87,31 @@ import Foundation
         }
     }
 
-    @Test func setPickSinglePhotoMatchesLegacyToggleSemantics() throws {
+    @Test func setPickSinglePhotoMatchesLegacyToggleSemantics() async throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let ids = try seedPhotos(1, into: folder)
         let app = AppState()
         app.loadPhotos(for: folder)
 
-        app.setPick(ids: [ids[0]])
+        await app.setPick(ids: [ids[0]]).value
         #expect(app.allPhotosForTesting().first?.isPick == true)
-        app.setPick(ids: [ids[0]])
+        await app.setPick(ids: [ids[0]]).value
         #expect(app.allPhotosForTesting().first?.isPick == false)
     }
 
-    @Test func setPickPushesOneUndoEntry() throws {
+    @Test func setPickPushesOneUndoEntry() async throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let ids = try seedPhotos(3, into: folder)
         let app = AppState()
         app.loadPhotos(for: folder)
 
-        app.setPick(ids: Set(ids))
+        await app.setPick(ids: Set(ids)).value
         let stackSizeAfter = app.undoStackSizeForTesting()
         #expect(stackSizeAfter == 1)
 
-        app.undoLastAction()
+        await app.undoLastAction().value
         let db = try ReportDatabase(folderPath: folder)
         for id in ids {
             #expect(try db.fetchPhoto(id: id)?.isPick == false)
@@ -118,14 +120,14 @@ import Foundation
 
     // MARK: - setRating(ids:rating:)
 
-    @Test func setRatingAppliesToEveryID() throws {
+    @Test func setRatingAppliesToEveryID() async throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let ids = try seedPhotos(3, into: folder)
         let app = AppState()
         app.loadPhotos(for: folder)
 
-        app.setRating(ids: Set(ids), rating: 4)
+        await app.setRating(ids: Set(ids), rating: 4).value
 
         let db = try ReportDatabase(folderPath: folder)
         for id in ids {
@@ -135,7 +137,7 @@ import Foundation
 
     // MARK: - reject(ids:)
 
-    @Test func rejectMakesPhotosLeaveFilteredArray() throws {
+    @Test func rejectMakesPhotosLeaveFilteredArray() async throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let ids = try seedPhotos(3, into: folder)
@@ -143,18 +145,18 @@ import Foundation
         app.loadPhotos(for: folder)
         app.sidebarSelection = .rating(3)
 
-        app.setRating(ids: Set(ids), rating: 3)
+        await app.setRating(ids: Set(ids), rating: 3).value
         app.applyFilter()
         #expect(app.photos.count == 3)
 
-        app.reject(ids: [ids[0]])
+        await app.reject(ids: [ids[0]]).value
         #expect(app.photos.count == 2)
         #expect(!app.photos.contains(where: { $0.id == ids[0] }))
     }
 
     // MARK: - correctSpecies(ids:commonName:)
 
-    @Test func correctSpeciesAppliesPrimaryRenameAcrossSelection() throws {
+    @Test func correctSpeciesAppliesPrimaryRenameAcrossSelection() async throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let ids = try seedPhotos(3, into: folder)
@@ -162,9 +164,9 @@ import Foundation
         app.loadPhotos(for: folder)
 
         for id in ids {
-            app.setPrimarySpecies(ids: [id], species: match("eagle"))
+            await app.setPrimarySpecies(ids: [id], species: match("eagle")).value
         }
-        app.correctSpecies(ids: Set(ids), commonName: "Bald Eagle")
+        await app.correctSpecies(ids: Set(ids), commonName: "Bald Eagle").value
 
         let db = try ReportDatabase(folderPath: folder)
         for id in ids {
@@ -175,17 +177,17 @@ import Foundation
 
     // MARK: - setPrimarySpecies(ids:species:)
 
-    @Test func setPrimarySpeciesAddsWhenMissingAndPromotesWhenPresent() throws {
+    @Test func setPrimarySpeciesAddsWhenMissingAndPromotesWhenPresent() async throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let ids = try seedPhotos(3, into: folder)
         let app = AppState()
         app.loadPhotos(for: folder)
 
-        app.addSpecies(ids: [ids[1]], species: match("hawk"))
-        app.addSpecies(ids: [ids[1]], species: match("eagle"))
+        await app.addSpecies(ids: [ids[1]], species: match("hawk")).value
+        await app.addSpecies(ids: [ids[1]], species: match("eagle")).value
 
-        app.setPrimarySpecies(ids: Set(ids), species: match("eagle"))
+        await app.setPrimarySpecies(ids: Set(ids), species: match("eagle")).value
 
         let db = try ReportDatabase(folderPath: folder)
         let p0 = try db.fetchPhoto(id: ids[0])!
@@ -198,15 +200,15 @@ import Foundation
 
     // MARK: - addSpecies(ids:species:)
 
-    @Test func addSpeciesIsIdempotentForExistingSpecies() throws {
+    @Test func addSpeciesIsIdempotentForExistingSpecies() async throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let ids = try seedPhotos(2, into: folder)
         let app = AppState()
         app.loadPhotos(for: folder)
 
-        app.addSpecies(ids: Set(ids), species: match("eagle"))
-        app.addSpecies(ids: Set(ids), species: match("eagle"))
+        await app.addSpecies(ids: Set(ids), species: match("eagle")).value
+        await app.addSpecies(ids: Set(ids), species: match("eagle")).value
 
         let db = try ReportDatabase(folderPath: folder)
         for id in ids {
@@ -218,15 +220,15 @@ import Foundation
 
     // MARK: - removeSpecies(ids:species:)
 
-    @Test func removeSpeciesNoOpsWhenAbsent() throws {
+    @Test func removeSpeciesNoOpsWhenAbsent() async throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let ids = try seedPhotos(2, into: folder)
         let app = AppState()
         app.loadPhotos(for: folder)
 
-        app.addSpecies(ids: [ids[0]], species: match("eagle"))
-        app.removeSpecies(ids: Set(ids), species: match("hawk"))
+        await app.addSpecies(ids: [ids[0]], species: match("eagle")).value
+        await app.removeSpecies(ids: Set(ids), species: match("hawk")).value
 
         let db = try ReportDatabase(folderPath: folder)
         let p0 = try db.fetchPhoto(id: ids[0])!
@@ -235,15 +237,15 @@ import Foundation
         #expect(p1.assignedSpecies.isEmpty)
     }
 
-    @Test func removeSpeciesDropsFromEveryPhotoThatHasIt() throws {
+    @Test func removeSpeciesDropsFromEveryPhotoThatHasIt() async throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let ids = try seedPhotos(3, into: folder)
         let app = AppState()
         app.loadPhotos(for: folder)
-        app.addSpecies(ids: Set(ids), species: match("eagle"))
+        await app.addSpecies(ids: Set(ids), species: match("eagle")).value
 
-        app.removeSpecies(ids: Set(ids), species: match("eagle"))
+        await app.removeSpecies(ids: Set(ids), species: match("eagle")).value
 
         let db = try ReportDatabase(folderPath: folder)
         for id in ids {
@@ -253,7 +255,7 @@ import Foundation
 
     // MARK: - Burst fan-out
 
-    @Test func setPrimarySpeciesFansOutToBurstMembers() throws {
+    @Test func setPrimarySpeciesFansOutToBurstMembers() async throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let db = try ReportDatabase(folderPath: folder)
@@ -272,12 +274,70 @@ import Foundation
         let app = AppState()
         app.loadPhotos(for: folder)
 
-        app.setPrimarySpecies(ids: [burstIDs[0]], species: match("eagle"))
+        await app.setPrimarySpecies(ids: [burstIDs[0]], species: match("eagle")).value
 
         for id in burstIDs {
             let p = try db.fetchPhoto(id: id)!
             #expect(p.assignedSpecies.first?.speciesID == "eagle")
         }
+    }
+
+    @Test func speciesEditReturnsBeforePersistenceCompletes() async throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let db = try ReportDatabase(folderPath: folder)
+        let burstID = UUID()
+        var firstID: UUID?
+
+        for i in 0..<200 {
+            var photo = Photo(
+                filename: "probe_\(i).CR3",
+                filePath: folder.appendingPathComponent("probe_\(i).CR3").path,
+                folderPath: folder.path
+            )
+            photo.burstGroupID = burstID
+            try db.save(&photo)
+            firstID = firstID ?? photo.id
+        }
+
+        let app = AppState()
+        app.loadPhotos(for: folder)
+        let start = ProcessInfo.processInfo.systemUptime
+        let mutation = app.setPrimarySpecies(
+            ids: [try #require(firstID)],
+            species: match("eagle")
+        )
+        let elapsedMS = (ProcessInfo.processInfo.systemUptime - start) * 1_000
+        #expect(elapsedMS < 100, "Species edit blocked the caller for \(elapsedMS) ms")
+
+        await mutation.value
+        let photos = app.allPhotosForTesting()
+        for i in 0..<200 {
+            let photo = try #require(try db.fetchPhoto(
+                id: photos[i].id
+            ))
+            #expect(photo.assignedSpecies.first?.speciesID == "eagle")
+        }
+        let sidecar = XMPWriter.sidecarURL(for: photos[0])
+        let xmp = try String(contentsOf: sidecar, encoding: .utf8)
+        #expect(xmp.contains("Eagle"))
+    }
+
+    @Test func queuedSpeciesEditsCommitInCallOrder() async throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let ids = try seedPhotos(1, into: folder)
+        let app = AppState()
+        app.loadPhotos(for: folder)
+
+        let addEagle = app.addSpecies(ids: Set(ids), species: match("eagle"))
+        let promoteHawk = app.setPrimarySpecies(ids: Set(ids), species: match("hawk"))
+        await promoteHawk.value
+        await addEagle.value
+
+        let db = try ReportDatabase(folderPath: folder)
+        let photo = try #require(try db.fetchPhoto(id: ids[0]))
+        #expect(photo.assignedSpecies.map(\.speciesID) == ["hawk", "eagle"])
     }
 
     // MARK: - applyFilter() auto-selects first when nothing remains active
@@ -349,14 +409,14 @@ import Foundation
                 "Same-folder re-click with deferSelection must bump filterToken so the view re-selects display-first")
     }
 
-    @Test func sameFolderReclickPreservesUndoStack() throws {
+    @Test func sameFolderReclickPreservesUndoStack() async throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let ids = try seedPhotos(3, into: folder)
 
         let app = AppState()
         app.loadPhotos(for: folder)
-        app.setRating(ids: [ids[0]], rating: 5)
+        await app.setRating(ids: [ids[0]], rating: 5).value
         #expect(app.undoStackSizeForTesting() == 1,
                 "Setup: rating mutation should push one undo entry")
 
@@ -388,16 +448,16 @@ import Foundation
 
     // MARK: - Undo restores species
 
-    @Test func undoRestoresAssignedSpeciesAfterBatchEdit() throws {
+    @Test func undoRestoresAssignedSpeciesAfterBatchEdit() async throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let ids = try seedPhotos(3, into: folder)
         let app = AppState()
         app.loadPhotos(for: folder)
-        app.addSpecies(ids: Set(ids), species: match("eagle"))
+        await app.addSpecies(ids: Set(ids), species: match("eagle")).value
 
-        app.setPrimarySpecies(ids: Set(ids), species: match("hawk"))
-        app.undoLastAction()
+        await app.setPrimarySpecies(ids: Set(ids), species: match("hawk")).value
+        await app.undoLastAction().value
 
         let db = try ReportDatabase(folderPath: folder)
         for id in ids {

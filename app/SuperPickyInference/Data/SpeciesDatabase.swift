@@ -21,11 +21,20 @@ public struct SpeciesEntry: Sendable {
 
 public final class SpeciesDatabase: Sendable {
 
+    private struct SearchRecord: Sendable {
+        let entry: SpeciesEntry
+        let english: String
+        let scientific: String
+        let chinese: String
+        let pinyin: String
+        let pinyinInitials: String
+    }
+
     private let byClassID: [Int: SpeciesEntry]
-    /// Flat array for linear-scan autocomplete. Holds the same values as
-    /// `byClassID` but in a form that's cheap to iterate without materializing
-    /// the dictionary's values on each search call.
-    private let all: [SpeciesEntry]
+    /// Pre-normalized and alphabetized once at load time. Search can then scan
+    /// without allocating five lowercase strings per species per keystroke or
+    /// sorting thousands of broad-query matches.
+    private let searchRecords: [SearchRecord]
     private let logger = Logger(subsystem: "com.halfhacked.superpicky", category: "SpeciesDB")
 
     public init(url: URL, ebirdByClassID: [Int: String] = [:]) throws {
@@ -70,7 +79,20 @@ public final class SpeciesDatabase: Sendable {
                                           ebirdCode: ebirdByClassID[classID])
         }
         self.byClassID = dict
-        self.all = Array(dict.values)
+        self.searchRecords = dict.values
+            .sorted {
+                $0.englishName.localizedCaseInsensitiveCompare($1.englishName) == .orderedAscending
+            }
+            .map {
+                SearchRecord(
+                    entry: $0,
+                    english: $0.englishName.lowercased(),
+                    scientific: $0.scientificName.lowercased(),
+                    chinese: $0.chineseName.lowercased(),
+                    pinyin: $0.pinyin?.lowercased() ?? "",
+                    pinyinInitials: $0.pinyinInitials?.lowercased() ?? ""
+                )
+            }
     }
 
     public func lookup(classID: Int) -> SpeciesEntry? {
@@ -80,7 +102,8 @@ public final class SpeciesDatabase: Sendable {
     /// Substring autocomplete across english / scientific / chinese / pinyin,
     /// plus prefix match on pinyin initials (e.g. "bthd" -> 白头海雕).
     /// Ranks prefix matches ahead of substring matches, then alphabetical by
-    /// english name. Linear scan over ~11k entries is fine at typing speeds.
+    /// english name. The scan uses pre-normalized records and caps each ranked
+    /// bucket at `limit`, avoiding per-keystroke lowercase and sort work.
     ///
     /// Initials are matched by prefix only (not substring): initials strings
     /// are short and noisy — a 2-letter substring like "sh" would otherwise
@@ -93,42 +116,42 @@ public final class SpeciesDatabase: Sendable {
         let initialsEligible = trimmed.count >= 2
             && trimmed.allSatisfy { $0.isASCII && $0.isLetter }
 
-        struct Scored {
-            let entry: SpeciesEntry
-            let score: Int
-        }
+        var prefixMatches: [SpeciesEntry] = []
+        var initialsMatches: [SpeciesEntry] = []
+        var substringMatches: [SpeciesEntry] = []
+        prefixMatches.reserveCapacity(limit)
+        initialsMatches.reserveCapacity(limit)
+        substringMatches.reserveCapacity(limit)
 
-        var scored: [Scored] = []
-        scored.reserveCapacity(64)
-        for entry in all {
-            let eng = entry.englishName.lowercased()
-            let sci = entry.scientificName.lowercased()
-            let cn  = entry.chineseName.lowercased()
-            let py  = entry.pinyin?.lowercased() ?? ""
-            let pyi = entry.pinyinInitials?.lowercased() ?? ""
-
-            var score = 0
-            if eng.hasPrefix(trimmed) || sci.hasPrefix(trimmed)
-                || cn.hasPrefix(trimmed) || (!py.isEmpty && py.hasPrefix(trimmed)) {
-                score = 3
-            } else if initialsEligible && !pyi.isEmpty && pyi.hasPrefix(trimmed) {
-                // Initials-prefix matches rank just below full-prefix matches
-                // so a literal-name match always wins, but above substring.
-                score = 2
-            } else if eng.contains(trimmed) || sci.contains(trimmed)
-                || cn.contains(trimmed) || (!py.isEmpty && py.contains(trimmed)) {
-                score = 1
-            }
-            if score > 0 {
-                scored.append(Scored(entry: entry, score: score))
+        for record in searchRecords {
+            if record.english.hasPrefix(trimmed) || record.scientific.hasPrefix(trimmed)
+                || record.chinese.hasPrefix(trimmed)
+                || (!record.pinyin.isEmpty && record.pinyin.hasPrefix(trimmed)) {
+                if prefixMatches.count < limit {
+                    prefixMatches.append(record.entry)
+                }
+                if prefixMatches.count == limit { break }
+            } else if initialsEligible && !record.pinyinInitials.isEmpty
+                        && record.pinyinInitials.hasPrefix(trimmed) {
+                if initialsMatches.count < limit {
+                    initialsMatches.append(record.entry)
+                }
+            } else if record.english.contains(trimmed) || record.scientific.contains(trimmed)
+                        || record.chinese.contains(trimmed)
+                        || (!record.pinyin.isEmpty && record.pinyin.contains(trimmed)) {
+                if substringMatches.count < limit {
+                    substringMatches.append(record.entry)
+                }
             }
         }
 
-        scored.sort { a, b in
-            if a.score != b.score { return a.score > b.score }
-            return a.entry.englishName.localizedCaseInsensitiveCompare(b.entry.englishName) == .orderedAscending
+        var results: [SpeciesEntry] = []
+        results.reserveCapacity(limit)
+        for bucket in [prefixMatches, initialsMatches, substringMatches] {
+            results.append(contentsOf: bucket.prefix(limit - results.count))
+            if results.count == limit { break }
         }
-        return scored.prefix(limit).map { $0.entry }
+        return results
     }
 
     /// Locate the bundled `bird_reference.sqlite` inside the SuperPickyInference

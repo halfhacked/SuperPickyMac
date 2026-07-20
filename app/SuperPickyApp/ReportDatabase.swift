@@ -1,6 +1,11 @@
 import Foundation
 import GRDB
 
+struct PhotoMutationResult: Sendable {
+    let previous: Photo
+    let updated: Photo
+}
+
 final class ReportDatabase: Sendable {
     private let dbQueue: DatabaseQueue
 
@@ -156,6 +161,46 @@ final class ReportDatabase: Sendable {
         }
     }
 
+    func saveAll(_ photos: inout [Photo]) throws {
+        try dbQueue.write { db in
+            for index in photos.indices {
+                try photos[index].save(db)
+            }
+        }
+    }
+
+    /// Fetch, mutate, and save a photo batch in one transaction. Keeping the
+    /// read-modify-write cycle atomic prevents concurrent pipeline writes from
+    /// interleaving between an edit's reads and saves.
+    func mutatePhotos(
+        ids: [UUID],
+        _ mutate: @Sendable (inout [Photo]) -> Void
+    ) throws -> [PhotoMutationResult] {
+        try dbQueue.write { db in
+            var previous: [Photo] = []
+            previous.reserveCapacity(ids.count)
+            for id in ids {
+                if let photo = try Photo.fetchOne(db, key: id) {
+                    previous.append(photo)
+                }
+            }
+
+            var updated = previous
+            mutate(&updated)
+            precondition(
+                updated.map(\.id) == previous.map(\.id),
+                "Photo batch mutations must preserve identity and order"
+            )
+            for index in updated.indices {
+                try updated[index].save(db)
+            }
+
+            return zip(previous, updated).map {
+                PhotoMutationResult(previous: $0.0, updated: $0.1)
+            }
+        }
+    }
+
     func fetchPhoto(id: UUID) throws -> Photo? {
         try dbQueue.read { db in
             try Photo.fetchOne(db, key: id)
@@ -180,6 +225,23 @@ final class ReportDatabase: Sendable {
         try dbQueue.read { db in
             let paths = try String.fetchAll(db, sql: "SELECT filePath FROM photos")
             return Set(paths)
+        }
+    }
+
+    /// Capture timestamp keyed by file path for resume ordering. Existing
+    /// photos can participate in the timestamp sequence without re-opening
+    /// every RAW file during the metadata pre-pass.
+    func fetchAllFileDates() throws -> [String: Date] {
+        try dbQueue.read { db in
+            let rows = try Row.fetchAll(
+                db, sql: "SELECT filePath, dateCreated FROM photos"
+            )
+            var dates: [String: Date] = [:]
+            dates.reserveCapacity(rows.count)
+            for row in rows {
+                dates[row["filePath"]] = row["dateCreated"]
+            }
+            return dates
         }
     }
 

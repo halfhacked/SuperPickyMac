@@ -23,7 +23,7 @@ struct ContentView: View {
     var onExportAllVisible: (([Photo]) -> Void)?
     var onDeletePhoto: ((UUID) -> Void)?
     var onCorrectSpecies: ((UUID, String) -> Void)?
-    var searchSpecies: ((String) -> [SpeciesMatch])?
+    var searchSpecies: (String) async -> [SpeciesMatch] = { _ in [] }
     @Environment(CullingConfig.self) private var config
     @State private var minimumStars: Int = 0
     @State private var topBurstOnly: Bool = false
@@ -100,7 +100,7 @@ struct ContentView: View {
                         ExifPanelView(
                             appState: appState,
                             photo: photo,
-                            searchSpecies: searchSpecies ?? { _ in [] }
+                            searchSpecies: searchSpecies
                         )
                         .transition(.move(edge: .trailing))
                     }

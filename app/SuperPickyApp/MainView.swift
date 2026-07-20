@@ -52,9 +52,8 @@ struct MainView: View {
     @Environment(CullingConfig.self) private var config
     let modelState: ModelDownloadState
     @State private var appState = AppState()
-    /// Bundled species reference DB (~11 k entries, ~2 ms load). Used for
-    /// autocomplete in the species edit panel, independent of whether the
-    /// CoreML inference pipeline is running.
+    /// Bundled species reference DB (~11 k entries), loaded and indexed away
+    /// from the main actor for species autocomplete.
     @State private var speciesDB: SpeciesDatabase? = nil
     @State private var processingTask: Task<Void, Never>?
     @State private var isExporting = false
@@ -124,7 +123,7 @@ struct MainView: View {
                         exportAllVisible(photos)
                     },
                     onDeletePhoto: { id in
-                        try? appState.deletePhoto(id: id)
+                        appState.deletePhoto(id: id)
                     },
                     onCorrectSpecies: { id, name in
                         let ids: Set<UUID> = appState.selection.isMulti
@@ -132,19 +131,22 @@ struct MainView: View {
                             : [id]
                         appState.correctSpecies(ids: ids, commonName: name)
                     },
-                    searchSpecies: { query in
-                        speciesDB?.search(query: query).map { entry in
-                            SpeciesMatch(
-                                scientificName: entry.scientificName,
-                                commonName: entry.englishName,
-                                confidence: 0,
-                                cnName: entry.chineseName.isEmpty ? nil : entry.chineseName,
-                                pinyin: entry.pinyin,
-                                pinyinInitials: entry.pinyinInitials,
-                                thresholdUsed: "manual",
-                                ebirdCode: entry.ebirdCode
-                            )
-                        } ?? []
+                    searchSpecies: { [speciesDB] query in
+                        guard let speciesDB else { return [] }
+                        return await Task.detached(priority: .userInitiated) {
+                            speciesDB.search(query: query).map { entry in
+                                SpeciesMatch(
+                                    scientificName: entry.scientificName,
+                                    commonName: entry.englishName,
+                                    confidence: 0,
+                                    cnName: entry.chineseName.isEmpty ? nil : entry.chineseName,
+                                    pinyin: entry.pinyin,
+                                    pinyinInitials: entry.pinyinInitials,
+                                    thresholdUsed: "manual",
+                                    ebirdCode: entry.ebirdCode
+                                )
+                            }
+                        }.value
                     }
                 )
             }
@@ -220,7 +222,13 @@ struct MainView: View {
     private func loadSpeciesDatabase() {
         guard speciesDB == nil else { return }
         guard let url = SpeciesDatabase.bundledURL() else { return }
-        speciesDB = try? SpeciesDatabase(url: url)
+        Task {
+            let loaded = await Task.detached(priority: .utility) {
+                try? SpeciesDatabase(url: url)
+            }.value
+            guard !Task.isCancelled else { return }
+            speciesDB = loaded
+        }
     }
 
     /// Mirror the current config's display-name + locale into AppState so
@@ -411,7 +419,8 @@ struct MainView: View {
         // Seed allPhotos from the DB so any already-processed photos (skipped
         // by the pipeline) appear immediately, and so incremental append can
         // update-in-place by ID.
-        appState.loadPhotos(for: folder)
+        PreviewSweepCoordinator.shared.stop()
+        appState.loadPhotos(for: folder, startPreviewSweep: false)
 
         processingTask = Task {
             let batcher = PhotoIngestBatcher(appState: appState, pipeline: pipeline)
