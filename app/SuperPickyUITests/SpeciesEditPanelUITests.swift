@@ -66,10 +66,15 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
 
         Self.app.activate()
         for _ in 0..<3 {
-            thumb.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+            Self.app.typeKey(.leftArrow, modifierFlags: [])
+        }
+        for position in 0..<3 {
             if poll(timeout: 1, { thumb.value as? String == active }) {
                 Self.currentPhotoFilename = filename
                 return true
+            }
+            if position < 2 {
+                Self.app.typeKey(.rightArrow, modifierFlags: [])
             }
         }
 
