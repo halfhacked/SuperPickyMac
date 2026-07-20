@@ -30,7 +30,6 @@ struct ContentView: View {
     @State private var pickedOnly: Bool = false
     @State private var sortOrder: SortOrder = .captureDate
     @State private var sortAscending: Bool = true
-    @State private var showSortOptions = false
     @State private var showExifPanel = true
     @State private var showFullscreen = false
     @State private var zoomState = ZoomState()
@@ -158,36 +157,28 @@ struct ContentView: View {
 
                     Divider().frame(height: 12)
 
-                    Button {
-                        showSortOptions.toggle()
-                    } label: {
-                        Image(systemName: "arrow.up.arrow.down")
-                            .font(.system(size: 10))
-                            .foregroundStyle(sortOrder == .filename && sortAscending ? .secondary : .primary)
-                    }
-                    .buttonStyle(.plain)
-                    .fixedSize()
-                    .help(config.localized("Sort photos"))
-                    .accessibilityIdentifier("SortMenu")
-
-                    if showSortOptions {
+                    Menu {
                         ForEach(SortOrder.allCases, id: \.self) { order in
                             Button {
                                 applySort(order)
-                                showSortOptions = false
                             } label: {
-                                HStack(spacing: 2) {
+                                HStack {
                                     Text(order.rawValue)
                                     if sortOrder == order {
                                         Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
                                     }
                                 }
-                                .font(.caption)
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier(order.rawValue)
                         }
+                    } label: {
+                        Image(systemName: "arrow.up.arrow.down")
+                            .font(.system(size: 10))
+                            .foregroundStyle(sortOrder == .filename && sortAscending ? .secondary : .primary)
                     }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                    .help(config.localized("Sort photos"))
+                    .accessibilityIdentifier("SortMenu")
 
                     Spacer()
 
@@ -350,7 +341,6 @@ struct ContentView: View {
 
     private func handleKey(_ key: KeyboardMonitor.KeyEvent) -> Bool {
         if showKeyboardHelp { showKeyboardHelp = false; return true }
-        if showSortOptions, key.isEscape { showSortOptions = false; return true }
 
         let selection = appState.selection
         let filtered = filteredPhotos
