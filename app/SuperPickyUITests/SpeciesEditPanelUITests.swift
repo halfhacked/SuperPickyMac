@@ -225,14 +225,26 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
                       "Candidates should collapse")
     }
 
-    /// Click a button reliably on CI. The 12-pt SF-symbol Add/Remove
+    /// Click a button reliably on CI. The 12–13 pt SF-symbol Add/Remove
     /// buttons in the candidates list race between `isHittable` returning
-    /// true and the click being dispatched — the click then fails with
-    /// "Not hittable". Always using a coordinate click at the reported
-    /// centre bypasses the a11y hit test entirely.
+    /// true and the click being dispatched — `element.click()` then fails
+    /// with "Not hittable". A coordinate click at the reported centre
+    /// bypasses that a11y hit test, but on the hosted macOS 15.7.x runner a
+    /// *raw* coordinate click (mouse-down/up with no preceding pointer move)
+    /// is silently dropped by SwiftUI's hover-based hit testing: the button
+    /// is found and the click synthesized, yet the action never fires. This
+    /// is why the cold first candidate click of the suite (test44's Add)
+    /// failed on 184e4b5 while the same code passed on the pre-upgrade
+    /// runner. Bring the app frontmost and hover onto the control to prime
+    /// the hit test before clicking — the same `activate()` + `hover()`
+    /// priming the proven `retryMenuInteraction` path uses.
     private func tapButton(_ element: XCUIElement) {
         guard element.exists else { return }
-        element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+        Self.app.activate()
+        let center = element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        center.hover()
+        Thread.sleep(forTimeInterval: 0.1)
+        center.click()
     }
 
     /// Grant keyboard focus to the species search TextField. CI's smaller
@@ -353,24 +365,9 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
 
         let add = app.buttons[A11y.speciesEditAdd("goleag")]
         XCTAssertTrue(add.waitForExistence(timeout: 3))
-        let remove = app.buttons[A11y.speciesEditRemove("goleag")]
-
-        // test44 is the first Add-click of the shared species suite, so it
-        // absorbs the cold first-interaction drop the hosted runner applies
-        // before the app is frontmost: on 184e4b5 this line failed while
-        // every later test — warmed by test44 having run — passed. Retry the
-        // Add only when it was genuinely *dropped* (goleag still a Candidate,
-        // so Add is still present) after a settle long enough that a merely
-        // delayed click would already have landed. We never click Add while
-        // Remove is present, so this can't double-toggle goleag and corrupt
-        // the eagle state the later tests share (the failure mode a blind
-        // coordinate retry caused earlier in this PR).
         tapButton(add)
-        if !remove.waitForExistence(timeout: 3) {
-            Thread.sleep(forTimeInterval: 0.8)
-            if add.exists { tapButton(add) }
-        }
 
+        let remove = app.buttons[A11y.speciesEditRemove("goleag")]
         XCTAssertTrue(remove.waitForExistence(timeout: 2),
                       "After Add_goleag click, goleag should move to Assigned (Remove_goleag present)")
         XCTAssertFalse(app.buttons[A11y.speciesEditAdd("goleag")].exists)

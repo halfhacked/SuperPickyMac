@@ -86,29 +86,27 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
         let sortMenu = app.buttons["SortMenu"]
         XCTAssertTrue(sortMenu.waitForExistence(timeout: 5), "SortMenu element should exist")
 
-        // Open the inline sort options with a plain click, the same way the
-        // other .plain toolbar toggles are driven (test06 TopBurstFilter,
-        // test25 PickedFilter). The popup-oriented openMenu is wrong for a
-        // toggle: its press -> click -> space retry ladder double-toggles
-        // showSortOptions shut when a cold hosted click is *delayed* rather
-        // than dropped (the delayed press and the retry click both land),
-        // which is why test05 failed cold while the warm test24 passed.
-        // Re-click only when the panel is confirmed still closed after a
-        // settle a delayed click would have landed within — never re-click an
-        // already-open panel, so this cannot toggle it back shut.
+        // Open the inline sort options. On the hosted macOS 15.7.x runner
+        // the first synthesized clicks of the suite are dropped unless the
+        // app is explicitly frontmost and the pointer is moved onto the
+        // control first (SwiftUI hover-based hit testing) — the same
+        // activate() + hover() priming the proven openMenu /
+        // retryMenuInteraction path uses, which is why the warm test24
+        // drives this identical inline control every run. This is a TOGGLE
+        // (showSortOptions), so only ever click when the panel is confirmed
+        // still closed (Filename absent); never re-click an open panel,
+        // which would toggle it shut. The popup-oriented openMenu is wrong
+        // here: its press -> click -> space retry ladder double-toggles the
+        // toggle when a cold hosted click is delayed rather than dropped.
         let filenameItem = app.buttons["Filename"]
         var opened = filenameItem.waitForExistence(timeout: 0.5)
-        if !opened {
-            sortMenu.click()
+        for _ in 0..<3 where !opened {
+            app.activate()
+            let center = sortMenu.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            center.hover()
+            Thread.sleep(forTimeInterval: 0.1)
+            center.click()
             opened = filenameItem.waitForExistence(timeout: 3)
-            if !opened {
-                Thread.sleep(forTimeInterval: 0.8)
-                opened = filenameItem.exists
-                if !opened, sortMenu.exists {
-                    sortMenu.click()
-                    opened = filenameItem.waitForExistence(timeout: 3)
-                }
-            }
         }
         XCTAssertTrue(opened, "Sort menu should open and offer 'Filename'")
 
