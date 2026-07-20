@@ -230,26 +230,24 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
     /// true and the click being dispatched — the click then fails with
     /// "Not hittable". Always using a coordinate click at the reported
     /// centre bypasses the a11y hit test entirely.
+    ///
+    /// `openPanelOnEagle()` collapses metadata just before these taps, which
+    /// re-flows the candidates list; a coordinate click issued mid-reflow
+    /// lands on the button's old position and is silently dropped. Wait for
+    /// the frame to settle (two equal samples) before clicking so the hit
+    /// lands where the button actually is. A settle can't corrupt shared
+    /// state the way a blind retry-click can (a retry double-toggles when the
+    /// first click was merely delayed, not dropped).
     private func tapButton(_ element: XCUIElement) {
         guard element.exists else { return }
+        var last = element.frame
+        for _ in 0..<10 {
+            Thread.sleep(forTimeInterval: 0.1)
+            let now = element.frame
+            if now == last { break }
+            last = now
+        }
         element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
-    }
-
-    /// Tap a species Add/Remove button and confirm the move landed,
-    /// retrying the click once. The hosted runner intermittently drops a
-    /// synthesized coordinate click on a SwiftUI button that was just
-    /// re-laid-out (the panel re-flows when metadata collapses right before
-    /// the tap), so the assigned/candidate move never happens. A second tap
-    /// after the miss lands; `tapButton` no-ops once its target has already
-    /// disappeared, so a successful first tap can't be double-toggled.
-    @discardableResult
-    private func tapButton(_ element: XCUIElement,
-                           until result: XCUIElement,
-                           timeout: TimeInterval = 2) -> Bool {
-        tapButton(element)
-        if result.waitForExistence(timeout: timeout) { return true }
-        tapButton(element)
-        return result.waitForExistence(timeout: timeout)
     }
 
     /// Grant keyboard focus to the species search TextField. CI's smaller
@@ -370,13 +368,15 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
 
         let add = app.buttons[A11y.speciesEditAdd("goleag")]
         XCTAssertTrue(add.waitForExistence(timeout: 3))
+        tapButton(add)
 
         let remove = app.buttons[A11y.speciesEditRemove("goleag")]
-        XCTAssertTrue(tapButton(add, until: remove),
+        XCTAssertTrue(remove.waitForExistence(timeout: 2),
                       "After Add_goleag click, goleag should move to Assigned (Remove_goleag present)")
         XCTAssertFalse(app.buttons[A11y.speciesEditAdd("goleag")].exists)
 
-        XCTAssertTrue(tapButton(remove, until: app.buttons[A11y.speciesEditAdd("goleag")]),
+        tapButton(remove)
+        XCTAssertTrue(app.buttons[A11y.speciesEditAdd("goleag")].waitForExistence(timeout: 2),
                       "After Remove_goleag click, goleag should be back in Candidates (Add_goleag present)")
     }
 
