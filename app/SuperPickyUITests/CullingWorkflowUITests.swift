@@ -70,6 +70,16 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
 
     func test05_SortMenuOffersFiveOrders() {
         let app = Self.app!
+        // Prime the window before driving the toggle-based sort control.
+        // On the hosted runner the first synthesized click of a test lands
+        // as a window-activating "first mouse" that AppKit does not deliver
+        // to the control, so a cold click on SortMenu is silently dropped.
+        // test24 gets this priming for free from its preview click; test05
+        // is the first sort interaction, so do it explicitly.
+        let preview = app.images[A11y.photoPreview]
+        if preview.waitForExistence(timeout: 5) { preview.click() }
+        Thread.sleep(forTimeInterval: 0.3)
+
         let sortMenu = app.buttons["SortMenu"]
         XCTAssertTrue(sortMenu.waitForExistence(timeout: 5), "SortMenu element should exist")
         let filenameItem = app.buttons["Filename"]

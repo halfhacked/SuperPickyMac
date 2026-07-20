@@ -235,6 +235,23 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
         element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
     }
 
+    /// Tap a species Add/Remove button and confirm the move landed,
+    /// retrying the click once. The hosted runner intermittently drops a
+    /// synthesized coordinate click on a SwiftUI button that was just
+    /// re-laid-out (the panel re-flows when metadata collapses right before
+    /// the tap), so the assigned/candidate move never happens. A second tap
+    /// after the miss lands; `tapButton` no-ops once its target has already
+    /// disappeared, so a successful first tap can't be double-toggled.
+    @discardableResult
+    private func tapButton(_ element: XCUIElement,
+                           until result: XCUIElement,
+                           timeout: TimeInterval = 2) -> Bool {
+        tapButton(element)
+        if result.waitForExistence(timeout: timeout) { return true }
+        tapButton(element)
+        return result.waitForExistence(timeout: timeout)
+    }
+
     /// Grant keyboard focus to the species search TextField. CI's smaller
     /// window occasionally leaves a single `field.click()` non-focus-
     /// granting, so approach with a coordinate click first, then a hover
@@ -353,15 +370,13 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
 
         let add = app.buttons[A11y.speciesEditAdd("goleag")]
         XCTAssertTrue(add.waitForExistence(timeout: 3))
-        tapButton(add)
 
         let remove = app.buttons[A11y.speciesEditRemove("goleag")]
-        XCTAssertTrue(remove.waitForExistence(timeout: 2),
+        XCTAssertTrue(tapButton(add, until: remove),
                       "After Add_goleag click, goleag should move to Assigned (Remove_goleag present)")
         XCTAssertFalse(app.buttons[A11y.speciesEditAdd("goleag")].exists)
 
-        tapButton(remove)
-        XCTAssertTrue(app.buttons[A11y.speciesEditAdd("goleag")].waitForExistence(timeout: 2),
+        XCTAssertTrue(tapButton(remove, until: app.buttons[A11y.speciesEditAdd("goleag")]),
                       "After Remove_goleag click, goleag should be back in Candidates (Add_goleag present)")
     }
 
