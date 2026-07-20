@@ -32,20 +32,55 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
     // in the thumbnail strip's initial lazy render window, so we can click
     // by identifier directly without the arrow-strip detour the larger
     // shared fixture needs.
-    private func selectThumbnail(filename: String) {
-        let thumb = Self.app.images.matching(identifier: A11y.thumbnail(filename)).firstMatch
-        XCTAssertTrue(thumb.waitForExistence(timeout: 5),
-                      "\(filename) thumbnail should exist in the 3-photo species fixture")
-        thumb.click()
-        // Brief settle so a subsequent `exifToggleButton.click()` doesn't
-        // race the still-processing thumbnail selection. Removing this
-        // caused a measurable CI regression (waitForExistence(panel) ate
-        // most of its 3 s budget instead of returning immediately).
-        Thread.sleep(forTimeInterval: 0.3)
-        Self.currentPhotoFilename = filename
+    private func thumbnail(filename: String) -> XCUIElement {
+        Self.app.images
+            .matching(identifier: A11y.thumbnail(filename))
+            .matching(NSPredicate(
+                format: "value IN %@",
+                [
+                    A11y.ThumbnailSelection.active.rawValue,
+                    A11y.ThumbnailSelection.selected.rawValue,
+                    A11y.ThumbnailSelection.none.rawValue,
+                ]
+            ))
+            .firstMatch
     }
 
-    private func selectEaglePhoto() { selectThumbnail(filename: "DSC09969.jpg") }
+    private func thumbnailIsActive(_ filename: String) -> Bool {
+        thumbnail(filename: filename).value as? String
+            == A11y.ThumbnailSelection.active.rawValue
+    }
+
+    @discardableResult
+    private func selectThumbnail(filename: String) -> Bool {
+        let thumb = thumbnail(filename: filename)
+        XCTAssertTrue(thumb.waitForExistence(timeout: 5),
+                      "\(filename) thumbnail should exist in the 3-photo species fixture")
+        guard thumb.exists else { return false }
+
+        let active = A11y.ThumbnailSelection.active.rawValue
+        if poll(timeout: 0.5, { thumb.value as? String == active }) {
+            Self.currentPhotoFilename = filename
+            return true
+        }
+
+        Self.app.activate()
+        for _ in 0..<3 {
+            thumb.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+            if poll(timeout: 1, { thumb.value as? String == active }) {
+                Self.currentPhotoFilename = filename
+                return true
+            }
+        }
+
+        XCTFail("\(filename) thumbnail never became active")
+        return false
+    }
+
+    @discardableResult
+    private func selectEaglePhoto() -> Bool {
+        selectThumbnail(filename: "DSC09969.jpg")
+    }
 
     // SearchField sits at the bottom of a scrollable panel and can be pruned
     // from the accessibility tree when scrolled out of view. The root
@@ -59,7 +94,9 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
     /// `true` skip the close → reselect → reopen cycle, which is the
     /// dominant per-test cost on CI (two toggle animations per hop).
     private func panelIsOpenOnEagle() -> Bool {
-        Self.currentPhotoFilename == "DSC09969.jpg" && panelIsOpen()
+        Self.currentPhotoFilename == "DSC09969.jpg"
+            && thumbnailIsActive("DSC09969.jpg")
+            && panelIsOpen()
     }
 
     // On macOS CI (GitHub Actions runner), SwiftUI toolbar buttons surface as a
@@ -86,7 +123,7 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
             return
         }
         ensurePanelClosed()
-        selectEaglePhoto()
+        guard selectEaglePhoto() else { return }
         exifToggleButton.click()
         XCTAssertTrue(Self.app.scrollViews[A11y.exifPanel].waitForExistence(timeout: 3),
                       "Panel should open")
@@ -376,7 +413,7 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
         let app = Self.app!
         ensurePanelClosed()
         // DSC09951 is a bird-but-unidentified photo in the mock fixture.
-        selectThumbnail(filename: "DSC09951.jpg")
+        guard selectThumbnail(filename: "DSC09951.jpg") else { return }
         exifToggleButton.click()
         XCTAssertTrue(app.scrollViews[A11y.exifPanel].waitForExistence(timeout: 3))
         collapseMetadata()
@@ -403,7 +440,7 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
         // Switch to DSC09970 (second eagle in the species fixture) — a real
         // photo change that should clear the search.
         ensurePanelClosed()
-        selectThumbnail(filename: "DSC09970.jpg")
+        guard selectThumbnail(filename: "DSC09970.jpg") else { return }
 
         exifToggleButton.click()
         XCTAssertTrue(app.scrollViews[A11y.exifPanel].waitForExistence(timeout: 3))
@@ -415,7 +452,7 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
                        "Search field should clear on photo change " +
                        "(value=\(String(describing: newField.value)))")
         // Leave the panel open on DSC09970; the next eagle test's
-        // openPanelOnEagle() slow path (currentPhotoFilename != DSC09969)
+        // openPanelOnEagle() slow path (the eagle thumbnail isn't active)
         // closes it before re-opening on the eagle.
     }
 
@@ -498,7 +535,7 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
     func test54_InfoPanelRefreshesKeywordsOnSpeciesEdit() {
         let app = Self.app!
         ensurePanelClosed()
-        selectEaglePhoto()
+        guard selectEaglePhoto() else { return }
 
         let sidecarPath = (Self.testDir! as NSString).appendingPathComponent("DSC09969.xmp")
         XCTAssertTrue(waitForSidecar(at: sidecarPath, containing: "Bald Eagle", timeout: 5))
