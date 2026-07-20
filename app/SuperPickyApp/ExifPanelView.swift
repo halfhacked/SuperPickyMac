@@ -65,11 +65,16 @@ struct ExifPanelView: View {
         .shadow(color: .black.opacity(0.2), radius: 8, x: -2, y: 2)
         .padding(8)
         .accessibilityIdentifier("ExifPanel")
-        // Re-fire on assignedSpeciesJSON changes too: keywords come from the
-        // XMP sidecar, which the species edit panel rewrites on every edit.
+        // Re-fire on assignment changes and again after write-behind XMP
+        // completes. The optimistic assignment can render before its debounced
+        // sidecar, so the flush token performs the authoritative keyword read.
         // Swap atomically — clearing exifData between photos flashes the
         // species sections up and back down on every switch.
-        .task(id: [photo.id.uuidString, photo.assignedSpeciesJSON ?? ""]) {
+        .task(id: [
+            photo.id.uuidString,
+            photo.assignedSpeciesJSON ?? "",
+            String(appState.speciesXMPFlushToken),
+        ]) {
             let newData = await Task.detached {
                 EXIFReader.read(from: photo.filePath)
             }.value

@@ -619,6 +619,7 @@ struct AppStateBatchMutationTests {
         let ids = try seedPhotos(1, into: folder)
         let app = AppState()
         app.loadPhotos(for: folder)
+        let flushTokenBefore = app.speciesXMPFlushToken
 
         // Three rapid edits collapse to the final desired state.
         await app.addSpecies(ids: Set(ids), species: match("eagle")).value
@@ -633,6 +634,7 @@ struct AppStateBatchMutationTests {
         #expect(!xmp.contains("Eagle"))
         let pendingXMP = await app.pendingXMPWriteCountForTesting()
         #expect(pendingXMP == 0)
+        #expect(app.speciesXMPFlushToken > flushTokenBefore)
     }
 
     // MARK: - Retryable XMP failure

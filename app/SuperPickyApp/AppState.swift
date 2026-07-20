@@ -392,6 +392,7 @@ final class AppState {
     @ObservationIgnored private var lastSpeciesEditProfile: SpeciesEditProfile?
     @ObservationIgnored private var pendingSpeciesEditRender: PendingSpeciesEditRender?
     private(set) var speciesEditRenderToken = 0
+    private(set) var speciesXMPFlushToken = 0
 
     // MARK: Optimistic species-edit persistence
 
@@ -1200,6 +1201,9 @@ final class AppState {
             SpeciesEditProfiler.logger.info(
                 "species_xmp_flush writes=\(summary.writeCount) failures=\(summary.failureCount) max_ms=\(String(format: "%.1f", summary.slowestMilliseconds)) total_ms=\(String(format: "%.1f", summary.totalMilliseconds))"
             )
+        }
+        if summary.writeCount > 0 {
+            speciesXMPFlushToken &+= 1
         }
         // Reconcile durable XMP failure state: paths that recovered clear, paths
         // that failed (still pending) are retained.
