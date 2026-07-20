@@ -174,6 +174,9 @@ struct MainView: View {
             appState.speciesSortOrder = config.speciesSortOrder
             syncSpeciesDisplay()
             loadSpeciesDatabase()
+            FlushCoordinator.shared.register(owner: appState) { [weak appState] in
+                await appState?.flushPendingPersistence()
+            }
             if let testFolder = ProcessInfo.processInfo.environment["TEST_FOLDER"] {
                 let folder = URL(fileURLWithPath: testFolder)
                 Task {

@@ -80,6 +80,9 @@ struct ExifPanelView: View {
             searchQuery = ""
             searchResults = []
         }
+        .onChange(of: appState.speciesEditRenderToken) { _, token in
+            appState.noteSpeciesEditRowsRendered(token: token)
+        }
     }
 
     // MARK: - EXIF sections
@@ -198,9 +201,36 @@ struct ExifPanelView: View {
 
     @ViewBuilder
     private var speciesSections: some View {
+        retryBanner
         assignedSection
         candidatesSection
         searchSection
+    }
+
+    @ViewBuilder
+    private var retryBanner: some View {
+        if appState.hasSpeciesPersistenceFailure {
+            HStack(spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.orange)
+                Text(config.localized("Some species edits couldn't be saved"))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 4)
+                Button(config.localized("Retry")) {
+                    appState.retrySpeciesPersistence()
+                }
+                .font(.system(size: 11))
+                .buttonStyle(.borderless)
+                .accessibilityIdentifier("SpeciesEditPanel_RetrySave")
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Color.orange.opacity(0.12))
+            .accessibilityIdentifier("SpeciesEditPanel_RetryBanner")
+        }
     }
 
     @ViewBuilder

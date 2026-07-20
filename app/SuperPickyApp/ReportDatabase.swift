@@ -6,6 +6,14 @@ struct PhotoMutationResult: Sendable {
     let updated: Photo
 }
 
+/// A captured "desired" species assignment for one photo. Persistence overlays
+/// this list onto a freshly-fetched database row so concurrent pipeline writes
+/// to non-species fields are preserved.
+struct SpeciesSnapshot: Sendable {
+    let id: UUID
+    let species: [SpeciesMatch]
+}
+
 final class ReportDatabase: Sendable {
     private let dbQueue: DatabaseQueue
 
@@ -198,6 +206,29 @@ final class ReportDatabase: Sendable {
             return zip(previous, updated).map {
                 PhotoMutationResult(previous: $0.0, updated: $0.1)
             }
+        }
+    }
+
+    /// Overlay captured species assignments onto freshly-fetched rows.
+    ///
+    /// Each snapshot is applied to the *current* database row for that photo so
+    /// concurrent pipeline writes to non-species fields survive. Rows whose
+    /// assigned species already equal the desired list are skipped (no write).
+    /// Returns the rows that were actually updated so the caller can queue XMP
+    /// writes for them — the caller must NOT publish these back into the UI,
+    /// which already holds the optimistic state.
+    func overlaySpecies(_ snapshots: [SpeciesSnapshot]) throws -> [Photo] {
+        try dbQueue.write { db in
+            var written: [Photo] = []
+            written.reserveCapacity(snapshots.count)
+            for snapshot in snapshots {
+                guard var photo = try Photo.fetchOne(db, key: snapshot.id) else { continue }
+                if photo.assignedSpecies == snapshot.species { continue }
+                photo.assignedSpecies = snapshot.species
+                try photo.save(db)
+                written.append(photo)
+            }
+            return written
         }
     }
 

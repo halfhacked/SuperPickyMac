@@ -253,6 +253,29 @@ struct AppStateBatchMutationTests {
         }
     }
 
+    @Test func addAndRemoveSpeciesRecordLatencyProfiles() async throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let ids = try seedPhotos(2, into: folder)
+        let app = AppState()
+        app.loadPhotos(for: folder)
+        let eagle = match("eagle")
+
+        await app.addSpecies(ids: Set(ids), species: eagle).value
+        let addProfile = try #require(app.lastSpeciesEditProfileForTesting())
+        #expect(addProfile.operation == "add")
+        #expect(addProfile.targetPhotoCount == 2)
+        #expect(addProfile.changedPhotoCount == 2)
+        #expect(addProfile.persistedPhotoCount == 2)
+
+        await app.removeSpecies(ids: Set(ids), species: eagle).value
+        let removeProfile = try #require(app.lastSpeciesEditProfileForTesting())
+        #expect(removeProfile.operation == "remove")
+        #expect(removeProfile.targetPhotoCount == 2)
+        #expect(removeProfile.changedPhotoCount == 2)
+        #expect(removeProfile.persistedPhotoCount == 2)
+    }
+
     // MARK: - Burst fan-out
 
     @Test func setPrimarySpeciesFansOutToBurstMembers() async throws {
@@ -303,7 +326,7 @@ struct AppStateBatchMutationTests {
         let app = AppState()
         app.loadPhotos(for: folder)
         let start = ProcessInfo.processInfo.systemUptime
-        let mutation = app.setPrimarySpecies(
+        let mutation = app.addSpecies(
             ids: [try #require(firstID)],
             species: match("eagle")
         )
@@ -311,6 +334,17 @@ struct AppStateBatchMutationTests {
         #expect(elapsedMS < 100, "Species edit blocked the caller for \(elapsedMS) ms")
 
         await mutation.value
+        let profile = try #require(app.lastSpeciesEditProfileForTesting())
+        #expect(profile.operation == "add")
+        #expect(profile.requestedPhotoCount == 1)
+        #expect(profile.targetPhotoCount == 200)
+        #expect(profile.changedPhotoCount == 200)
+        #expect(profile.persistedPhotoCount == 200)
+        #expect(profile.queuedXMPWriteCount == 200)
+        #expect(!profile.persistenceFailed)
+        // Immediate work is measured separately from deferred DB latency.
+        #expect(profile.immediateMilliseconds >= profile.stateApplyMilliseconds)
+
         let photos = app.allPhotosForTesting()
         for i in 0..<200 {
             let photo = try #require(try db.fetchPhoto(
@@ -318,6 +352,8 @@ struct AppStateBatchMutationTests {
             ))
             #expect(photo.assignedSpecies.first?.speciesID == "eagle")
         }
+        // XMP is write-behind — assert sidecars only after an explicit flush.
+        await app.flushPendingPersistence()
         let sidecar = XMPWriter.sidecarURL(for: photos[0])
         let xmp = try String(contentsOf: sidecar, encoding: .utf8)
         #expect(xmp.contains("Eagle"))
@@ -464,5 +500,237 @@ struct AppStateBatchMutationTests {
             let p = try db.fetchPhoto(id: id)!
             #expect(p.assignedSpecies.map(\.speciesID) == ["eagle"])
         }
+    }
+
+    // MARK: - Optimistic (immediate) state visibility
+
+    @Test func speciesEditUpdatesObservableStateBeforeTaskAwait() async throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let ids = try seedPhotos(1, into: folder)
+        let app = AppState()
+        app.loadPhotos(for: folder)
+
+        // Do NOT await — the observable arrays must already reflect the edit.
+        let task = app.addSpecies(ids: Set(ids), species: match("eagle"))
+        #expect(app.allPhotosForTesting().first?.assignedSpecies.first?.speciesID == "eagle")
+        #expect(app.photos.first?.assignedSpecies.first?.speciesID == "eagle")
+        #expect(app.speciesEntries.contains { $0.speciesID == "eagle" })
+
+        await task.value
+        let db = try ReportDatabase(folderPath: folder)
+        #expect(try db.fetchPhoto(id: ids[0])?.assignedSpecies.first?.speciesID == "eagle")
+    }
+
+    @Test func speciesEditImmediateLatencyAtLargeLibraryScale() async throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let db = try ReportDatabase(folderPath: folder)
+        var seeded = (0..<2_000).map { index in
+            Photo(
+                filename: "large_\(index).CR3",
+                filePath: folder.appendingPathComponent("large_\(index).CR3").path,
+                folderPath: folder.path
+            )
+        }
+        try db.saveAll(&seeded)
+
+        let app = AppState()
+        app.loadPhotos(for: folder)
+        let mutation = app.addSpecies(ids: [seeded[0].id], species: match("eagle"))
+        let profile = try #require(app.lastSpeciesEditProfileForTesting())
+
+        #expect(
+            profile.immediateMilliseconds < 100,
+            "Large-library species edit took \(profile.immediateMilliseconds) ms before returning"
+        )
+
+        await mutation.value
+        await app.flushPendingPersistence()
+    }
+
+    @Test func rapidSpeciesEditsKeepOrderedStateWithoutStaleCompletion() async throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let ids = try seedPhotos(1, into: folder)
+        let app = AppState()
+        app.loadPhotos(for: folder)
+
+        let addEagle = app.addSpecies(ids: Set(ids), species: match("eagle"))
+        let promoteHawk = app.setPrimarySpecies(ids: Set(ids), species: match("hawk"))
+        // Synchronously the UI already shows both edits applied in call order.
+        #expect(app.allPhotosForTesting().first?.assignedSpecies.map(\.speciesID) == ["hawk", "eagle"])
+
+        await addEagle.value
+        await promoteHawk.value
+        // Deferred persistence never republishes stale rows over the UI.
+        #expect(app.allPhotosForTesting().first?.assignedSpecies.map(\.speciesID) == ["hawk", "eagle"])
+        let db = try ReportDatabase(folderPath: folder)
+        #expect(try db.fetchPhoto(id: ids[0])?.assignedSpecies.map(\.speciesID) == ["hawk", "eagle"])
+    }
+
+    @Test func immediateUndoRevertsObservableStateBeforeAwait() async throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let ids = try seedPhotos(1, into: folder)
+        let app = AppState()
+        app.loadPhotos(for: folder)
+        await app.addSpecies(ids: Set(ids), species: match("eagle")).value
+
+        let undo = app.undoLastAction()
+        // Undo must revert observable state synchronously, before persistence.
+        #expect(app.allPhotosForTesting().first?.assignedSpecies.isEmpty == true)
+        #expect(!app.speciesEntries.contains { $0.speciesID == "eagle" })
+        #expect(app.speciesEntries.first(where: \.isUnidentified)?.count == 1)
+
+        await undo.value
+        let db = try ReportDatabase(folderPath: folder)
+        #expect(try db.fetchPhoto(id: ids[0])?.assignedSpecies.isEmpty == true)
+    }
+
+    // MARK: - Logical no-ops
+
+    @Test func noOpSpeciesEditSkipsUndoDatabaseAndXMP() async throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let ids = try seedPhotos(1, into: folder)
+        let app = AppState()
+        app.loadPhotos(for: folder)
+        await app.addSpecies(ids: Set(ids), species: match("eagle")).value
+        await app.flushPendingPersistence()
+
+        let undoBefore = app.undoStackSizeForTesting()
+        // Re-adding the same species is a logical no-op.
+        await app.addSpecies(ids: Set(ids), species: match("eagle")).value
+
+        #expect(app.undoStackSizeForTesting() == undoBefore)
+        let profile = try #require(app.lastSpeciesEditProfileForTesting())
+        #expect(profile.changedPhotoCount == 0)
+        #expect(profile.persistedPhotoCount == 0)
+        let pendingXMP = await app.pendingXMPWriteCountForTesting()
+        #expect(pendingXMP == 0)
+    }
+
+    // MARK: - Write-behind XMP coalescing
+
+    @Test func coalescedXMPWritesLatestSpeciesAfterFlush() async throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let ids = try seedPhotos(1, into: folder)
+        let app = AppState()
+        app.loadPhotos(for: folder)
+
+        // Three rapid edits collapse to the final desired state.
+        await app.addSpecies(ids: Set(ids), species: match("eagle")).value
+        await app.removeSpecies(ids: Set(ids), species: match("eagle")).value
+        await app.addSpecies(ids: Set(ids), species: match("hawk")).value
+
+        // One coalesced sidecar per path — flush deterministically (no sleep).
+        await app.flushPendingPersistence()
+        let sidecar = XMPWriter.sidecarURL(for: app.allPhotosForTesting()[0])
+        let xmp = try String(contentsOf: sidecar, encoding: .utf8)
+        #expect(xmp.contains("Hawk"))
+        #expect(!xmp.contains("Eagle"))
+        let pendingXMP = await app.pendingXMPWriteCountForTesting()
+        #expect(pendingXMP == 0)
+    }
+
+    // MARK: - Retryable XMP failure
+
+    @Test func xmpWriteFailureIsRetryableAndKeepsOptimisticState() async throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let ids = try seedPhotos(1, into: folder)
+        let app = AppState()
+        app.loadPhotos(for: folder)
+        await app.addSpecies(ids: Set(ids), species: match("eagle")).value
+
+        // Block the sidecar path with a directory so the write-behind XMP fails.
+        let sidecar = XMPWriter.sidecarURL(for: app.allPhotosForTesting()[0])
+        try FileManager.default.createDirectory(at: sidecar, withIntermediateDirectories: true)
+
+        await app.flushPendingPersistence()
+        #expect(app.hasSpeciesPersistenceFailure)
+        // Optimistic state survives the failed write.
+        #expect(app.allPhotosForTesting().first?.assignedSpecies.first?.speciesID == "eagle")
+
+        // Clear the obstruction and retry — the pending XMP write drains.
+        try FileManager.default.removeItem(at: sidecar)
+        await app.retrySpeciesPersistence().value
+
+        #expect(!app.hasSpeciesPersistenceFailure)
+        let xmp = try String(contentsOf: sidecar, encoding: .utf8)
+        #expect(xmp.contains("Eagle"))
+    }
+
+    /// Regression: an XMP-only failure must stay durably represented in
+    /// `AppState` so an unrelated successful edit cannot clear the retry banner
+    /// while a failed sidecar is still pending. See handleXMPFlush /
+    /// refreshSpeciesFailureMessage / failedXMPSidecars.
+    @Test func retainedXMPFailureSurvivesUnrelatedSuccessAndClearsOnRetry() async throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let ids = try seedPhotos(2, into: folder)
+        let app = AppState()
+        app.loadPhotos(for: folder)
+
+        // Edit photo 0, then block its sidecar so only the write-behind XMP
+        // fails (SQLite already committed).
+        await app.addSpecies(ids: [ids[0]], species: match("eagle")).value
+        let target = try #require(app.allPhotosForTesting().first { $0.id == ids[0] })
+        let sidecar = XMPWriter.sidecarURL(for: target)
+        try FileManager.default.createDirectory(at: sidecar, withIntermediateDirectories: true)
+
+        await app.flushPendingPersistence()
+        // XMP-only failure: no SQLite failure, exactly one retained sidecar.
+        #expect(app.hasSpeciesPersistenceFailure)
+        #expect(app.failedSpeciesEditCountForTesting() == 0)
+        #expect(app.failedXMPSidecarCountForTesting() == 1)
+
+        // An unrelated SUCCESSFUL species edit refreshes the banner state but
+        // must NOT clear it while the failed sidecar is still pending.
+        await app.addSpecies(ids: [ids[1]], species: match("hawk")).value
+        #expect(app.hasSpeciesPersistenceFailure)
+        #expect(app.failedXMPSidecarCountForTesting() == 1)
+
+        // Fix the filesystem and retry — the retained failed sidecar drains and
+        // the banner clears.
+        try FileManager.default.removeItem(at: sidecar)
+        await app.retrySpeciesPersistence().value
+
+        #expect(!app.hasSpeciesPersistenceFailure)
+        #expect(app.failedXMPSidecarCountForTesting() == 0)
+        let xmp = try String(contentsOf: sidecar, encoding: .utf8)
+        #expect(xmp.contains("Eagle"))
+    }
+
+    /// Deleting a photo with a retained XMP failure must evict it from both the
+    /// write-behind queue and the durable failure state so no impossible retry
+    /// (a sidecar for a now-trashed photo) remains.
+    @Test func deletingPhotoEvictsRetainedXMPFailure() async throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let ids = try seedPhotos(1, into: folder)
+        // Delete trashes the underlying file, so it must actually exist.
+        FileManager.default.createFile(
+            atPath: folder.appendingPathComponent("p0.CR3").path, contents: Data()
+        )
+        let app = AppState()
+        app.loadPhotos(for: folder)
+
+        await app.addSpecies(ids: [ids[0]], species: match("eagle")).value
+        let target = try #require(app.allPhotosForTesting().first { $0.id == ids[0] })
+        let sidecar = XMPWriter.sidecarURL(for: target)
+        try FileManager.default.createDirectory(at: sidecar, withIntermediateDirectories: true)
+
+        await app.flushPendingPersistence()
+        #expect(app.hasSpeciesPersistenceFailure)
+        #expect(app.failedXMPSidecarCountForTesting() == 1)
+
+        await app.deletePhoto(id: ids[0]).value
+        #expect(!app.hasSpeciesPersistenceFailure)
+        #expect(app.failedXMPSidecarCountForTesting() == 0)
+        let pendingXMP = await app.pendingXMPWriteCountForTesting()
+        #expect(pendingXMP == 0)
     }
 }

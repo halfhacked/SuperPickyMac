@@ -23,4 +23,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
     }
+
+    /// Opportunistic write-behind flush when the app loses focus, so a normal
+    /// app switch narrows the crash-loss window without waiting for the debounce.
+    func applicationWillResignActive(_ notification: Notification) {
+        Task { @MainActor in
+            await FlushCoordinator.shared.flushAll()
+        }
+    }
+
+    /// Defer termination until every registered `AppState` has drained its
+    /// pending SQLite + write-behind XMP. Replies exactly once.
+    func applicationShouldTerminate(
+        _ sender: NSApplication
+    ) -> NSApplication.TerminateReply {
+        MainActor.assumeIsolated {
+            FlushCoordinator.shared.handleTerminate(sender)
+        }
+    }
 }
