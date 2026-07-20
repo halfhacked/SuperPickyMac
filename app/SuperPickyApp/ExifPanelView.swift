@@ -12,7 +12,7 @@ struct ExifPanelView: View {
     var searchSpecies: (_ query: String) -> [SpeciesMatch] = { _ in [] }
 
     @State private var exifData: EXIFData?
-    @State private var isMetadataExpanded = true
+    @State private var isMetadataExpanded = false
     @State private var isCandidatesExpanded = true
     @State private var searchQuery: String = ""
     @State private var searchResults: [SpeciesMatch] = []

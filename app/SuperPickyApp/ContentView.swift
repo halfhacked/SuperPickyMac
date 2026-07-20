@@ -169,28 +169,24 @@ struct ContentView: View {
                     .fixedSize()
                     .help(config.localized("Sort photos"))
                     .accessibilityIdentifier("SortMenu")
-                    .popover(isPresented: $showSortOptions, arrowEdge: .bottom) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            ForEach(SortOrder.allCases, id: \.self) { order in
-                                Button {
-                                    applySort(order)
-                                    showSortOptions = false
-                                } label: {
-                                    HStack {
-                                        Text(order.rawValue)
-                                        Spacer(minLength: 12)
-                                        if sortOrder == order {
-                                            Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
-                                        }
+
+                    if showSortOptions {
+                        ForEach(SortOrder.allCases, id: \.self) { order in
+                            Button {
+                                applySort(order)
+                                showSortOptions = false
+                            } label: {
+                                HStack(spacing: 2) {
+                                    Text(order.rawValue)
+                                    if sortOrder == order {
+                                        Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
                                     }
-                                    .frame(minWidth: 120, alignment: .leading)
-                                    .contentShape(Rectangle())
                                 }
-                                .buttonStyle(.plain)
-                                .accessibilityIdentifier(order.rawValue)
+                                .font(.caption)
                             }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier(order.rawValue)
                         }
-                        .padding(10)
                     }
 
                     Spacer()
@@ -354,6 +350,7 @@ struct ContentView: View {
 
     private func handleKey(_ key: KeyboardMonitor.KeyEvent) -> Bool {
         if showKeyboardHelp { showKeyboardHelp = false; return true }
+        if showSortOptions, key.isEscape { showSortOptions = false; return true }
 
         let selection = appState.selection
         let filtered = filteredPhotos
