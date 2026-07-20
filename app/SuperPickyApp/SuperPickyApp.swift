@@ -7,6 +7,10 @@ struct SuperPickyApp: App {
     @State private var config: CullingConfig
     @State private var modelState: ModelDownloadState
 
+    private static var isTestMode: Bool {
+        ProcessInfo.processInfo.environment["TEST_MODE"] == "1"
+    }
+
     init() {
         // Under TEST_MODE, wipe the entire persistent prefs domain
         // before CullingConfig reads it and before SwiftUI restores
@@ -15,12 +19,17 @@ struct SuperPickyApp: App {
         // prior-class window geometry would otherwise leak into the
         // test and flake sidebar / toolbar assertions.
         // See docs/ci-perf-retry-notes.md.
-        if ProcessInfo.processInfo.environment["TEST_MODE"] == "1",
+        if Self.isTestMode,
            let bundleID = Bundle.main.bundleIdentifier {
             UserDefaults.standard.removePersistentDomain(forName: bundleID)
         }
         _config = State(wrappedValue: CullingConfig())
-        _modelState = State(wrappedValue: ModelDownloadState())
+        // In TEST_MODE inference is served by MockInferenceClientForUI, so the
+        // real ~350 MB CoreML model download is never used. Skip it: it only
+        // starves the mock processing pipeline and keeps the opaque
+        // ModelDownloadOverlay up, which blocks menu/toolbar interactions and
+        // delays species assignment on the CI runner (see the UI test suites).
+        _modelState = State(wrappedValue: ModelDownloadState(skipDownload: Self.isTestMode))
     }
 
     var body: some Scene {
@@ -39,7 +48,9 @@ struct SuperPickyApp: App {
             .onAppear {
                 LocalizationManager.localizeMenuBar(language: config.appLanguage)
                 PrefetchCoordinator.shared.bootstrap()
-                Task { await modelState.ensureReady() }
+                if !Self.isTestMode {
+                    Task { await modelState.ensureReady() }
+                }
             }
             .onChange(of: config.appTheme) { _, theme in
                 switch theme {
@@ -79,9 +90,17 @@ final class ModelDownloadState {
 
     private let manager: ModelManager
 
-    init() {
+    /// - Parameter skipDownload: when true (TEST_MODE), the real model download
+    ///   is never started and the state begins already "ready" so the
+    ///   ModelDownloadOverlay never appears. Inference is mocked in tests, so
+    ///   the on-disk models are unused; downloading them only starves the mock
+    ///   pipeline and blocks the UI behind the opaque overlay.
+    init(skipDownload: Bool = false) {
         let manifest = (try? ModelManifest.loadBundled()) ?? ModelManifest(version: 1, models: [])
         self.manager = ModelManager(manifest: manifest, rootDir: Self.cacheDir)
+        if skipDownload {
+            isDownloading = false
+        }
     }
 
     func ensureReady() async {

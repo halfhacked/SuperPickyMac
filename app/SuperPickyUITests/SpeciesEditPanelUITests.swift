@@ -254,6 +254,45 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
     // end so the following eagle test correctly takes the slow path and
     // re-selects DSC09969.
 
+    // TEMP DIAGNOSTIC — remove before merge. Runs first (test00) so it
+    // captures the exact post-open/post-scroll state test41 sees. Prints
+    // screen/window/panel/element frames + full a11y tree to the CI log.
+    func test00_DiagnosticDump() {
+        let app = Self.app!
+        let screenSize = XCUIScreen.main.screenshot().image.size
+        print("DIAG screen=\(screenSize)")
+        print("DIAG window=\(app.windows.firstMatch.frame)")
+
+        ensurePanelClosed()
+        selectThumbnail(filename: "DSC09969.jpg")
+        exifToggleButton.click()
+        let panel = app.scrollViews[A11y.exifPanel]
+        _ = panel.waitForExistence(timeout: 3)
+        let panelBefore = panel.exists ? String(describing: panel.frame) : "n/a"
+        print("DIAG panelExists=\(panel.exists) panelFrameBeforeScroll=\(panelBefore)")
+
+        scrollPanelToBottom()
+        let panelAfter = panel.exists ? String(describing: panel.frame) : "n/a"
+        print("DIAG panelFrameAfterScroll=\(panelAfter)")
+
+        dumpElement("Remove_baleag", app.buttons[A11y.speciesEditRemove("baleag")])
+        dumpElement("Add_goleag", app.buttons[A11y.speciesEditAdd("goleag")])
+        dumpElement("Add_osprey", app.buttons[A11y.speciesEditAdd("osprey")])
+        dumpElement("SearchField", app.textFields[A11y.speciesEditPanelSearchField])
+        print("DIAG scrollViewsCount=\(app.scrollViews.count) buttonsCount=\(app.buttons.count) textFieldsCount=\(app.textFields.count)")
+        print("DIAG TREE START\n\(app.debugDescription)\nDIAG TREE END")
+
+        ensurePanelClosed()
+        Self.currentPhotoFilename = nil
+    }
+
+    private func dumpElement(_ name: String, _ element: XCUIElement) {
+        let exists = element.exists
+        let frame = exists ? String(describing: element.frame) : "n/a"
+        let hittable = exists ? String(describing: element.isHittable) : "n/a"
+        print("DIAG \(name) exists=\(exists) hittable=\(hittable) frame=\(frame)")
+    }
+
     func test41_ToggleOpensPanelWithAssignedSpecies() {
         openPanelOnEagle()
         XCTAssertTrue(Self.app.buttons[A11y.speciesEditRemove("baleag")].waitForExistence(timeout: 2))
