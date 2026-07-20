@@ -28,7 +28,15 @@ extension XCUIApplication {
         timeout: TimeInterval = 2
     ) -> Bool {
         retryMenuInteraction(on: control, exposing: menuItem, attempts: attempts, timeout: timeout) {
-            $0.click()
+            coordinate, attempt in
+            switch attempt {
+            case 0:
+                coordinate.press(forDuration: 0.3)
+            case 1:
+                coordinate.click()
+            default:
+                control.typeKey(.space, modifierFlags: [])
+            }
         }
     }
 
@@ -42,7 +50,8 @@ extension XCUIApplication {
         timeout: TimeInterval = 2
     ) -> Bool {
         retryMenuInteraction(on: target, exposing: menuItem, attempts: attempts, timeout: timeout) {
-            $0.rightClick()
+            coordinate, _ in
+            coordinate.rightClick()
         }
     }
 
@@ -51,23 +60,23 @@ extension XCUIApplication {
         exposing menuItem: XCUIElement,
         attempts: Int,
         timeout: TimeInterval,
-        interaction: (XCUICoordinate) -> Void
+        interaction: (XCUICoordinate, Int) -> Void
     ) -> Bool {
         guard attempts > 0, target.waitForExistence(timeout: timeout) else { return false }
 
         for attempt in 0..<attempts {
             if attempt > 0 {
                 typeKey(.escape, modifierFlags: [])
-                activate()
                 Thread.sleep(forTimeInterval: 0.15)
             }
+            activate()
 
             let center = target.coordinate(
                 withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
             )
             center.hover()
             Thread.sleep(forTimeInterval: 0.1)
-            interaction(center)
+            interaction(center, attempt)
 
             if menuItem.waitForExistence(timeout: timeout) {
                 return true
