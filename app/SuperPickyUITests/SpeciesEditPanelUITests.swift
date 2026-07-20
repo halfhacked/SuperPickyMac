@@ -136,15 +136,30 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
             return
         }
         let expected = expanded ? "expanded" : "collapsed"
-        if (toggle.value as? String) != expected {
-            guard toggle.isHittable else {
-                XCTFail("Pinned metadata toggle should be hittable")
+        guard toggle.isHittable else {
+            XCTFail("Pinned metadata toggle should be hittable")
+            return
+        }
+
+        for attempt in 0..<3 {
+            if (toggle.value as? String) == expected { return }
+            Self.app.activate()
+            let center = toggle.coordinate(
+                withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
+            )
+            switch attempt {
+            case 0:
+                center.press(forDuration: 0.2)
+            case 1:
+                center.click()
+            default:
+                toggle.typeKey(.space, modifierFlags: [])
+            }
+            if poll(timeout: 1, { (toggle.value as? String) == expected }) {
                 return
             }
-            toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
         }
-        XCTAssertTrue(poll(timeout: 2) { (toggle.value as? String) == expected },
-                      "Metadata should become \(expected)")
+        XCTFail("Metadata should become \(expected)")
     }
 
     private func collapseMetadata() { setMetadataExpanded(false) }
