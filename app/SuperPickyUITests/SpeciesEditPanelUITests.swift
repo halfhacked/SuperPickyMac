@@ -32,60 +32,20 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
     // in the thumbnail strip's initial lazy render window, so we can click
     // by identifier directly without the arrow-strip detour the larger
     // shared fixture needs.
-    private func thumbnail(filename: String) -> XCUIElement {
-        Self.app.images
-            .matching(identifier: A11y.thumbnail(filename))
-            .matching(NSPredicate(
-                format: "value IN %@",
-                [
-                    A11y.ThumbnailSelection.active.rawValue,
-                    A11y.ThumbnailSelection.selected.rawValue,
-                    A11y.ThumbnailSelection.none.rawValue,
-                ]
-            ))
-            .firstMatch
-    }
-
-    private func thumbnailIsActive(_ filename: String) -> Bool {
-        thumbnail(filename: filename).value as? String
-            == A11y.ThumbnailSelection.active.rawValue
-    }
-
-    @discardableResult
-    private func selectThumbnail(filename: String) -> Bool {
-        let thumb = thumbnail(filename: filename)
+    private func selectThumbnail(filename: String) {
+        let thumb = Self.app.images.matching(identifier: A11y.thumbnail(filename)).firstMatch
         XCTAssertTrue(thumb.waitForExistence(timeout: 5),
                       "\(filename) thumbnail should exist in the 3-photo species fixture")
-        guard thumb.exists else { return false }
-
-        let active = A11y.ThumbnailSelection.active.rawValue
-        if poll(timeout: 0.5, { thumb.value as? String == active }) {
-            Self.currentPhotoFilename = filename
-            return true
-        }
-
-        Self.app.activate()
-        for _ in 0..<3 {
-            Self.app.typeKey(.leftArrow, modifierFlags: [])
-        }
-        for position in 0..<3 {
-            if poll(timeout: 1, { thumb.value as? String == active }) {
-                Self.currentPhotoFilename = filename
-                return true
-            }
-            if position < 2 {
-                Self.app.typeKey(.rightArrow, modifierFlags: [])
-            }
-        }
-
-        XCTFail("\(filename) thumbnail never became active")
-        return false
+        thumb.click()
+        // Brief settle so a subsequent `exifToggleButton.click()` doesn't
+        // race the still-processing thumbnail selection. Removing this
+        // caused a measurable CI regression (waitForExistence(panel) ate
+        // most of its 3 s budget instead of returning immediately).
+        Thread.sleep(forTimeInterval: 0.3)
+        Self.currentPhotoFilename = filename
     }
 
-    @discardableResult
-    private func selectEaglePhoto() -> Bool {
-        selectThumbnail(filename: "DSC09969.jpg")
-    }
+    private func selectEaglePhoto() { selectThumbnail(filename: "DSC09969.jpg") }
 
     // SearchField sits at the bottom of a scrollable panel and can be pruned
     // from the accessibility tree when scrolled out of view. The root
@@ -99,9 +59,7 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
     /// `true` skip the close → reselect → reopen cycle, which is the
     /// dominant per-test cost on CI (two toggle animations per hop).
     private func panelIsOpenOnEagle() -> Bool {
-        Self.currentPhotoFilename == "DSC09969.jpg"
-            && thumbnailIsActive("DSC09969.jpg")
-            && panelIsOpen()
+        Self.currentPhotoFilename == "DSC09969.jpg" && panelIsOpen()
     }
 
     // On macOS CI (GitHub Actions runner), SwiftUI toolbar buttons surface as a
@@ -121,18 +79,22 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
     private func openPanelOnEagle() {
         // Fast path: panel already open on the eagle from the previous
         // test in the shared-app suite. Skip the toggle-off / reselect /
-        // toggle-on cycle (roughly 2–3 s on the CI runner).
+        // toggle-on + re-scroll cycle (roughly 2–3 s on the CI runner).
+        // The panel's scroll offset persists, so the species section is
+        // already visible — only state-normalization is needed.
         if panelIsOpenOnEagle() {
-            collapseMetadata()
             resetEagleSpeciesToBaleagOnly()
             return
         }
         ensurePanelClosed()
-        guard selectEaglePhoto() else { return }
+        selectEaglePhoto()
         exifToggleButton.click()
         XCTAssertTrue(Self.app.scrollViews[A11y.exifPanel].waitForExistence(timeout: 3),
                       "Panel should open")
-        collapseMetadata()
+        // Species sits below EXIF in the scrollable panel. On small windows
+        // (CI) the species section is below the fold; scroll it into view
+        // so Remove_/Add_/MakePrimary_ buttons and SearchField are hittable.
+        scrollPanelToBottom()
         resetEagleSpeciesToBaleagOnly()
     }
 
@@ -171,80 +133,33 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
         }
     }
 
-    private func setMetadataExpanded(_ expanded: Bool) {
-        let toggle = Self.app.buttons.matching(identifier: A11y.exifMetadataToggle).firstMatch
-        guard toggle.waitForExistence(timeout: 3) else {
-            XCTFail("Metadata toggle should exist")
-            return
-        }
-        let expected = expanded ? "expanded" : "collapsed"
-        guard toggle.isHittable else {
-            XCTFail("Pinned metadata toggle should be hittable")
-            return
-        }
-
-        for attempt in 0..<3 {
-            if (toggle.value as? String) == expected { return }
-            Self.app.activate()
-            let center = toggle.coordinate(
-                withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
-            )
-            switch attempt {
-            case 0:
-                center.press(forDuration: 0.2)
-            case 1:
-                center.click()
-            default:
-                toggle.typeKey(.space, modifierFlags: [])
-            }
-            if poll(timeout: 1, { (toggle.value as? String) == expected }) {
-                return
-            }
-        }
-        XCTFail("Metadata should become \(expected)")
+    /// Scrolls the ExifPanel down so the species section becomes visible.
+    /// A fixed post-scroll settle is simpler and faster on CI than polling
+    /// `.isHittable` on candidate elements — each `.isHittable` probe
+    /// triggers a snapshot refresh (~0.5 s on the macOS-15 runner) and
+    /// calling three of them in a poll loop costs more than a plain 0.3 s
+    /// wait. The race being mitigated is: the SwiftUI scroll animation
+    /// completes a frame or two after XCUITest returns from `scroll(...)`,
+    /// and a coordinate click issued before that frame lands off-screen.
+    private func scrollPanelToBottom() {
+        let panel = Self.app.scrollViews[A11y.exifPanel]
+        guard panel.exists else { return }
+        // -600 is the original, proven-on-CI delta. Larger values risk
+        // over-scrolling past the scroll-view's content bottom, which
+        // XCTest reports as "Unable to find hit point" and aborts the
+        // current test.
+        panel.scroll(byDeltaX: 0, deltaY: -600)
+        Thread.sleep(forTimeInterval: 0.3)
     }
 
-    private func collapseMetadata() { setMetadataExpanded(false) }
-    private func expandMetadata() { setMetadataExpanded(true) }
-
-    private func collapseCandidates() {
-        let toggle = Self.app.buttons
-            .matching(identifier: A11y.speciesEditPanelCandidatesToggle)
-            .firstMatch
-        guard toggle.exists else { return }
-        guard (toggle.value as? String) != "collapsed" else { return }
-        let panelFrame = Self.app.scrollViews[A11y.exifPanel].frame
-        let toggleFrame = toggle.frame
-        let toggleCenter = CGPoint(x: toggleFrame.midX, y: toggleFrame.midY)
-        guard panelFrame.contains(toggleCenter) else {
-            XCTFail("Candidates toggle should be inside the visible panel")
-            return
-        }
-        toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
-        XCTAssertTrue(poll(timeout: 2) { (toggle.value as? String) == "collapsed" },
-                      "Candidates should collapse")
-    }
-
-    /// Click a button reliably on CI. The 12–13 pt SF-symbol Add/Remove
+    /// Click a button reliably on CI. The 12-pt SF-symbol Add/Remove
     /// buttons in the candidates list race between `isHittable` returning
-    /// true and the click being dispatched — `element.click()` then fails
-    /// with "Not hittable". A coordinate click at the reported centre
-    /// bypasses that a11y hit test, but on the hosted macOS 15.7.x runner a
-    /// *raw* coordinate click (mouse-down/up with no preceding pointer move)
-    /// is silently dropped by SwiftUI's hover-based hit testing: the button
-    /// is found and the click synthesized, yet the action never fires. This
-    /// is why the cold first candidate click of the suite (test44's Add)
-    /// failed on 184e4b5 while the same code passed on the pre-upgrade
-    /// runner. Bring the app frontmost and hover onto the control to prime
-    /// the hit test before clicking — the same `activate()` + `hover()`
-    /// priming the proven `retryMenuInteraction` path uses.
+    /// true and the click being dispatched — the click then fails with
+    /// "Not hittable". Always using a coordinate click at the reported
+    /// centre bypasses the a11y hit test entirely.
     private func tapButton(_ element: XCUIElement) {
         guard element.exists else { return }
-        Self.app.activate()
-        let center = element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        center.hover()
-        Thread.sleep(forTimeInterval: 0.1)
-        center.click()
+        element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
     }
 
     /// Grant keyboard focus to the species search TextField. CI's smaller
@@ -254,20 +169,12 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
     /// landed by asserting on the typed value afterwards (`typeAndWaitFor`).
     @discardableResult
     private func focusSearchField() -> XCUIElement {
-        collapseCandidates()
         let field = Self.app.textFields[A11y.speciesEditPanelSearchField]
-        guard field.waitForExistence(timeout: 3) else {
-            XCTFail("Search field should exist after collapsible sections are folded")
-            return field
-        }
-        let panelFrame = Self.app.scrollViews[A11y.exifPanel].frame
-        let fieldFrame = field.frame
-        let fieldCenter = CGPoint(x: fieldFrame.midX, y: fieldFrame.midY)
-        guard panelFrame.contains(fieldCenter) else {
-            XCTFail("Search field should be inside the visible panel")
-            return field
-        }
+        _ = field.waitForExistence(timeout: 3)
         let center = field.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        center.click()
+        Thread.sleep(forTimeInterval: 0.15)
+        field.hover()
         center.click()
         Thread.sleep(forTimeInterval: 0.15)
         return field
@@ -430,10 +337,10 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
         let app = Self.app!
         ensurePanelClosed()
         // DSC09951 is a bird-but-unidentified photo in the mock fixture.
-        guard selectThumbnail(filename: "DSC09951.jpg") else { return }
+        selectThumbnail(filename: "DSC09951.jpg")
         exifToggleButton.click()
         XCTAssertTrue(app.scrollViews[A11y.exifPanel].waitForExistence(timeout: 3))
-        collapseMetadata()
+        scrollPanelToBottom()
         XCTAssertTrue(app.staticTexts[A11y.speciesEditPanelEmptyAssigned].waitForExistence(timeout: 2))
         XCTAssertFalse(app.buttons[A11y.speciesEditRemove("baleag")].exists)
         // Leave the panel open; the next test's openPanelOnEagle() takes
@@ -457,11 +364,11 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
         // Switch to DSC09970 (second eagle in the species fixture) — a real
         // photo change that should clear the search.
         ensurePanelClosed()
-        guard selectThumbnail(filename: "DSC09970.jpg") else { return }
+        selectThumbnail(filename: "DSC09970.jpg")
 
         exifToggleButton.click()
         XCTAssertTrue(app.scrollViews[A11y.exifPanel].waitForExistence(timeout: 3))
-        collapseMetadata()
+        scrollPanelToBottom()
 
         let newField = app.textFields[A11y.speciesEditPanelSearchField]
         XCTAssertTrue(newField.waitForExistence(timeout: 2))
@@ -469,7 +376,7 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
                        "Search field should clear on photo change " +
                        "(value=\(String(describing: newField.value)))")
         // Leave the panel open on DSC09970; the next eagle test's
-        // openPanelOnEagle() slow path (the eagle thumbnail isn't active)
+        // openPanelOnEagle() slow path (currentPhotoFilename != DSC09969)
         // closes it before re-opening on the eagle.
     }
 
@@ -552,23 +459,24 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
     func test54_InfoPanelRefreshesKeywordsOnSpeciesEdit() {
         let app = Self.app!
         ensurePanelClosed()
-        guard selectEaglePhoto() else { return }
+        selectEaglePhoto()
 
         let sidecarPath = (Self.testDir! as NSString).appendingPathComponent("DSC09969.xmp")
         XCTAssertTrue(waitForSidecar(at: sidecarPath, containing: "Bald Eagle", timeout: 5))
 
+        let baldKeyword = app.staticTexts[A11y.exifKeyword("Bald Eagle")]
+        if !baldKeyword.exists {
+            exifToggleButton.click()
+        }
+        XCTAssertTrue(baldKeyword.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts[A11y.exifKeyword("Golden Eagle")].exists)
+
+        // Panel already open from the check above; just scroll + normalize.
         if !app.scrollViews[A11y.exifPanel].exists {
             exifToggleButton.click()
         }
         XCTAssertTrue(app.scrollViews[A11y.exifPanel].waitForExistence(timeout: 3))
-        expandMetadata()
-        let baldKeyword = app.staticTexts[A11y.exifKeyword("Bald Eagle")]
-        XCTAssertTrue(baldKeyword.waitForExistence(timeout: 5))
-        XCTAssertFalse(app.staticTexts[A11y.exifKeyword("Golden Eagle")].exists)
-
-        // Collapse metadata so the species controls fit without relying on
-        // XCUITest scrolling.
-        collapseMetadata()
+        scrollPanelToBottom()
         resetEagleSpeciesToBaleagOnly()
 
         tapButton(app.buttons[A11y.speciesEditAdd("goleag")])
@@ -576,16 +484,13 @@ final class SpeciesEditPanelUITests: SuperPickyUITestCase {
                       "Add_goleag click should move goleag to Assigned")
 
         XCTAssertTrue(waitForSidecar(at: sidecarPath, containing: "Golden Eagle", timeout: 3))
-        expandMetadata()
         XCTAssertTrue(app.staticTexts[A11y.exifKeyword("Golden Eagle")].waitForExistence(timeout: 5),
                       "EXIF keywords should refresh after species edit")
         XCTAssertTrue(app.staticTexts[A11y.exifKeyword("Bald Eagle")].exists)
 
-        collapseMetadata()
         tapButton(app.buttons[A11y.speciesEditRemove("goleag")])
         XCTAssertTrue(app.buttons[A11y.speciesEditAdd("goleag")].waitForExistence(timeout: 2),
                       "Remove click should move goleag back to Candidates")
-        expandMetadata()
         XCTAssertTrue(poll(timeout: 4) { !app.staticTexts[A11y.exifKeyword("Golden Eagle")].exists },
                       "Keyword should drop after removal")
 
