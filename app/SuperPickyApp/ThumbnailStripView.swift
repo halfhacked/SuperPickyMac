@@ -48,7 +48,6 @@ struct ThumbnailStripView: View {
                 .padding(.horizontal, 4)
                 .padding(.vertical, 6)
             }
-            .accessibilityIdentifier("ThumbnailStrip")
             .background(ScrollWheelRedirector())
             .background(.bar)
             .onChange(of: selection.activeID) { _, _ in
@@ -237,4 +236,5 @@ struct AsyncThumbnailImage: View {
         await ImageLoader.load(path: filePath, maxPixelSize: 160)
     }
 }
+
 

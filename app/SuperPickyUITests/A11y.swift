@@ -7,11 +7,8 @@ import Foundation
 enum A11y {
     static let photoPreview = "PhotoPreview"
     static let exifPanel = "ExifPanel"
-    static let exifMetadataToggle = "ExifMetadataToggle"
     static let exifToggle = "ExifToggle"
     static let photoCounter = "PhotoCounter"
-    static let thumbnailStrip = "ThumbnailStrip"
-    static let speciesEditPanelCandidatesToggle = "SpeciesEditPanel_CandidatesToggle"
     static let speciesEditPanelSearchField = "SpeciesEditPanel_SearchField"
     static let speciesEditPanelEmptyAssigned = "SpeciesEditPanel_EmptyAssigned"
     static let selectionCounter = "SelectionCounter"
