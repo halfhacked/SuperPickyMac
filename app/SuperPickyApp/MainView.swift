@@ -419,7 +419,8 @@ struct MainView: View {
         // Seed allPhotos from the DB so any already-processed photos (skipped
         // by the pipeline) appear immediately, and so incremental append can
         // update-in-place by ID.
-        appState.loadPhotos(for: folder)
+        PreviewSweepCoordinator.shared.stop()
+        appState.loadPhotos(for: folder, startPreviewSweep: false)
 
         processingTask = Task {
             let batcher = PhotoIngestBatcher(appState: appState, pipeline: pipeline)

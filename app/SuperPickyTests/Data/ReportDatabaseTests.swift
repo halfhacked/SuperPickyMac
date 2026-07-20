@@ -24,6 +24,25 @@ import GRDB
         #expect(fetched?.aestheticsScore == 6.5)
     }
 
+    @Test func fetchAllFileDatesReturnsPersistedCaptureDates() throws {
+        let tempDir = try makeTempDir()
+        let db = try ReportDatabase(folderPath: tempDir)
+        let date = Date(timeIntervalSince1970: 1_700_000_000.125)
+        var photo = Photo(
+            filename: "dated.jpg",
+            filePath: "/tmp/dated.jpg",
+            folderPath: tempDir.path,
+            dateCreated: date
+        )
+        try db.save(&photo)
+
+        let dates = try db.fetchAllFileDates()
+        let stored = try #require(dates[photo.filePath])
+        #expect(
+            abs(stored.timeIntervalSince1970 - date.timeIntervalSince1970) < 0.001
+        )
+    }
+
     @Test func fetchByRating() throws {
         let tempDir = try makeTempDir()
         let db = try ReportDatabase(folderPath: tempDir)

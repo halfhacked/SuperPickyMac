@@ -261,7 +261,12 @@ final class AppState {
     /// Pass `deferSelection: true` from a user-initiated sidebar click so the
     /// view layer can pick the displayed-first photo even when re-clicking the
     /// already-loaded folder (where `isFolderSwitch` would otherwise be `false`).
-    func loadPhotos(for folder: URL, skipHierarchy: Bool = false, deferSelection: Bool = false) {
+    func loadPhotos(
+        for folder: URL,
+        skipHierarchy: Bool = false,
+        deferSelection: Bool = false,
+        startPreviewSweep: Bool = true
+    ) {
         let isFolderSwitch = (currentFolder != folder)
         // Sidebar re-click on the already-loaded folder: the in-memory
         // photo set, indices, species hierarchy, undo stack, and DB cache
@@ -291,15 +296,19 @@ final class AppState {
             // respects the user's current sort order.
             applyFilter(autoSelectFirst: !shouldDeferSelection)
 
-            if isFolderSwitch {
-                let paths = allPhotos.map(\.filePath)
+            if startPreviewSweep || isFolderSwitch {
                 let prefillPhotos = allPhotos
                 Task { @MainActor in
-                    PreviewSweepCoordinator.shared.start(folder: folder, paths: paths)
-                    PrefetchCoordinator.shared.reset()
-                    NavigationStateMonitor.shared.reset()
-                    if !prefillPhotos.isEmpty {
-                        PrefetchCoordinator.shared.prefill(photos: prefillPhotos, around: 0)
+                    if startPreviewSweep {
+                        let paths = prefillPhotos.map(\.filePath)
+                        PreviewSweepCoordinator.shared.start(folder: folder, paths: paths)
+                    }
+                    if isFolderSwitch {
+                        PrefetchCoordinator.shared.reset()
+                        NavigationStateMonitor.shared.reset()
+                        if !prefillPhotos.isEmpty {
+                            PrefetchCoordinator.shared.prefill(photos: prefillPhotos, around: 0)
+                        }
                     }
                 }
             }
