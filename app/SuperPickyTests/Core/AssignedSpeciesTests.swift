@@ -6,26 +6,32 @@ import Foundation
 /// `AppState` mutation APIs (`setPrimarySpecies` / `addSpecies` /
 /// `removeSpecies` / `correctSpecies`) that back the new species edit
 /// panel.
-@Suite(.serialized) struct AssignedSpeciesTests {
+@Suite(.serialized)
+@MainActor
+struct AssignedSpeciesTests {
 
     /// Wraps the legacy "set the full list" semantics in terms of the new
     /// set-based API: promote the head as primary, add the rest, then
     /// remove anything from the photo's prior list that isn't in `species`.
     /// Empty `species` removes every existing entry.
-    private func setSpeciesList(_ appState: AppState, id: UUID, species: [SpeciesMatch]) {
+    private func setSpeciesList(
+        _ appState: AppState,
+        id: UUID,
+        species: [SpeciesMatch]
+    ) async {
         let existing = appState.photos.first(where: { $0.id == id })?.assignedSpecies ?? []
         if let primary = species.first {
-            appState.setPrimarySpecies(ids: [id], species: primary)
+            await appState.setPrimarySpecies(ids: [id], species: primary).value
             for sp in species.dropFirst() {
-                appState.addSpecies(ids: [id], species: sp)
+                await appState.addSpecies(ids: [id], species: sp).value
             }
             let newIDs = Set(species.map(\.speciesID))
             for sp in existing where !newIDs.contains(sp.speciesID) {
-                appState.removeSpecies(ids: [id], species: sp)
+                await appState.removeSpecies(ids: [id], species: sp).value
             }
         } else {
             for sp in existing {
-                appState.removeSpecies(ids: [id], species: sp)
+                await appState.removeSpecies(ids: [id], species: sp).value
             }
         }
     }
@@ -212,7 +218,7 @@ import Foundation
 
     // MARK: - AppState.setAssignedSpecies
 
-    @Test func setAssignedSpeciesPersistsToDB() throws {
+    @Test func setAssignedSpeciesPersistsToDB() async throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
 
@@ -225,7 +231,7 @@ import Foundation
         appState.loadPhotos(for: folder)
 
         let hawk = match(sci: "Accipiter", common: "Hawk", ebird: "hawk")
-        setSpeciesList(appState, id: photo.id, species: [
+        await setSpeciesList(appState, id: photo.id, species: [
             match(sci: "Aquila", common: "Eagle", ebird: "eagle"),
             hawk,
         ])
@@ -238,7 +244,7 @@ import Foundation
         #expect(refetched.assignedSpecies.map(\.speciesID) == ["eagle", "hawk"])
     }
 
-    @Test func setAssignedSpeciesUpdatesSidebarBuckets() throws {
+    @Test func setAssignedSpeciesUpdatesSidebarBuckets() async throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
 
@@ -252,7 +258,7 @@ import Foundation
         #expect(appState.speciesEntries.contains { $0.speciesID == "eagle" })
         #expect(!appState.speciesEntries.contains { $0.speciesID == "hawk" })
 
-        setSpeciesList(appState, id: photo.id, species: [
+        await setSpeciesList(appState, id: photo.id, species: [
             match(sci: "Aquila", common: "Eagle", ebird: "eagle"),
             match(sci: "Accipiter", common: "Hawk", ebird: "hawk"),
         ])
@@ -261,7 +267,7 @@ import Foundation
         #expect(appState.speciesEntries.contains { $0.speciesID == "hawk" })
     }
 
-    @Test func setAssignedSpeciesEmptyMovesPhotoToUnidentified() throws {
+    @Test func setAssignedSpeciesEmptyMovesPhotoToUnidentified() async throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
 
@@ -272,7 +278,7 @@ import Foundation
 
         let appState = AppState()
         appState.loadPhotos(for: folder)
-        setSpeciesList(appState, id: photo.id, species: [])
+        await setSpeciesList(appState, id: photo.id, species: [])
 
         appState.sidebarSelection = .species(nil) // Unidentified bucket
         appState.applyFilter()
@@ -285,7 +291,7 @@ import Foundation
 
     // MARK: - AppState.correctSpecies (inline rename shim)
 
-    @Test func correctSpeciesRenamesCommonNameWithoutChangingSpeciesID() throws {
+    @Test func correctSpeciesRenamesCommonNameWithoutChangingSpeciesID() async throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
 
@@ -298,7 +304,7 @@ import Foundation
 
         let appState = AppState()
         appState.loadPhotos(for: folder)
-        appState.correctSpecies(ids: [photo.id], commonName: "Golden Eagle")
+        await appState.correctSpecies(ids: [photo.id], commonName: "Golden Eagle").value
 
         let db2 = try ReportDatabase(folderPath: folder)
         let fetched = try db2.fetchPhoto(id: photo.id)
@@ -309,7 +315,7 @@ import Foundation
         #expect(refetched.assignedSpecies.first?.scientificName == "Aquila chrysaetos")
     }
 
-    @Test func correctSpeciesOnUnidentifiedPhotoCreatesCustomEntry() throws {
+    @Test func correctSpeciesOnUnidentifiedPhotoCreatesCustomEntry() async throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
 
@@ -319,7 +325,7 @@ import Foundation
 
         let appState = AppState()
         appState.loadPhotos(for: folder)
-        appState.correctSpecies(ids: [photo.id], commonName: "Mystery Bird")
+        await appState.correctSpecies(ids: [photo.id], commonName: "Mystery Bird").value
 
         let db2 = try ReportDatabase(folderPath: folder)
         let fetched = try db2.fetchPhoto(id: photo.id)
@@ -363,7 +369,7 @@ import Foundation
 
     // MARK: - Burst fan-out
 
-    @Test func setAssignedSpeciesFansOutToAllBurstMembers() throws {
+    @Test func setAssignedSpeciesFansOutToAllBurstMembers() async throws {
         let seeded = try seedBurstAndSolo(
             burstPrimary: match(sci: "Aquila", common: "Eagle", ebird: "eagle")
         )
@@ -378,7 +384,7 @@ import Foundation
             match(sci: "Accipiter", common: "Hawk", ebird: "hawk"),
             match(sci: "Buteo", common: "Buzzard", ebird: "buzzard"),
         ]
-        setSpeciesList(appState, id: seeded.burstIDs[0], species: newList)
+        await setSpeciesList(appState, id: seeded.burstIDs[0], species: newList)
 
         let db = try ReportDatabase(folderPath: seeded.folder)
         for id in seeded.burstIDs {
@@ -389,7 +395,7 @@ import Foundation
         #expect(solo.assignedSpecies.map(\.speciesID) == ["eagle"])
     }
 
-    @Test func correctSpeciesFansOutToAllBurstMembers() throws {
+    @Test func correctSpeciesFansOutToAllBurstMembers() async throws {
         let seeded = try seedBurstAndSolo(
             burstPrimary: match(sci: "Aquila chrysaetos",
                                 common: "Bald Eagle", // deliberately wrong
@@ -400,7 +406,10 @@ import Foundation
         let appState = AppState()
         appState.loadPhotos(for: seeded.folder)
 
-        appState.correctSpecies(ids: [seeded.burstIDs[0]], commonName: "Golden Eagle")
+        await appState.correctSpecies(
+            ids: [seeded.burstIDs[0]],
+            commonName: "Golden Eagle"
+        ).value
 
         let db = try ReportDatabase(folderPath: seeded.folder)
         for id in seeded.burstIDs {
@@ -415,7 +424,7 @@ import Foundation
         #expect(solo.assignedSpecies.first?.commonName == "Bald Eagle")
     }
 
-    @Test func setAssignedSpeciesOnSoloPhotoDoesNotTouchOtherPhotos() throws {
+    @Test func setAssignedSpeciesOnSoloPhotoDoesNotTouchOtherPhotos() async throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
 
@@ -434,7 +443,7 @@ import Foundation
         appState.loadPhotos(for: folder)
 
         let hawk = match(sci: "Accipiter", common: "Hawk", ebird: "hawk")
-        setSpeciesList(appState, id: solo.id, species: [hawk])
+        await setSpeciesList(appState, id: solo.id, species: [hawk])
 
         let db2 = try ReportDatabase(folderPath: folder)
         let soloAfter = try #require(try db2.fetchPhoto(id: solo.id))
@@ -443,7 +452,7 @@ import Foundation
         #expect(otherAfter.assignedSpecies.map(\.speciesID) == ["eagle"])
     }
 
-    @Test func burstFanOutWithSecondarySpeciesAppearsUnderBothSidebarBuckets() throws {
+    @Test func burstFanOutWithSecondarySpeciesAppearsUnderBothSidebarBuckets() async throws {
         // Start with a burst where every member is tagged Eagle.
         // Edit one member's species list to [Eagle, Hawk] — fan-out
         // propagates [Eagle, Hawk] to every burst member. The sidebar
@@ -468,7 +477,7 @@ import Foundation
         appState.loadPhotos(for: folder)
 
         let hawk = match(sci: "Accipiter", common: "Hawk", ebird: "hawk")
-        setSpeciesList(appState, id: burstIDs[0], species: [eagle, hawk])
+        await setSpeciesList(appState, id: burstIDs[0], species: [eagle, hawk])
 
         let eagleEntry = appState.speciesEntries.first { $0.speciesID == "eagle" }
         let hawkEntry = appState.speciesEntries.first { $0.speciesID == "hawk" }

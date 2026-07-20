@@ -1,6 +1,11 @@
 import Foundation
 import GRDB
 
+struct PhotoMutationResult: Sendable {
+    let previous: Photo
+    let updated: Photo
+}
+
 final class ReportDatabase: Sendable {
     private let dbQueue: DatabaseQueue
 
@@ -160,6 +165,38 @@ final class ReportDatabase: Sendable {
         try dbQueue.write { db in
             for index in photos.indices {
                 try photos[index].save(db)
+            }
+        }
+    }
+
+    /// Fetch, mutate, and save a photo batch in one transaction. Keeping the
+    /// read-modify-write cycle atomic prevents concurrent pipeline writes from
+    /// interleaving between an edit's reads and saves.
+    func mutatePhotos(
+        ids: [UUID],
+        _ mutate: @Sendable (inout [Photo]) -> Void
+    ) throws -> [PhotoMutationResult] {
+        try dbQueue.write { db in
+            var previous: [Photo] = []
+            previous.reserveCapacity(ids.count)
+            for id in ids {
+                if let photo = try Photo.fetchOne(db, key: id) {
+                    previous.append(photo)
+                }
+            }
+
+            var updated = previous
+            mutate(&updated)
+            precondition(
+                updated.map(\.id) == previous.map(\.id),
+                "Photo batch mutations must preserve identity and order"
+            )
+            for index in updated.indices {
+                try updated[index].save(db)
+            }
+
+            return zip(previous, updated).map {
+                PhotoMutationResult(previous: $0.0, updated: $0.1)
             }
         }
     }
