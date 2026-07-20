@@ -70,24 +70,49 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
 
     func test05_SortMenuOffersFiveOrders() {
         let app = Self.app!
-        // SwiftUI Menu renders as a popUpButton on macOS, not a plain
-        // Button. The identifier is applied to the Menu's label.
-        let sortMenu = app.descendants(matching: .any).matching(identifier: "SortMenu").firstMatch
+        // Warm the app frontmost before opening the sort control. On the
+        // hosted runner the first interactions of a cold test are dropped
+        // before AppKit brings the app frontmost: at 184e4b5 test05 had no
+        // warm-up and failed, while test23/test24 — which do this exact
+        // preview-click + arrow-key warm-up — drove the same inline sort
+        // control successfully every run. The keyboard events force
+        // activation so the following sort-toggle click lands.
+        let preview = app.images[A11y.photoPreview]
+        XCTAssertTrue(preview.waitForExistence(timeout: 10))
+        preview.click()
+        for _ in 0..<3 { app.typeKey(.rightArrow, modifierFlags: []) }
+        Thread.sleep(forTimeInterval: 0.4)
+
+        let sortMenu = app.buttons["SortMenu"]
         XCTAssertTrue(sortMenu.waitForExistence(timeout: 5), "SortMenu element should exist")
-        if sortMenu.isHittable {
-            sortMenu.click()
-        } else {
-            sortMenu.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+
+        // Open the inline sort options. On the hosted macOS 15.7.x runner
+        // the first synthesized clicks of the suite are dropped unless the
+        // app is explicitly frontmost and the pointer is moved onto the
+        // control first (SwiftUI hover-based hit testing) — the same
+        // activate() + hover() priming the proven openMenu /
+        // retryMenuInteraction path uses, which is why the warm test24
+        // drives this identical inline control every run. This is a TOGGLE
+        // (showSortOptions), so only ever click when the panel is confirmed
+        // still closed (Filename absent); never re-click an open panel,
+        // which would toggle it shut. The popup-oriented openMenu is wrong
+        // here: its press -> click -> space retry ladder double-toggles the
+        // toggle when a cold hosted click is delayed rather than dropped.
+        let filenameItem = app.buttons["Filename"]
+        var opened = filenameItem.waitForExistence(timeout: 0.5)
+        for _ in 0..<3 where !opened {
+            app.activate()
+            let center = sortMenu.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            center.hover()
+            Thread.sleep(forTimeInterval: 0.1)
+            center.click()
+            opened = filenameItem.waitForExistence(timeout: 3)
         }
-        // Gate on the first item appearing rather than a blind sleep.
-        XCTAssertTrue(app.menuItems["Filename"].waitForExistence(timeout: 2) ||
-                      app.descendants(matching: .any)["Filename"].firstMatch.waitForExistence(timeout: 1),
-                      "Sort menu should open and offer 'Filename'")
+        XCTAssertTrue(opened, "Sort menu should open and offer 'Filename'")
 
         for label in ["Filename", "Date", "Rating", "Sharpness", "Aesthetics"] {
-            XCTAssertTrue(app.menuItems[label].exists ||
-                          app.descendants(matching: .any)[label].exists,
-                          "Sort menu should offer '\(label)'")
+            XCTAssertTrue(app.buttons[label].exists,
+                         "Sort menu should offer '\(label)'")
         }
         // Dismiss without changing selection so later tests see default order.
         app.typeKey(.escape, modifierFlags: [])
@@ -460,13 +485,11 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
         Thread.sleep(forTimeInterval: 0.5)
         let folderName = (Self.testDir! as NSString).lastPathComponent
         app.staticTexts[folderName].click()
-        Thread.sleep(forTimeInterval: 0.7)
 
-        let activeID = activeThumbnailID(in: app)
-        let leftmostID = leftmostVisibleThumbnailID(in: app)
-        XCTAssertNotNil(activeID, "Some thumbnail should be marked active")
-        XCTAssertEqual(activeID, leftmostID,
-                       "Sidebar filter switch must select the displayed-first thumbnail")
+        assertActiveThumbnailIsLeftmost(
+            in: app,
+            message: "Sidebar filter switch must select the displayed-first thumbnail"
+        )
     }
 
     /// Changing the sort order (Date asc ↔ desc here, via the SortMenu's
@@ -486,29 +509,19 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
         // Open the sort menu and click "Date" — toggles ascending if
         // already Date, else switches to Date. Either way the displayed
         // list's leftmost shifts and selection must follow.
-        let sortMenu = app.descendants(matching: .any)
-            .matching(identifier: "SortMenu").firstMatch
+        let sortMenu = app.buttons["SortMenu"]
         XCTAssertTrue(sortMenu.waitForExistence(timeout: 5),
                       "SortMenu should be present")
-        if sortMenu.isHittable {
-            sortMenu.click()
-        } else {
-            sortMenu.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
-        }
 
-        let dateItem = app.menuItems["Date"].firstMatch
-        if dateItem.waitForExistence(timeout: 2) {
-            dateItem.click()
-        } else {
-            app.descendants(matching: .any)["Date"].firstMatch.click()
-        }
-        Thread.sleep(forTimeInterval: 0.7)
+        let dateItem = app.buttons["Date"]
+        XCTAssertTrue(app.openMenu(from: sortMenu, exposing: dateItem),
+                      "Sort menu should open and offer 'Date'")
+        dateItem.click()
 
-        let activeID = activeThumbnailID(in: app)
-        let leftmostID = leftmostVisibleThumbnailID(in: app)
-        XCTAssertNotNil(activeID, "Some thumbnail should be marked active")
-        XCTAssertEqual(activeID, leftmostID,
-                       "Sort change must select the displayed-first thumbnail")
+        assertActiveThumbnailIsLeftmost(
+            in: app,
+            message: "Sort change must select the displayed-first thumbnail"
+        )
     }
 
     /// Toggling an in-bar filter (PickedFilter on→off) must also land
@@ -528,13 +541,11 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
         pickedFilter.click()
         Thread.sleep(forTimeInterval: 0.5)
         pickedFilter.click()
-        Thread.sleep(forTimeInterval: 0.7)
 
-        let activeID = activeThumbnailID(in: app)
-        let leftmostID = leftmostVisibleThumbnailID(in: app)
-        XCTAssertNotNil(activeID, "Some thumbnail should be marked active")
-        XCTAssertEqual(activeID, leftmostID,
-                       "Toggling PickedFilter must select the displayed-first thumbnail")
+        assertActiveThumbnailIsLeftmost(
+            in: app,
+            message: "Toggling PickedFilter must select the displayed-first thumbnail"
+        )
     }
 
     // MARK: - Helpers
@@ -548,6 +559,29 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
         return active.exists ? active.identifier : nil
     }
 
+    private func waitUntil(_ timeout: TimeInterval, condition: () -> Bool) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if condition() { return true }
+            Thread.sleep(forTimeInterval: 0.15)
+        }
+        return false
+    }
+
+    private func assertActiveThumbnailIsLeftmost(
+        in app: XCUIApplication,
+        message: String
+    ) {
+        XCTAssertTrue(waitUntil(3) {
+            guard let activeID = self.activeThumbnailID(in: app),
+                  let leftmostID = self.leftmostVisibleThumbnailID(in: app) else {
+                return false
+            }
+            return activeID == leftmostID
+        }, "\(message) (active=\(activeThumbnailID(in: app) ?? "nil"), " +
+           "leftmost=\(leftmostVisibleThumbnailID(in: app) ?? "nil"))")
+    }
+
     /// Identifier of the leftmost thumbnail in the visible viewport. Walks
     /// a single `app.snapshot()` of the a11y tree — properties on
     /// `XCUIElementSnapshot` are pure reads, no per-element re-query. The
@@ -557,23 +591,52 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
     /// that was ~30 s of pure query overhead per culling-shard run.
     private func leftmostVisibleThumbnailID(in app: XCUIApplication) -> String? {
         guard let root = try? app.snapshot() else { return nil }
-        var minX = CGFloat.greatestFiniteMagnitude
-        var result: String?
+        var stripFrame: CGRect?
+        var previewFrame: CGRect?
+        var thumbnailFrames: [(identifier: String, frame: CGRect)] = []
         var stack: [XCUIElementSnapshot] = [root]
         while let node = stack.popLast() {
+            if node.identifier == A11y.thumbnailStrip {
+                stripFrame = node.frame
+            } else if node.identifier == A11y.photoPreview,
+                      node.frame.width > (previewFrame?.width ?? 0) {
+                previewFrame = node.frame
+            }
             if node.elementType == .image,
                node.identifier.hasPrefix("Thumbnail_") {
                 let frame = node.frame
                 if frame.size.width > 0,
+                   frame.size.height > 0,
                    frame.origin.x.isFinite,
-                   frame.origin.x < minX {
-                    minX = frame.origin.x
-                    result = node.identifier
+                   frame.origin.y.isFinite {
+                    thumbnailFrames.append((node.identifier, frame))
                 }
             }
             stack.append(contentsOf: node.children)
         }
-        return result
+
+        guard let stripFrame, !stripFrame.isEmpty, !stripFrame.isNull else {
+            return nil
+        }
+        // SwiftUI offsets this nested horizontal ScrollView's AX frame by
+        // the sidebar width twice. The preview has the correct detail-column
+        // bounds, while the strip still reports the correct vertical bounds.
+        let horizontalBounds = previewFrame ?? stripFrame
+        let viewport = CGRect(
+            x: horizontalBounds.minX,
+            y: stripFrame.minY,
+            width: horizontalBounds.width,
+            height: stripFrame.height
+        )
+        return thumbnailFrames
+            .filter {
+                let visible = $0.frame.intersection(viewport)
+                return !visible.isNull &&
+                    visible.width >= $0.frame.width * 0.9 &&
+                    visible.height >= $0.frame.height * 0.9
+            }
+            .min(by: { $0.frame.minX < $1.frame.minX })?
+            .identifier
     }
 
     // MARK: - 30-39: Export
@@ -601,16 +664,12 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
         XCTAssertTrue(preview.waitForExistence(timeout: 10),
                       "Photo preview must be visible before right-clicking thumbnails")
 
-        // Pick the first thumbnail in the strip — must arrow into view
-        // first so LazyHStack instantiates it (per A11y rule on lazy strips).
-        let firstThumbnail = app.images.matching(NSPredicate(format: "identifier BEGINSWITH 'Thumbnail_'")).firstMatch
-        XCTAssertTrue(firstThumbnail.waitForExistence(timeout: 5),
-                      "At least one thumbnail must exist")
-
-        firstThumbnail.rightClick()
-
+        let firstVisibleID = leftmostVisibleThumbnailID(in: app)
+        XCTAssertNotNil(firstVisibleID, "At least one visible thumbnail must exist")
+        guard let firstVisibleID else { return }
+        let firstThumbnail = app.images.matching(identifier: firstVisibleID).firstMatch
         let menuItem = app.menuItems[A11y.revealInFinderMenuItem]
-        XCTAssertTrue(menuItem.waitForExistence(timeout: 3),
+        XCTAssertTrue(app.openContextMenu(on: firstThumbnail, exposing: menuItem),
                       "Reveal in Finder menu item should appear on right-click")
 
         // Dismiss without invoking — clicking would launch Finder during CI.
@@ -623,10 +682,8 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
         XCTAssertTrue(preview.waitForExistence(timeout: 10),
                       "Photo preview must be visible")
 
-        preview.rightClick()
-
         let menuItem = app.menuItems[A11y.revealInFinderMenuItem]
-        XCTAssertTrue(menuItem.waitForExistence(timeout: 3),
+        XCTAssertTrue(app.openContextMenu(on: preview, exposing: menuItem),
                       "Reveal in Finder menu item should appear on right-click")
 
         app.typeKey(.escape, modifierFlags: [])
