@@ -80,15 +80,8 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
             sortMenu.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
         }
         // Gate on the first item appearing rather than a blind sleep.
-        // TEMP DIAGNOSTIC — remove before merge.
-        let screenSize = XCUIScreen.main.screenshot().image.size
-        print("DIAG-CULL screen=\(screenSize) window=\(app.windows.firstMatch.frame)")
-        print("DIAG-CULL SortMenu exists=\(sortMenu.exists) hittable=\(sortMenu.isHittable) frame=\(sortMenu.frame)")
-        let firstItemAppeared = app.menuItems["Filename"].waitForExistence(timeout: 2) ||
-                      app.descendants(matching: .any)["Filename"].firstMatch.waitForExistence(timeout: 1)
-        print("DIAG-CULL afterClick menusCount=\(app.menus.count) menuItemsCount=\(app.menuItems.count) popUpButtonsCount=\(app.popUpButtons.count) firstItemAppeared=\(firstItemAppeared)")
-        print("DIAG-CULL TREE START\n\(app.debugDescription)\nDIAG-CULL TREE END")
-        XCTAssertTrue(firstItemAppeared,
+        XCTAssertTrue(app.menuItems["Filename"].waitForExistence(timeout: 2) ||
+                      app.descendants(matching: .any)["Filename"].firstMatch.waitForExistence(timeout: 1),
                       "Sort menu should open and offer 'Filename'")
 
         for label in ["Filename", "Date", "Rating", "Sharpness", "Aesthetics"] {
