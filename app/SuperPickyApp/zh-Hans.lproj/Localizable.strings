@@ -1,3 +1,4 @@
+"0 Stars" = "0 星";
 "About" = "关于";
 "Add a folder to get started" = "添加文件夹以开始";
 "Advanced" = "高级";
@@ -83,6 +84,7 @@
 "Ratings" = "评分";
 "Redo" = "重做";
 "Reject" = "淘汰";
+"Rejected" = "已淘汰";
 "Remove" = "移除";
 "Retry" = "重试";
 "Reveal in Finder" = "在访达中显示";
@@ -163,6 +165,12 @@
 "Not measured" = "未测量";
 "Delete Photo?" = "删除照片？";
 "Move to Trash?" = "移到废纸篓？";
+"Delete All Rejected Photos?" = "删除所有已淘汰照片？";
+"Delete All" = "全部删除";
+"Move every rejected photo to Trash?" = "将所有已淘汰照片移到废纸篓？";
+"No Rejected Photos" = "没有已淘汰照片";
+"There are no rejected photos to delete." = "没有可删除的已淘汰照片。";
+"Delete all rejected photos to Trash" = "将所有已淘汰照片删除到废纸篓";
 "Export All Visible" = "导出所有可见";
 "Sort photos" = "排序照片";
 "Sort species" = "排序鸟种";

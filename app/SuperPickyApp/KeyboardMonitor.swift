@@ -14,6 +14,8 @@ struct KeyboardMonitor: NSViewRepresentable {
         let isReturn: Bool
         let isLeftArrow: Bool
         let isRightArrow: Bool
+        var isDelete: Bool { keyCode == 51 || keyCode == 117 }
+        var isCommandDelete: Bool { isDelete && modifiers.contains(.command) }
     }
 
     func makeNSView(context: Context) -> KeyboardMonitorView {

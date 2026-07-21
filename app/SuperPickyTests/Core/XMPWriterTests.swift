@@ -61,6 +61,17 @@ import Foundation
         #expect(xml.contains("xmp:PickStatus=\"0\""))
     }
 
+    @Test func xmpPreservesZeroRatingAlongsideRejectedPickStatus() {
+        var photo = makePhoto(starRating: 0)
+        photo.isPick = true
+        photo.isRejected = true
+
+        let xml = XMPWriter.generate(photo: photo)
+
+        #expect(xml.contains("xmp:Rating=\"0\""))
+        #expect(xml.contains("xmp:PickStatus=\"-1\""))
+    }
+
     // MARK: - Species keywords
 
     @Test func xmpContainsSpeciesKeywords() {

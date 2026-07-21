@@ -18,6 +18,7 @@ struct KeyboardHelpView: View {
         ("P", "Pick / unpick selection"),
         ("X", "Reject selection"),
         ("⌫", "Delete photo to Trash"),
+        ("⌘⌫", "Delete all rejected photos to Trash"),
         ("⌘Z", "Undo last action"),
         ("⌘0–5", "Set minimum star filter"),
         ("⌘E", "Export picks"),

@@ -138,6 +138,16 @@ struct ThumbnailCell: View {
                     .accessibilityIdentifier("PickFlag_\(photo.filename)")
             }
 
+            if photo.isRejected {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.red)
+                    .padding(3)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 2))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .padding(2)
+            }
+
             // Burst best bottom-right
             if photo.isBurstBest {
                 Image(systemName: "crown.fill")
@@ -157,6 +167,7 @@ struct ThumbnailCell: View {
                 .padding(2)
         }
         .animation(.easeInOut(duration: 0.2), value: photo.isPick)
+        .animation(.easeInOut(duration: 0.2), value: photo.isRejected)
         .clipShape(RoundedRectangle(cornerRadius: 4))
         .overlay(
             // strokeBorder draws inside the frame; plain stroke would center
@@ -236,5 +247,4 @@ struct AsyncThumbnailImage: View {
         await ImageLoader.load(path: filePath, maxPixelSize: 160)
     }
 }
-
 

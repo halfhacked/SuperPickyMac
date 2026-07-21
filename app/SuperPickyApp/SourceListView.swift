@@ -5,6 +5,7 @@ struct SourceListView: View {
     @Binding var selection: SidebarSelection?
     @Binding var folders: [URL]
     let ratingCounts: [Int: Int]
+    let rejectedCount: Int
     let flyingCount: Int
     let picksCount: Int
     let speciesEntries: [SpeciesEntry]
@@ -87,6 +88,19 @@ struct SourceListView: View {
                     }
                     .tag(SidebarSelection.rating(rating))
                 }
+
+                Label {
+                    HStack {
+                        Text(config.localized("Rejected"))
+                        Spacer()
+                        Text("\(rejectedCount)")
+                            .foregroundStyle(.secondary)
+                    }
+                } icon: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.red)
+                }
+                .tag(SidebarSelection.rejected)
             }
 
             Section(config.localized("Tags")) {
@@ -223,7 +237,7 @@ struct SourceListView: View {
         case 3: config.localized("Average")
         case 2: config.localized("Below Average")
         case 1: config.localized("Poor")
-        case 0: config.localized("Reject")
+        case 0: config.localized("0 Stars")
         default: config.localized("Unknown")
         }
     }
@@ -235,7 +249,7 @@ struct SourceListView: View {
         case 3: "star.leadinghalf.filled"
         case 2: "star"
         case 1: "star"
-        case 0: "xmark"
+        case 0: "star"
         default: "questionmark"
         }
     }
@@ -247,7 +261,7 @@ struct SourceListView: View {
         case 3: .yellow
         case 2: .orange
         case 1: .secondary
-        case 0: .red
+        case 0: .secondary
         default: .secondary
         }
     }

@@ -22,6 +22,7 @@ struct ContentView: View {
     var onExportPicks: (() -> Void)?
     var onExportAllVisible: (([Photo]) -> Void)?
     var onDeletePhoto: ((UUID) -> Void)?
+    var onDeleteRejectedPhotos: (() -> Void)?
     var onCorrectSpecies: ((UUID, String) -> Void)?
     var searchSpecies: (String) async -> [SpeciesMatch] = { _ in [] }
     @Environment(CullingConfig.self) private var config
@@ -41,6 +42,8 @@ struct ContentView: View {
     @State private var showNoPhotosAlert = false
     @State private var showDeleteConfirm = false
     @State private var pendingDeleteID: UUID?
+    @State private var showDeleteRejectedConfirm = false
+    @State private var showNoRejectedPhotosAlert = false
     @State private var showKeyboardHelp = false
     @State private var showThresholdCalibrator = false
     @State private var showSharpnessOverlay = false
@@ -258,6 +261,25 @@ struct ContentView: View {
         } message: {
             Text(config.localized("Move to Trash?"))
         }
+        .alert(
+            config.localized("Delete All Rejected Photos?"),
+            isPresented: $showDeleteRejectedConfirm
+        ) {
+            Button(config.localized("Delete All"), role: .destructive) {
+                onDeleteRejectedPhotos?()
+            }
+            Button(config.localized("Cancel"), role: .cancel) {}
+        } message: {
+            Text(config.localized("Move every rejected photo to Trash?"))
+        }
+        .alert(
+            config.localized("No Rejected Photos"),
+            isPresented: $showNoRejectedPhotosAlert
+        ) {
+            Button(config.localized("OK"), role: .cancel) {}
+        } message: {
+            Text(config.localized("There are no rejected photos to delete."))
+        }
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 Menu {
@@ -443,8 +465,16 @@ struct ContentView: View {
         default: break
         }
 
-        // Delete/Backspace key (keyCode 51)
-        if key.keyCode == 51 {
+        // Delete/Backspace; Command deletes all rejected.
+        if key.isDelete {
+            if key.isCommandDelete {
+                if appState.rejectedCount > 0 {
+                    showDeleteRejectedConfirm = true
+                } else {
+                    showNoRejectedPhotosAlert = true
+                }
+                return true
+            }
             guard let id = selectedPhoto?.id else { return false }
             pendingDeleteID = id
             showDeleteConfirm = true

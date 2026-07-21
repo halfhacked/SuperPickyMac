@@ -15,12 +15,14 @@ import GRDB
         let db = try ReportDatabase(folderPath: tempDir)
         var photo = Photo(filename: "IMG_001.CR3", filePath: tempDir.appendingPathComponent("IMG_001.CR3").path, folderPath: tempDir.path)
         photo.starRating = 3
+        photo.isRejected = true
         photo.aestheticsScore = 6.5
         try db.save(&photo)
 
         let fetched = try db.fetchPhoto(id: photo.id)
         #expect(fetched != nil)
         #expect(fetched?.starRating == 3)
+        #expect(fetched?.isRejected == true)
         #expect(fetched?.aestheticsScore == 6.5)
     }
 
@@ -68,6 +70,30 @@ import GRDB
         let counts = try db.ratingCounts()
         #expect(counts[3] == 3)
         #expect(counts[1] == 3)
+    }
+
+    @Test func rejectedPhotosRemainInZeroStarQueries() throws {
+        let tempDir = try makeTempDir()
+        let db = try ReportDatabase(folderPath: tempDir)
+
+        var zeroStar = Photo(
+            filename: "zero.CR3",
+            filePath: "/tmp/zero.CR3",
+            folderPath: tempDir.path
+        )
+        try db.save(&zeroStar)
+
+        var rejected = Photo(
+            filename: "rejected.CR3",
+            filePath: "/tmp/rejected.CR3",
+            folderPath: tempDir.path
+        )
+        rejected.isRejected = true
+        try db.save(&rejected)
+
+        let zeroStarPhotos = try db.fetchPhotos(starRating: 0)
+        #expect(Set(zeroStarPhotos.map(\.id)) == [zeroStar.id, rejected.id])
+        #expect(try db.ratingCounts()[0] == 2)
     }
 
     @Test func v2MigrationAddsIsManualRatingAndRemapsMinus1() throws {
@@ -124,6 +150,8 @@ import GRDB
         #expect(allPhotos[0].starRating == 0)
         // isManualRating column should exist and default to false
         #expect(allPhotos[0].isManualRating == false)
+        // The migration cannot infer whether a legacy zero meant 0 or reject.
+        #expect(allPhotos[0].isRejected == false)
     }
 
     @Test func isManualRatingDefaultsFalseForNewPhotos() throws {
@@ -134,6 +162,7 @@ import GRDB
         let fetched = try db.fetchPhoto(id: photo.id)
         #expect(fetched != nil)
         #expect(fetched?.isManualRating == false)
+        #expect(fetched?.isRejected == false)
     }
 
     @Test func deletePhoto() throws {
@@ -190,7 +219,7 @@ import GRDB
         #expect(refetched.assignedSpecies.first?.commonName == "Peregrine Falcon")
     }
 
-    @Test func deleteNonManualPhotos_preservesManualRatings() throws {
+    @Test func deleteNonManualPhotosPreservesManualRatingsAndRejections() throws {
         let dir = try makeTempDir()
         let db = try ReportDatabase(folderPath: dir)
 
@@ -203,10 +232,17 @@ import GRDB
         manualPhoto.starRating = 4
         try db.save(&manualPhoto)
 
+        var rejectedPhoto = Photo(
+            filename: "rejected.jpg",
+            filePath: "/tmp/rejected.jpg",
+            folderPath: dir.path
+        )
+        rejectedPhoto.isRejected = true
+        try db.save(&rejectedPhoto)
+
         try db.deleteNonManualPhotos()
 
         let remaining = try db.fetchAllPhotos()
-        #expect(remaining.count == 1)
-        #expect(remaining[0].filename == "manual.jpg")
+        #expect(Set(remaining.map(\.filename)) == ["manual.jpg", "rejected.jpg"])
     }
 }

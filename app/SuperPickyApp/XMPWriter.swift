@@ -60,7 +60,7 @@ struct XMPWriter {
               xmlns:Iptc4xmpCore="http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/"
               xmlns:sp="https://halfhacked.com/ns/superpicky/1.0/"
               xmp:Rating="\(photo.starRating)"
-              xmp:PickStatus="\(photo.isPick ? 1 : 0)"
+              xmp:PickStatus="\(pickStatus(for: photo))"
               sp:ManagedSubject="\(encodeManaged(flatKeywords))"
               sp:ManagedHierarchicalSubject="\(encodeManaged(hierarchicalKeywords))">\n
         """
@@ -167,6 +167,11 @@ struct XMPWriter {
 
     // MARK: - Private
 
+    private static func pickStatus(for photo: Photo) -> Int {
+        if photo.isRejected { return -1 }
+        return photo.isPick ? 1 : 0
+    }
+
     private static func merge(photo: Photo, into data: Data) throws -> Data {
         let document = try XMLDocument(data: data, options: [.nodePreserveAll])
         let descriptions = descendantElements(
@@ -190,7 +195,7 @@ struct XMPWriter {
             localName: "PickStatus",
             uri: xmpURI,
             preferredPrefix: "xmp",
-            value: photo.isPick ? "1" : "0",
+            value: String(pickStatus(for: photo)),
             descriptions: descriptions,
             fallback: primaryDescription
         )

@@ -5,6 +5,7 @@ import os
 enum SidebarSelection: Hashable {
     case folder(URL)
     case rating(Int)
+    case rejected
     case flying
     case picks
     /// Species bucket keyed by stable `SpeciesMatch.speciesID` (eBird code
@@ -77,6 +78,11 @@ private struct SpeciesPersistResult: Sendable {
     let databaseMilliseconds: Double
 }
 
+private struct PhotoDeletionBatchResult: Sendable {
+    let deleted: [Photo]
+    let failureCount: Int
+}
+
 /// Summary of one XMP write-behind drain, reported back to `AppState` so it can
 /// surface persistent failures and log deferred sidecar latency separately from
 /// the synchronous edit.
@@ -98,6 +104,11 @@ private actor PhotoMutationWorker {
         subsystem: "com.halfhacked.superpicky",
         category: "PhotoMutationWorker"
     )
+    private let trashPhoto: @Sendable (URL) throws -> Void
+
+    init(trashPhoto: @escaping @Sendable (URL) throws -> Void) {
+        self.trashPhoto = trashPhoto
+    }
 
     /// Full read-modify-write used by pick / rate / reject and field-undo.
     /// XMP is written synchronously here to preserve existing behavior for
@@ -135,12 +146,26 @@ private actor PhotoMutationWorker {
 
     func delete(database: ReportDatabase, id: UUID) throws -> Photo? {
         guard let photo = try database.fetchPhoto(id: id) else { return nil }
-        try FileManager.default.trashItem(
-            at: URL(fileURLWithPath: photo.filePath),
-            resultingItemURL: nil
-        )
+        try trashPhoto(URL(fileURLWithPath: photo.filePath))
         try database.delete(id: id)
         return photo
+    }
+
+    func delete(database: ReportDatabase, ids: [UUID]) -> PhotoDeletionBatchResult {
+        var deleted: [Photo] = []
+        var failureCount = 0
+        deleted.reserveCapacity(ids.count)
+        for id in ids {
+            do {
+                if let photo = try delete(database: database, id: id) {
+                    deleted.append(photo)
+                }
+            } catch {
+                failureCount += 1
+                logger.error("Failed to delete photo \(id): \(error)")
+            }
+        }
+        return PhotoDeletionBatchResult(deleted: deleted, failureCount: failureCount)
     }
 }
 
@@ -327,9 +352,12 @@ final class AppState {
 
     var ratingCounts: [Int: Int] {
         var counts: [Int: Int] = [:]
-        for p in allPhotos { counts[p.starRating, default: 0] += 1 }
+        for photo in allPhotos {
+            counts[photo.starRating, default: 0] += 1
+        }
         return counts
     }
+    var rejectedCount: Int { allPhotos.lazy.filter(\.isRejected).count }
     var flyingCount: Int { allPhotos.lazy.filter(\.isFlying).count }
     var picksCount: Int { allPhotos.lazy.filter(\.isPick).count }
 
@@ -346,8 +374,8 @@ final class AppState {
             let previousRating: Int
             let previousIsPick: Bool
             let previousIsManualRating: Bool
+            let previousIsRejected: Bool
             let previousAssignedSpecies: [SpeciesMatch]
-            let wasHidden: Bool
         }
         var kind: Kind = .fields
         let entries: [Entry]
@@ -387,7 +415,7 @@ final class AppState {
     var canUndo: Bool { !undoStack.isEmpty }
 
     private var cachedDB: ReportDatabase?
-    @ObservationIgnored private let mutationWorker = PhotoMutationWorker()
+    @ObservationIgnored private let mutationWorker: PhotoMutationWorker
     @ObservationIgnored private var pendingMutationTask: Task<Void, Never>?
     @ObservationIgnored private var lastSpeciesEditProfile: SpeciesEditProfile?
     @ObservationIgnored private var pendingSpeciesEditRender: PendingSpeciesEditRender?
@@ -444,8 +472,14 @@ final class AppState {
     /// - Parameter xmpDebounceMilliseconds: write-behind debounce window. Capped
     ///   at 150 ms in production; tests never wait on it (they call
     ///   `flushPendingPersistence()`), so its value is irrelevant to them.
-    init(xmpDebounceMilliseconds: Double = 150) {
+    init(
+        xmpDebounceMilliseconds: Double = 150,
+        trashPhoto: @escaping @Sendable (URL) throws -> Void = { url in
+            try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+        }
+    ) {
         self.xmpDebounceMilliseconds = min(max(0, xmpDebounceMilliseconds), 150)
+        self.mutationWorker = PhotoMutationWorker(trashPhoto: trashPhoto)
     }
 
     // Per-folder processing state
@@ -659,6 +693,8 @@ final class AppState {
 
     private func photoMatchesCurrentFilter(_ photo: Photo) -> Bool {
         switch sidebarSelection {
+        case .rejected:
+            return photo.isRejected
         case .folder, nil:
             return true
         case .rating(let rating):
@@ -780,19 +816,10 @@ final class AppState {
             return completedMutationTask()
         }
         return enqueueMutation { state in
-            await state.applyBatch(
-                context: context,
-                ids: Array(ids),
-                wasHidden: true
-            ) { photos in
+            await state.applyBatch(context: context, ids: Array(ids)) { photos in
                 for index in photos.indices {
-                    photos[index].starRating = 0
-                    photos[index].isManualRating = true
+                    photos[index].isRejected = true
                 }
-            } afterAll: { [weak state] _ in
-                guard let state else { return }
-                state.photos.removeAll { ids.contains($0.id) }
-                state.rebuildFilteredPhotoIndex()
             }
         }
     }
@@ -807,10 +834,8 @@ final class AppState {
     private func applyBatch(
         context: MutationContext,
         ids: [UUID],
-        wasHidden: Bool = false,
         _ mutate: @escaping @Sendable (inout [Photo]) -> Void,
-        afterEach: ((Photo) -> Void)? = nil,
-        afterAll: ((_ mutated: [Photo]) -> Void)? = nil
+        afterEach: ((Photo) -> Void)? = nil
     ) async {
         guard !ids.isEmpty else { return }
         do {
@@ -822,9 +847,7 @@ final class AppState {
             guard currentFolder == context.folder else { return }
 
             var entries: [UndoAction.Entry] = []
-            var mutated: [Photo] = []
             entries.reserveCapacity(results.count)
-            mutated.reserveCapacity(results.count)
             for result in results {
                 let previous = result.previous
                 let photo = result.updated
@@ -833,19 +856,17 @@ final class AppState {
                     previousRating: previous.starRating,
                     previousIsPick: previous.isPick,
                     previousIsManualRating: previous.isManualRating,
-                    previousAssignedSpecies: previous.assignedSpecies,
-                    wasHidden: wasHidden
+                    previousIsRejected: previous.isRejected,
+                    previousAssignedSpecies: previous.assignedSpecies
                 ))
                 if let idx = allPhotoIndex[photo.id] { allPhotos[idx] = photo }
-                if let fIdx = filteredPhotoIndex[photo.id] { photos[fIdx] = photo }
-                mutated.append(photo)
                 afterEach?(photo)
             }
             if !entries.isEmpty {
                 undoStack.append(UndoAction(kind: .fields, entries: entries))
                 if undoStack.count > Self.maxUndoDepth { undoStack.removeFirst() }
             }
-            afterAll?(mutated)
+            applyFilter()
         } catch {
             logger.error("applyBatch failed: \(error)")
         }
@@ -865,32 +886,70 @@ final class AppState {
                 ) else {
                     return
                 }
-                // Evict any pending write-behind XMP for this sidecar so a
-                // deferred flush can't recreate an orphan sidecar next to the
-                // now-trashed original. Drop any failed/optimistic state too.
-                let sidecarPath = XMPWriter.sidecarURL(for: photo).path
-                await state.xmpQueue.evict(sidecarPath: sidecarPath)
-                state.pendingOptimisticSpecies.removeValue(forKey: id)
-                state.failedSpeciesEdits.removeValue(forKey: id)
-                state.failedXMPSidecars.remove(sidecarPath)
-                guard state.currentFolder == context.folder else {
-                    state.refreshSpeciesFailureMessage()
-                    return
-                }
-
-                state.allPhotos.removeAll { $0.id == id }
-                state.photos.removeAll { $0.id == id }
-                state.rebuildAllPhotoIndex()
-                state.rebuildFilteredPhotoIndex()
-                state.undoStack.removeAll {
-                    $0.entries.contains(where: { $0.photoID == id })
-                }
-                state.refreshSpeciesFailureMessage()
+                await state.finalizeDeletedPhotos([photo], context: context)
                 state.logger.info("Deleted photo: \(photo.filename)")
             } catch {
                 state.logger.error("deletePhoto failed: \(error)")
             }
         }
+    }
+
+    @MainActor
+    @discardableResult
+    func deleteRejectedPhotos() -> Task<Void, Never> {
+        guard let context = mutationContext() else {
+            return completedMutationTask()
+        }
+        return enqueueMutation { state in
+            guard state.currentFolder == context.folder else { return }
+            let ids = state.allPhotos.filter(\.isRejected).map(\.id)
+            guard !ids.isEmpty else {
+                state.logger.info("Delete rejected photos skipped: no rejected photos")
+                return
+            }
+
+            let result = await state.mutationWorker.delete(
+                database: context.database,
+                ids: ids
+            )
+            await state.finalizeDeletedPhotos(result.deleted, context: context)
+            state.logger.info(
+                "Deleted \(result.deleted.count) rejected photos; \(result.failureCount) failed"
+            )
+        }
+    }
+
+    @MainActor
+    private func finalizeDeletedPhotos(
+        _ deleted: [Photo],
+        context: MutationContext
+    ) async {
+        guard !deleted.isEmpty else { return }
+        let ids = Set(deleted.map(\.id))
+
+        // Evict pending write-behind XMP before changing folders or observable
+        // state so no deferred flush can recreate an orphan sidecar.
+        for photo in deleted {
+            let sidecarPath = XMPWriter.sidecarURL(for: photo).path
+            await xmpQueue.evict(sidecarPath: sidecarPath)
+            pendingOptimisticSpecies.removeValue(forKey: photo.id)
+            failedSpeciesEdits.removeValue(forKey: photo.id)
+            failedXMPSidecars.remove(sidecarPath)
+        }
+
+        guard currentFolder == context.folder else {
+            refreshSpeciesFailureMessage()
+            return
+        }
+
+        allPhotos.removeAll { ids.contains($0.id) }
+        rebuildAllPhotoIndex()
+        undoStack.removeAll { action in
+            action.entries.contains { ids.contains($0.photoID) }
+        }
+        buildSpeciesHierarchy()
+        applyFilter()
+        refreshSpeciesFailureMessage()
     }
 
     // MARK: - Set-based mutation: species
@@ -1042,8 +1101,8 @@ final class AppState {
                 previousRating: photo.starRating,
                 previousIsPick: photo.isPick,
                 previousIsManualRating: photo.isManualRating,
-                previousAssignedSpecies: before,
-                wasHidden: false
+                previousIsRejected: photo.isRejected,
+                previousAssignedSpecies: before
             ))
             snapshots.append(SpeciesSnapshot(id: photo.id, species: after))
             pendingOptimisticSpecies[photo.id] = (generation, after)
@@ -1440,6 +1499,7 @@ final class AppState {
                     photos[index].starRating = entry.previousRating
                     photos[index].isPick = entry.previousIsPick
                     photos[index].isManualRating = entry.previousIsManualRating
+                    photos[index].isRejected = entry.previousIsRejected
                     photos[index].assignedSpecies = entry.previousAssignedSpecies
                 }
             }
@@ -1449,7 +1509,7 @@ final class AppState {
             var anySpeciesChanged = false
             for result in results {
                 let photo = result.updated
-                guard let entry = entriesByID[photo.id] else { continue }
+                guard entriesByID[photo.id] != nil else { continue }
                 let pickChanged = result.previous.isPick != photo.isPick
                 let speciesChanged = result.previous.assignedSpecies.map(\.speciesID)
                     != photo.assignedSpecies.map(\.speciesID)
@@ -1466,19 +1526,12 @@ final class AppState {
                 }
                 if speciesChanged { anySpeciesChanged = true }
 
-                if entry.wasHidden {
-                    if filteredPhotoIndex[photo.id] == nil {
-                        filteredPhotoIndex[photo.id] = photos.count
-                        photos.append(photo)
-                    }
-                } else if let idx = filteredPhotoIndex[photo.id] {
-                    photos[idx] = photo
-                }
                 lastID = photo.id
             }
             if anySpeciesChanged {
                 buildSpeciesHierarchy()
             }
+            applyFilter()
             if let id = lastID, photos.contains(where: { $0.id == id }) {
                 selection.click(id, photos: photos)
             }
@@ -1498,26 +1551,7 @@ final class AppState {
     /// bumped so the view layer can pick the displayed-first photo using
     /// its own sort order.
     func applyFilter(autoSelectFirst: Bool = true) {
-        switch sidebarSelection {
-        case .folder:
-            photos = allPhotos
-        case .rating(let rating):
-            photos = allPhotos.filter { $0.starRating == rating }
-        case .flying:
-            photos = allPhotos.filter { $0.isFlying }
-        case .picks:
-            photos = allPhotos.filter { $0.isPick }
-        case .species(let speciesID):
-            photos = allPhotos.filter { photoHasSpeciesID($0, speciesID: speciesID) }
-        case .burstGroup(let groupID):
-            photos = allPhotos.filter { $0.burstGroupID == groupID }
-        case .singles(let speciesID):
-            photos = allPhotos.filter { photo in
-                photo.burstGroupID == nil && photoHasSpeciesID(photo, speciesID: speciesID)
-            }
-        case nil:
-            photos = allPhotos
-        }
+        photos = allPhotos.filter(photoMatchesCurrentFilter)
         rebuildFilteredPhotoIndex()
         selection.reconcile(with: photos)
         if autoSelectFirst {

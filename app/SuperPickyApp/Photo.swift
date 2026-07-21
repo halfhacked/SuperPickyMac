@@ -23,6 +23,7 @@ struct Photo: Identifiable, Codable, Sendable, FetchableRecord, PersistableRecor
     var sharpnessScore: Float?
     var exposureStatus: String?
     var starRating: Int
+    var isRejected: Bool
     var isPick: Bool
     var speciesScientificName: String?
     var speciesCommonName: String?
@@ -68,6 +69,7 @@ struct Photo: Identifiable, Codable, Sendable, FetchableRecord, PersistableRecor
         self.dateCreated = dateCreated
         self.isFlying = false
         self.starRating = 0
+        self.isRejected = false
         self.isPick = false
         self.isBurstBest = false
         self.isManualRating = false
