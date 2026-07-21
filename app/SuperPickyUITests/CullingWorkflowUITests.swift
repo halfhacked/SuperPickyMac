@@ -27,12 +27,15 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
         XCTAssertTrue(app.staticTexts["Average"].exists)
         XCTAssertTrue(app.staticTexts["Below Average"].exists)
         XCTAssertTrue(app.staticTexts["Poor"].exists)
-        XCTAssertTrue(app.staticTexts["Reject"].exists)
+        XCTAssertTrue(app.staticTexts["0 Stars"].exists)
+        XCTAssertTrue(app.staticTexts["Rejected"].exists)
 
         // Verify descending order
         let excellent = app.staticTexts["Excellent"]
-        let reject = app.staticTexts["Reject"]
-        XCTAssertLessThan(excellent.frame.minY, reject.frame.minY)
+        let zeroStars = app.staticTexts["0 Stars"]
+        let rejected = app.staticTexts["Rejected"]
+        XCTAssertLessThan(excellent.frame.minY, zeroStars.frame.minY)
+        XCTAssertLessThan(zeroStars.frame.minY, rejected.frame.minY)
     }
 
     func test02_PreviewAndInfoBar() {
@@ -351,9 +354,8 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
         preview.click()
         Thread.sleep(forTimeInterval: 0.3)
 
-        // Rejecting hides the photo (starRating = 0, isReject flag). The
-        // visible total stays the same because reject doesn't filter by default;
-        // we assert the app doesn't crash and counter is still readable.
+        // Rejection records an explicit manual decision without replacing the
+        // independent star rating.
         app.typeText("x")
         Thread.sleep(forTimeInterval: 0.5)
         XCTAssertTrue(counter.exists, "Counter should remain after reject")

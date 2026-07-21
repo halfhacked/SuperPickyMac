@@ -16,6 +16,7 @@ final class MockUITests: XCTestCase {
 
         // Sidebar still shows rating labels even without photos
         XCTAssertTrue(app.staticTexts["Excellent"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Reject"].exists)
+        XCTAssertTrue(app.staticTexts["0 Stars"].exists)
+        XCTAssertTrue(app.staticTexts["Rejected"].exists)
     }
 }

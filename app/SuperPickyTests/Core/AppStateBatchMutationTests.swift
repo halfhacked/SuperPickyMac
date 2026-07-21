@@ -131,13 +131,15 @@ struct AppStateBatchMutationTests {
 
         let db = try ReportDatabase(folderPath: folder)
         for id in ids {
-            #expect(try db.fetchPhoto(id: id)?.starRating == 4)
+            let photo = try db.fetchPhoto(id: id)
+            #expect(photo?.starRating == 4)
+            #expect(photo?.isRejected == false)
         }
     }
 
     // MARK: - reject(ids:)
 
-    @Test func rejectMakesPhotosLeaveFilteredArray() async throws {
+    @Test func rejectPreservesRatingFilterMembership() async throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let ids = try seedPhotos(3, into: folder)
@@ -150,8 +152,72 @@ struct AppStateBatchMutationTests {
         #expect(app.photos.count == 3)
 
         await app.reject(ids: [ids[0]]).value
-        #expect(app.photos.count == 2)
-        #expect(!app.photos.contains(where: { $0.id == ids[0] }))
+        #expect(app.photos.count == 3)
+        #expect(app.photos.contains(where: { $0.id == ids[0] }))
+
+        let rejected = try #require(try ReportDatabase(folderPath: folder).fetchPhoto(id: ids[0]))
+        #expect(rejected.starRating == 3)
+        #expect(rejected.isManualRating)
+        #expect(rejected.isRejected)
+        #expect(app.ratingCounts[3] == 3)
+        #expect(app.rejectedCount == 1)
+    }
+
+    @Test func zeroRatingAndRejectionCanOverlap() async throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let ids = try seedPhotos(2, into: folder)
+        let app = AppState()
+        app.loadPhotos(for: folder)
+
+        await app.setRating(ids: [ids[0]], rating: 0).value
+        await app.reject(ids: [ids[1]]).value
+
+        app.sidebarSelection = .rating(0)
+        app.applyFilter()
+        #expect(Set(app.photos.map(\.id)) == Set(ids))
+
+        let rejectedZero = try #require(
+            try ReportDatabase(folderPath: folder).fetchPhoto(id: ids[1])
+        )
+        #expect(rejectedZero.starRating == 0)
+        #expect(rejectedZero.isRejected)
+        #expect(rejectedZero.isManualRating == false)
+
+        app.sidebarSelection = .rejected
+        app.applyFilter()
+        #expect(app.photos.map(\.id) == [ids[1]])
+
+        await app.setRating(ids: [ids[1]], rating: 4).value
+        #expect(app.photos.map(\.id) == [ids[1]])
+        #expect(app.ratingCounts[0] == 1)
+        #expect(app.ratingCounts[4] == 1)
+        #expect(app.rejectedCount == 1)
+
+        let updated = try #require(try ReportDatabase(folderPath: folder).fetchPhoto(id: ids[1]))
+        #expect(updated.starRating == 4)
+        #expect(updated.isRejected)
+    }
+
+    @Test func undoRejectRestoresRatingAndRejectedState() async throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let id = try #require(try seedPhotos(1, into: folder).first)
+        let app = AppState()
+        app.loadPhotos(for: folder)
+
+        await app.setRating(ids: [id], rating: 4).value
+        await app.reject(ids: [id]).value
+        app.sidebarSelection = .rating(4)
+        app.applyFilter()
+        #expect(app.photos.map(\.id) == [id])
+
+        await app.undoLastAction().value
+
+        let restored = try #require(try ReportDatabase(folderPath: folder).fetchPhoto(id: id))
+        #expect(restored.starRating == 4)
+        #expect(restored.isRejected == false)
+        #expect(app.photos.map(\.id) == [id])
     }
 
     // MARK: - correctSpecies(ids:commonName:)

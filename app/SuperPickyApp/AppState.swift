@@ -5,6 +5,7 @@ import os
 enum SidebarSelection: Hashable {
     case folder(URL)
     case rating(Int)
+    case rejected
     case flying
     case picks
     /// Species bucket keyed by stable `SpeciesMatch.speciesID` (eBird code
@@ -327,9 +328,12 @@ final class AppState {
 
     var ratingCounts: [Int: Int] {
         var counts: [Int: Int] = [:]
-        for p in allPhotos { counts[p.starRating, default: 0] += 1 }
+        for photo in allPhotos {
+            counts[photo.starRating, default: 0] += 1
+        }
         return counts
     }
+    var rejectedCount: Int { allPhotos.lazy.filter(\.isRejected).count }
     var flyingCount: Int { allPhotos.lazy.filter(\.isFlying).count }
     var picksCount: Int { allPhotos.lazy.filter(\.isPick).count }
 
@@ -346,8 +350,8 @@ final class AppState {
             let previousRating: Int
             let previousIsPick: Bool
             let previousIsManualRating: Bool
+            let previousIsRejected: Bool
             let previousAssignedSpecies: [SpeciesMatch]
-            let wasHidden: Bool
         }
         var kind: Kind = .fields
         let entries: [Entry]
@@ -659,6 +663,8 @@ final class AppState {
 
     private func photoMatchesCurrentFilter(_ photo: Photo) -> Bool {
         switch sidebarSelection {
+        case .rejected:
+            return photo.isRejected
         case .folder, nil:
             return true
         case .rating(let rating):
@@ -780,19 +786,10 @@ final class AppState {
             return completedMutationTask()
         }
         return enqueueMutation { state in
-            await state.applyBatch(
-                context: context,
-                ids: Array(ids),
-                wasHidden: true
-            ) { photos in
+            await state.applyBatch(context: context, ids: Array(ids)) { photos in
                 for index in photos.indices {
-                    photos[index].starRating = 0
-                    photos[index].isManualRating = true
+                    photos[index].isRejected = true
                 }
-            } afterAll: { [weak state] _ in
-                guard let state else { return }
-                state.photos.removeAll { ids.contains($0.id) }
-                state.rebuildFilteredPhotoIndex()
             }
         }
     }
@@ -807,10 +804,8 @@ final class AppState {
     private func applyBatch(
         context: MutationContext,
         ids: [UUID],
-        wasHidden: Bool = false,
         _ mutate: @escaping @Sendable (inout [Photo]) -> Void,
-        afterEach: ((Photo) -> Void)? = nil,
-        afterAll: ((_ mutated: [Photo]) -> Void)? = nil
+        afterEach: ((Photo) -> Void)? = nil
     ) async {
         guard !ids.isEmpty else { return }
         do {
@@ -822,9 +817,7 @@ final class AppState {
             guard currentFolder == context.folder else { return }
 
             var entries: [UndoAction.Entry] = []
-            var mutated: [Photo] = []
             entries.reserveCapacity(results.count)
-            mutated.reserveCapacity(results.count)
             for result in results {
                 let previous = result.previous
                 let photo = result.updated
@@ -833,19 +826,17 @@ final class AppState {
                     previousRating: previous.starRating,
                     previousIsPick: previous.isPick,
                     previousIsManualRating: previous.isManualRating,
-                    previousAssignedSpecies: previous.assignedSpecies,
-                    wasHidden: wasHidden
+                    previousIsRejected: previous.isRejected,
+                    previousAssignedSpecies: previous.assignedSpecies
                 ))
                 if let idx = allPhotoIndex[photo.id] { allPhotos[idx] = photo }
-                if let fIdx = filteredPhotoIndex[photo.id] { photos[fIdx] = photo }
-                mutated.append(photo)
                 afterEach?(photo)
             }
             if !entries.isEmpty {
                 undoStack.append(UndoAction(kind: .fields, entries: entries))
                 if undoStack.count > Self.maxUndoDepth { undoStack.removeFirst() }
             }
-            afterAll?(mutated)
+            applyFilter()
         } catch {
             logger.error("applyBatch failed: \(error)")
         }
@@ -1042,8 +1033,8 @@ final class AppState {
                 previousRating: photo.starRating,
                 previousIsPick: photo.isPick,
                 previousIsManualRating: photo.isManualRating,
-                previousAssignedSpecies: before,
-                wasHidden: false
+                previousIsRejected: photo.isRejected,
+                previousAssignedSpecies: before
             ))
             snapshots.append(SpeciesSnapshot(id: photo.id, species: after))
             pendingOptimisticSpecies[photo.id] = (generation, after)
@@ -1440,6 +1431,7 @@ final class AppState {
                     photos[index].starRating = entry.previousRating
                     photos[index].isPick = entry.previousIsPick
                     photos[index].isManualRating = entry.previousIsManualRating
+                    photos[index].isRejected = entry.previousIsRejected
                     photos[index].assignedSpecies = entry.previousAssignedSpecies
                 }
             }
@@ -1449,7 +1441,7 @@ final class AppState {
             var anySpeciesChanged = false
             for result in results {
                 let photo = result.updated
-                guard let entry = entriesByID[photo.id] else { continue }
+                guard entriesByID[photo.id] != nil else { continue }
                 let pickChanged = result.previous.isPick != photo.isPick
                 let speciesChanged = result.previous.assignedSpecies.map(\.speciesID)
                     != photo.assignedSpecies.map(\.speciesID)
@@ -1466,19 +1458,12 @@ final class AppState {
                 }
                 if speciesChanged { anySpeciesChanged = true }
 
-                if entry.wasHidden {
-                    if filteredPhotoIndex[photo.id] == nil {
-                        filteredPhotoIndex[photo.id] = photos.count
-                        photos.append(photo)
-                    }
-                } else if let idx = filteredPhotoIndex[photo.id] {
-                    photos[idx] = photo
-                }
                 lastID = photo.id
             }
             if anySpeciesChanged {
                 buildSpeciesHierarchy()
             }
+            applyFilter()
             if let id = lastID, photos.contains(where: { $0.id == id }) {
                 selection.click(id, photos: photos)
             }
@@ -1498,26 +1483,7 @@ final class AppState {
     /// bumped so the view layer can pick the displayed-first photo using
     /// its own sort order.
     func applyFilter(autoSelectFirst: Bool = true) {
-        switch sidebarSelection {
-        case .folder:
-            photos = allPhotos
-        case .rating(let rating):
-            photos = allPhotos.filter { $0.starRating == rating }
-        case .flying:
-            photos = allPhotos.filter { $0.isFlying }
-        case .picks:
-            photos = allPhotos.filter { $0.isPick }
-        case .species(let speciesID):
-            photos = allPhotos.filter { photoHasSpeciesID($0, speciesID: speciesID) }
-        case .burstGroup(let groupID):
-            photos = allPhotos.filter { $0.burstGroupID == groupID }
-        case .singles(let speciesID):
-            photos = allPhotos.filter { photo in
-                photo.burstGroupID == nil && photoHasSpeciesID(photo, speciesID: speciesID)
-            }
-        case nil:
-            photos = allPhotos
-        }
+        photos = allPhotos.filter(photoMatchesCurrentFilter)
         rebuildFilteredPhotoIndex()
         selection.reconcile(with: photos)
         if autoSelectFirst {

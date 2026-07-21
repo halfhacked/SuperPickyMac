@@ -90,7 +90,8 @@ final class ProcessingFlowUITests: XCTestCase {
         XCTAssertTrue(Self.app.staticTexts["Excellent"].exists)
         XCTAssertTrue(Self.app.staticTexts["Good"].exists)
         XCTAssertTrue(Self.app.staticTexts["Average"].exists)
-        XCTAssertTrue(Self.app.staticTexts["Reject"].exists)
+        XCTAssertTrue(Self.app.staticTexts["0 Stars"].exists)
+        XCTAssertTrue(Self.app.staticTexts["Rejected"].exists)
     }
 
     /// 08: Species appears in sidebar

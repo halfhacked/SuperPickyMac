@@ -75,6 +75,7 @@ struct MainView: View {
                 selection: $appState.sidebarSelection,
                 folders: $appState.folders,
                 ratingCounts: appState.ratingCounts,
+                rejectedCount: appState.rejectedCount,
                 flyingCount: appState.flyingCount,
                 picksCount: appState.picksCount,
                 speciesEntries: appState.speciesEntries,
@@ -164,7 +165,7 @@ struct MainView: View {
             switch newValue {
             case .folder(let url):
                 appState.loadPhotos(for: url, deferSelection: true)
-            case .rating, .flying, .picks, .species, .burstGroup, .singles:
+            case .rating, .rejected, .flying, .picks, .species, .burstGroup, .singles:
                 appState.applyFilter(autoSelectFirst: false)
             case nil:
                 break

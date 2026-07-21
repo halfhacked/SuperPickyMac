@@ -96,6 +96,12 @@ struct CompareView: View {
                             .font(.caption)
                             .transition(.opacity)
                     }
+                    if photo.isRejected {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.red)
+                            .font(.caption)
+                            .transition(.opacity)
+                    }
                     Spacer()
                     Text(photo.filename)
                         .font(.caption)
@@ -105,6 +111,7 @@ struct CompareView: View {
                 .padding(.vertical, 6)
                 .background(.black)
                 .animation(.easeInOut(duration: 0.2), value: photo.isPick)
+                .animation(.easeInOut(duration: 0.2), value: photo.isRejected)
             }
         }
     }

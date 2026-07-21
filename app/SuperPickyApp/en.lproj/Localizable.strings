@@ -1,3 +1,4 @@
+"0 Stars" = "0 Stars";
 "About" = "About";
 "Add a folder to get started" = "Add a folder to get started";
 "Advanced" = "Advanced";
@@ -83,6 +84,7 @@
 "Ratings" = "Ratings";
 "Redo" = "Redo";
 "Reject" = "Reject";
+"Rejected" = "Rejected";
 "Remove" = "Remove";
 "Retry" = "Retry";
 "Reveal in Finder" = "Reveal in Finder";

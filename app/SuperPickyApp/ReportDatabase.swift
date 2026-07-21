@@ -160,6 +160,14 @@ final class ReportDatabase: Sendable {
                 }
             }
         }
+        migrator.registerMigration("v9_rejected_state") { db in
+            try db.alter(table: "photos") { t in
+                t.add(column: "isRejected", .boolean).notNull().defaults(to: false)
+            }
+            // Legacy zero-star rows are intentionally left non-rejected because
+            // the old schema cannot prove whether the user pressed 0 or X.
+            try db.create(indexOn: "photos", columns: ["isRejected"])
+        }
         try migrator.migrate(dbQueue)
     }
 
@@ -288,7 +296,10 @@ final class ReportDatabase: Sendable {
 
     func ratingCounts() throws -> [Int: Int] {
         try dbQueue.read { db in
-            let rows = try Row.fetchAll(db, sql: "SELECT starRating, COUNT(*) as cnt FROM photos GROUP BY starRating")
+            let rows = try Row.fetchAll(
+                db,
+                sql: "SELECT starRating, COUNT(*) as cnt FROM photos GROUP BY starRating"
+            )
             var result: [Int: Int] = [:]
             for row in rows {
                 result[row["starRating"]] = row["cnt"]
@@ -303,10 +314,13 @@ final class ReportDatabase: Sendable {
         }
     }
 
-    /// Delete all photos that were NOT manually rated (keep manual overrides).
+    /// Delete photos with no manual culling decision so the pipeline can
+    /// reprocess them. Manual ratings and explicit rejections are preserved.
     func deleteNonManualPhotos() throws {
         try dbQueue.write { db in
-            try db.execute(sql: "DELETE FROM photos WHERE isManualRating = 0")
+            try db.execute(
+                sql: "DELETE FROM photos WHERE isManualRating = 0 AND isRejected = 0"
+            )
         }
     }
 }

@@ -1,3 +1,4 @@
+"0 Stars" = "0 星";
 "About" = "关于";
 "Add a folder to get started" = "添加文件夹以开始";
 "Advanced" = "高级";
@@ -83,6 +84,7 @@
 "Ratings" = "评分";
 "Redo" = "重做";
 "Reject" = "淘汰";
+"Rejected" = "已淘汰";
 "Remove" = "移除";
 "Retry" = "重试";
 "Reveal in Finder" = "在访达中显示";

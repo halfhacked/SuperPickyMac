@@ -195,6 +195,16 @@ struct InfoBarView: View {
                 }
             }
 
+            if photo.isRejected {
+                Label {
+                    Text(config.localized("Rejected"))
+                } icon: {
+                    Image(systemName: "xmark.circle.fill")
+                }
+                .font(.caption)
+                .foregroundStyle(.red)
+            }
+
             if let sharpness = photo.sharpnessScore {
                 Label {
                     Text("\(config.localized("Sharp")): \(Int(sharpness))")
