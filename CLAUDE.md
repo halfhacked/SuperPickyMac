@@ -23,7 +23,9 @@ Native macOS app for AI-powered bird photo culling.
 | L1 Unit | Swift Testing via xcodebuild | `scripts/pre-commit.sh` | pre-commit |
 | L2 Parity | Python reference vs Swift output | `scripts/parity/run.sh` | manual |
 | G2 Security | gitleaks | `scripts/gate-security.sh` | pre-push |
-| L3 BDD | XCUITest full user flows (TEST_MODE=1) | `scripts/run-l3.sh` | on-demand |
+| L3 BDD | XCUITest full user flows (TEST_MODE=1) | GitHub Actions | hosted CI only |
+
+**Never run XCUITest locally.** Local XCUITest runs interfere with the user's other work. Always rely on GitHub-hosted workers for XCUITest execution. Local validation is limited to unit tests, builds, linting, parity, and security gates.
 
 ## Common Commands
 
