@@ -361,6 +361,11 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
         XCTAssertTrue(counter.exists, "Counter should remain after reject")
         let after = counter.value as? String ?? ""
         XCTAssertFalse(after.isEmpty, "Counter value should still be readable: '\(before)' -> '\(after)'")
+
+        app.typeKey(.delete, modifierFlags: .command)
+        Thread.sleep(forTimeInterval: 0.3)
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(preview.exists, "Preview should remain after bulk-delete cancel")
     }
 
     func test19_DeleteAndUndo() {

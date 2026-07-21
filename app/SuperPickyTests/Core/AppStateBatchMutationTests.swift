@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import AppKit
 @testable import SuperPicky
 
 @Suite(.serialized)
@@ -218,6 +219,72 @@ struct AppStateBatchMutationTests {
         #expect(restored.starRating == 4)
         #expect(restored.isRejected == false)
         #expect(app.photos.map(\.id) == [id])
+    }
+
+    @Test func deleteRejectedPhotosDeletesAllRejectedPhotosOnly() async throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let db = try ReportDatabase(folderPath: folder)
+        let fixtures = [
+            (filename: "zero-rejected.CR3", rating: 0, rejected: true),
+            (filename: "rated-rejected.CR3", rating: 4, rejected: true),
+            (filename: "keep.CR3", rating: 0, rejected: false),
+        ]
+        var photos: [Photo] = []
+        for fixture in fixtures {
+            let url = folder.appendingPathComponent(fixture.filename)
+            FileManager.default.createFile(atPath: url.path, contents: Data())
+            var photo = Photo(
+                filename: fixture.filename,
+                filePath: url.path,
+                folderPath: folder.path
+            )
+            photo.starRating = fixture.rating
+            photo.isRejected = fixture.rejected
+            try db.save(&photo)
+            photos.append(photo)
+        }
+
+        let app = AppState(trashPhoto: { url in
+            try FileManager.default.removeItem(at: url)
+        })
+        app.loadPhotos(for: folder)
+        app.sidebarSelection = .rejected
+        app.applyFilter()
+        #expect(app.photos.count == 2)
+
+        await app.deleteRejectedPhotos().value
+
+        let remaining = try db.fetchAllPhotos()
+        #expect(remaining.map(\.filename) == ["keep.CR3"])
+        #expect(app.allPhotosForTesting().map(\.filename) == ["keep.CR3"])
+        #expect(app.photos.isEmpty)
+        #expect(app.rejectedCount == 0)
+        #expect(FileManager.default.fileExists(atPath: photos[2].filePath))
+        #expect(!FileManager.default.fileExists(atPath: photos[0].filePath))
+        #expect(!FileManager.default.fileExists(atPath: photos[1].filePath))
+    }
+
+    @Test func commandDeleteRecognizesBackspaceAndForwardDelete() {
+        func event(
+            keyCode: UInt16,
+            modifiers: NSEvent.ModifierFlags
+        ) -> KeyboardMonitor.KeyEvent {
+            KeyboardMonitor.KeyEvent(
+                characters: "",
+                keyCode: keyCode,
+                modifiers: modifiers,
+                isEscape: false,
+                isReturn: false,
+                isLeftArrow: false,
+                isRightArrow: false
+            )
+        }
+
+        #expect(event(keyCode: 51, modifiers: .command).isCommandDelete)
+        #expect(event(keyCode: 117, modifiers: .command).isCommandDelete)
+        #expect(!event(keyCode: 51, modifiers: []).isCommandDelete)
+        #expect(!event(keyCode: 0, modifiers: .command).isCommandDelete)
     }
 
     // MARK: - correctSpecies(ids:commonName:)

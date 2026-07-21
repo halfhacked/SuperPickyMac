@@ -126,6 +126,9 @@ struct MainView: View {
                     onDeletePhoto: { id in
                         appState.deletePhoto(id: id)
                     },
+                    onDeleteRejectedPhotos: {
+                        appState.deleteRejectedPhotos()
+                    },
                     onCorrectSpecies: { id, name in
                         let ids: Set<UUID> = appState.selection.isMulti
                             ? appState.selection.selectedIDs

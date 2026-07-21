@@ -165,6 +165,12 @@
 "Not measured" = "Not measured";
 "Delete Photo?" = "Delete Photo?";
 "Move to Trash?" = "Move to Trash?";
+"Delete All Rejected Photos?" = "Delete All Rejected Photos?";
+"Delete All" = "Delete All";
+"Move every rejected photo to Trash?" = "Move every rejected photo to Trash?";
+"No Rejected Photos" = "No Rejected Photos";
+"There are no rejected photos to delete." = "There are no rejected photos to delete.";
+"Delete all rejected photos to Trash" = "Delete all rejected photos to Trash";
 "Export All Visible" = "Export All Visible";
 "Sort photos" = "Sort photos";
 "Sort species" = "Sort species";
