@@ -172,7 +172,7 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
         // auto-select-first must repopulate the active and the preview must
         // stay visible. If the new filter is empty, the empty state is the
         // correct rendering — there's nothing to auto-select.
-        for label in ["Excellent", "Reject"] {
+        for label in ["Excellent", "0 Stars"] {
             app.staticTexts[label].click()
             Thread.sleep(forTimeInterval: 0.5)
             let count = currentFilteredCount()
