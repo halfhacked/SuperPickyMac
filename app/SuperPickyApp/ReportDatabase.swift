@@ -161,12 +161,25 @@ final class ReportDatabase: Sendable {
             }
         }
         migrator.registerMigration("v9_rejected_state") { db in
-            try db.alter(table: "photos") { t in
-                t.add(column: "isRejected", .boolean).notNull().defaults(to: false)
+            let hasRejectedColumn = try Int.fetchOne(
+                db,
+                sql: """
+                    SELECT COUNT(*)
+                    FROM pragma_table_info('photos')
+                    WHERE name = 'isRejected'
+                    """
+            ) == 1
+            if !hasRejectedColumn {
+                try db.alter(table: "photos") { t in
+                    t.add(column: "isRejected", .boolean).notNull().defaults(to: false)
+                }
             }
             // Legacy zero-star rows are intentionally left non-rejected because
             // the old schema cannot prove whether the user pressed 0 or X.
-            try db.create(indexOn: "photos", columns: ["isRejected"])
+            try db.execute(sql: """
+                CREATE INDEX IF NOT EXISTS index_photos_on_isRejected
+                ON photos(isRejected)
+            """)
         }
         try migrator.migrate(dbQueue)
     }
