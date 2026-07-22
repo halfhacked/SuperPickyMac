@@ -154,6 +154,64 @@ import GRDB
         #expect(allPhotos[0].isRejected == false)
     }
 
+    @Test func renamedRejectedMigrationAcceptsExistingColumn() throws {
+        let tempDir = try makeTempDir()
+        let dbPath = tempDir.appendingPathComponent(".report.db").path
+        let photoID = try {
+            let db = try ReportDatabase(folderPath: tempDir)
+            var photo = Photo(
+                filename: "rejected.CR3",
+                filePath: "/tmp/rejected.CR3",
+                folderPath: tempDir.path
+            )
+            photo.isRejected = true
+            try db.save(&photo)
+            return photo.id
+        }()
+
+        do {
+            let queue = try DatabaseQueue(path: dbPath)
+            try queue.write { db in
+                try db.execute(
+                    sql: "DELETE FROM grdb_migrations WHERE identifier = 'v9_rejected_state'"
+                )
+                try db.execute(
+                    sql: "INSERT INTO grdb_migrations (identifier) VALUES ('v9_rejected')"
+                )
+                try db.execute(sql: "DROP INDEX index_photos_on_isRejected")
+            }
+        }
+
+        let reopened = try ReportDatabase(folderPath: tempDir)
+        let reopenedPhoto = try reopened.fetchPhoto(id: photoID)
+        let fetched = try #require(reopenedPhoto)
+        #expect(fetched.isRejected)
+
+        let verificationQueue = try DatabaseQueue(path: dbPath)
+        let databaseState = try verificationQueue.read { db in
+            let migrationIdentifiers = Set(try String.fetchAll(
+                db,
+                sql: """
+                    SELECT identifier
+                    FROM grdb_migrations
+                    WHERE identifier IN ('v9_rejected', 'v9_rejected_state')
+                    """
+            ))
+            let hasRejectedIndex = try Int.fetchOne(
+                db,
+                sql: """
+                    SELECT COUNT(*)
+                    FROM sqlite_master
+                    WHERE type = 'index'
+                      AND name = 'index_photos_on_isRejected'
+                    """
+            ) == 1
+            return (migrationIdentifiers, hasRejectedIndex)
+        }
+        #expect(databaseState.0 == ["v9_rejected", "v9_rejected_state"])
+        #expect(databaseState.1)
+    }
+
     @Test func isManualRatingDefaultsFalseForNewPhotos() throws {
         let tempDir = try makeTempDir()
         let db = try ReportDatabase(folderPath: tempDir)
