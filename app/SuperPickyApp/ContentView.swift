@@ -15,8 +15,7 @@ struct ContentView: View {
     @Binding var selectedPhotoID: UUID?
     let selectedPhoto: Photo?
     var onRatePhoto: ((UUID, Int) -> Void)?
-    var onTogglePick: ((UUID) -> Void)?
-    var onRejectPhoto: ((UUID) -> Void)?
+    var onSetPickStatus: ((UUID, PhotoPickStatus) -> Void)?
     var onUndo: (() -> Void)?
     var canUndo: Bool = false
     var onExportPicks: (() -> Void)?
@@ -57,7 +56,7 @@ struct ContentView: View {
             result = result.filter { $0.burstGroupID == nil || $0.isBurstBest }
         }
         if pickedOnly {
-            result = result.filter { $0.isPick }
+            result = result.filter(\.isPicked)
         }
 
         switch sortOrder {
@@ -233,6 +232,7 @@ struct ContentView: View {
                     selectedPhotoID: $selectedPhotoID,
                     isPresented: $showFullscreen,
                     onRatePhoto: onRatePhoto,
+                    onSetPickStatus: onSetPickStatus,
                     zoomState: fullscreenZoomState
                 )
             }
@@ -242,7 +242,7 @@ struct ContentView: View {
                     selectedPhotoID: $selectedPhotoID,
                     isPresented: $showCompare,
                     onRatePhoto: onRatePhoto,
-                    onTogglePick: onTogglePick
+                    onSetPickStatus: onSetPickStatus
                 )
             }
             if showKeyboardHelp {
@@ -422,15 +422,16 @@ struct ContentView: View {
         case "c":
             if filtered.count >= 2 { showCompare.toggle() }
             return true
-        case "p":
+        case "p", "u":
             guard !ids.isEmpty else { return false }
-            appState.setPick(ids: ids)
+            guard let status = key.photoPickStatus else { return false }
+            appState.setPickStatus(ids: ids, status: status)
             if !isMulti, config.autoAdvance { navigatePhoto(direction: 1) }
             return true
         case "x":
             guard !ids.isEmpty else { return false }
             if !isMulti { navigatePhoto(direction: 1, fallbackToPrevious: true) }
-            appState.reject(ids: ids)
+            appState.setPickStatus(ids: ids, status: .rejected)
             return true
         case "0", "1", "2", "3", "4", "5":
             guard !ids.isEmpty,

@@ -15,14 +15,14 @@ import GRDB
         let db = try ReportDatabase(folderPath: tempDir)
         var photo = Photo(filename: "IMG_001.CR3", filePath: tempDir.appendingPathComponent("IMG_001.CR3").path, folderPath: tempDir.path)
         photo.starRating = 3
-        photo.isRejected = true
+        photo.pickStatus = .rejected
         photo.aestheticsScore = 6.5
         try db.save(&photo)
 
         let fetched = try db.fetchPhoto(id: photo.id)
         #expect(fetched != nil)
         #expect(fetched?.starRating == 3)
-        #expect(fetched?.isRejected == true)
+        #expect(fetched?.pickStatus == .rejected)
         #expect(fetched?.aestheticsScore == 6.5)
     }
 
@@ -88,7 +88,7 @@ import GRDB
             filePath: "/tmp/rejected.CR3",
             folderPath: tempDir.path
         )
-        rejected.isRejected = true
+        rejected.pickStatus = .rejected
         try db.save(&rejected)
 
         let zeroStarPhotos = try db.fetchPhotos(starRating: 0)
@@ -123,7 +123,7 @@ import GRDB
                     exposureStatus TEXT,
                     focusPointStatus TEXT,
                     starRating INTEGER NOT NULL DEFAULT 0,
-                    isPick BOOLEAN NOT NULL DEFAULT 0,
+                    pickStatus INTEGER NOT NULL DEFAULT 0,
                     speciesScientificName TEXT,
                     speciesCommonName TEXT,
                     speciesConfidence DOUBLE,
@@ -137,7 +137,7 @@ import GRDB
             // Insert a photo with starRating = -1 (legacy)
             let id = UUID().uuidString
             try db.execute(sql: """
-                INSERT INTO photos (id, filename, filePath, folderPath, dateCreated, isFlying, starRating, isPick, isBurstBest)
+                INSERT INTO photos (id, filename, filePath, folderPath, dateCreated, isFlying, starRating, pickStatus, isBurstBest)
                 VALUES (?, 'legacy.CR3', '/tmp/legacy.CR3', ?, datetime('now'), 0, -1, 0, 0)
             """, arguments: [id, tempDir.path])
         }
@@ -150,66 +150,7 @@ import GRDB
         #expect(allPhotos[0].starRating == 0)
         // isManualRating column should exist and default to false
         #expect(allPhotos[0].isManualRating == false)
-        // The migration cannot infer whether a legacy zero meant 0 or reject.
-        #expect(allPhotos[0].isRejected == false)
-    }
-
-    @Test func renamedRejectedMigrationAcceptsExistingColumn() throws {
-        let tempDir = try makeTempDir()
-        let dbPath = tempDir.appendingPathComponent(".report.db").path
-        let photoID = try {
-            let db = try ReportDatabase(folderPath: tempDir)
-            var photo = Photo(
-                filename: "rejected.CR3",
-                filePath: "/tmp/rejected.CR3",
-                folderPath: tempDir.path
-            )
-            photo.isRejected = true
-            try db.save(&photo)
-            return photo.id
-        }()
-
-        do {
-            let queue = try DatabaseQueue(path: dbPath)
-            try queue.write { db in
-                try db.execute(
-                    sql: "DELETE FROM grdb_migrations WHERE identifier = 'v9_rejected_state'"
-                )
-                try db.execute(
-                    sql: "INSERT INTO grdb_migrations (identifier) VALUES ('v9_rejected')"
-                )
-                try db.execute(sql: "DROP INDEX index_photos_on_isRejected")
-            }
-        }
-
-        let reopened = try ReportDatabase(folderPath: tempDir)
-        let reopenedPhoto = try reopened.fetchPhoto(id: photoID)
-        let fetched = try #require(reopenedPhoto)
-        #expect(fetched.isRejected)
-
-        let verificationQueue = try DatabaseQueue(path: dbPath)
-        let databaseState = try verificationQueue.read { db in
-            let migrationIdentifiers = Set(try String.fetchAll(
-                db,
-                sql: """
-                    SELECT identifier
-                    FROM grdb_migrations
-                    WHERE identifier IN ('v9_rejected', 'v9_rejected_state')
-                    """
-            ))
-            let hasRejectedIndex = try Int.fetchOne(
-                db,
-                sql: """
-                    SELECT COUNT(*)
-                    FROM sqlite_master
-                    WHERE type = 'index'
-                      AND name = 'index_photos_on_isRejected'
-                    """
-            ) == 1
-            return (migrationIdentifiers, hasRejectedIndex)
-        }
-        #expect(databaseState.0 == ["v9_rejected", "v9_rejected_state"])
-        #expect(databaseState.1)
+        #expect(allPhotos[0].pickStatus == .unflagged)
     }
 
     @Test func isManualRatingDefaultsFalseForNewPhotos() throws {
@@ -220,7 +161,7 @@ import GRDB
         let fetched = try db.fetchPhoto(id: photo.id)
         #expect(fetched != nil)
         #expect(fetched?.isManualRating == false)
-        #expect(fetched?.isRejected == false)
+        #expect(fetched?.pickStatus == .unflagged)
     }
 
     @Test func deletePhoto() throws {
@@ -277,7 +218,7 @@ import GRDB
         #expect(refetched.assignedSpecies.first?.commonName == "Peregrine Falcon")
     }
 
-    @Test func deleteNonManualPhotosPreservesManualRatingsAndRejections() throws {
+    @Test func deleteNonManualPhotosPreservesManualRatingsAndFlags() throws {
         let dir = try makeTempDir()
         let db = try ReportDatabase(folderPath: dir)
 
@@ -295,12 +236,20 @@ import GRDB
             filePath: "/tmp/rejected.jpg",
             folderPath: dir.path
         )
-        rejectedPhoto.isRejected = true
+        rejectedPhoto.pickStatus = .rejected
         try db.save(&rejectedPhoto)
+
+        var pickedPhoto = Photo(
+            filename: "picked.jpg",
+            filePath: "/tmp/picked.jpg",
+            folderPath: dir.path
+        )
+        pickedPhoto.pickStatus = .picked
+        try db.save(&pickedPhoto)
 
         try db.deleteNonManualPhotos()
 
         let remaining = try db.fetchAllPhotos()
-        #expect(Set(remaining.map(\.filename)) == ["manual.jpg", "rejected.jpg"])
+        #expect(Set(remaining.map(\.filename)) == ["manual.jpg", "picked.jpg", "rejected.jpg"])
     }
 }

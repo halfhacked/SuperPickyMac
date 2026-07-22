@@ -52,70 +52,108 @@ struct AppStateBatchMutationTests {
         return p
     }
 
-    // MARK: - setPick(ids:)
+    // MARK: - setPickStatus(ids:status:)
 
-    @Test func setPickPicksAllWhenAnyUnpicked() async throws {
+    @Test func setPickStatusPicksAllSelectedPhotos() async throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let ids = try seedPhotos(3, into: folder)
         let app = AppState()
         app.loadPhotos(for: folder)
 
-        await app.setPick(ids: [ids[0]]).value
-        let mixed = Set(ids[0...2])
-        await app.setPick(ids: mixed).value
+        await app.setPickStatus(ids: Set(ids), status: .picked).value
 
         let db = try ReportDatabase(folderPath: folder)
         for id in ids {
-            #expect(try db.fetchPhoto(id: id)?.isPick == true)
+            #expect(try db.fetchPhoto(id: id)?.pickStatus == .picked)
         }
+        #expect(app.picksCount == 3)
+        #expect(app.rejectedCount == 0)
     }
 
-    @Test func setPickUnpicksAllWhenAllPicked() async throws {
+    @Test func setPickStatusIsIdempotent() async throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
-        let ids = try seedPhotos(3, into: folder)
+        let id = try #require(try seedPhotos(1, into: folder).first)
         let app = AppState()
         app.loadPhotos(for: folder)
 
-        let s = Set(ids)
-        await app.setPick(ids: s).value
-        await app.setPick(ids: s).value
+        await app.setPickStatus(ids: [id], status: .picked).value
+        await app.setPickStatus(ids: [id], status: .picked).value
+
+        #expect(app.allPhotosForTesting().first?.pickStatus == .picked)
+        #expect(app.undoStackSizeForTesting() == 1)
+    }
+
+    @Test func setPickStatusTransitionsRejectedPhotoToPicked() async throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let id = try #require(try seedPhotos(1, into: folder).first)
+        let app = AppState()
+        app.loadPhotos(for: folder)
+
+        await app.setPickStatus(ids: [id], status: .rejected).value
+        await app.setPickStatus(ids: [id], status: .picked).value
+
+        let photo = try #require(try ReportDatabase(folderPath: folder).fetchPhoto(id: id))
+        #expect(photo.pickStatus == .picked)
+        #expect(photo.isPicked)
+        #expect(!photo.isRejected)
+        #expect(app.picksCount == 1)
+        #expect(app.rejectedCount == 0)
+    }
+
+    @Test func unflagClearsPickedAndRejectedPhotos() async throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let ids = try seedPhotos(2, into: folder)
+        let app = AppState()
+        app.loadPhotos(for: folder)
+
+        await app.setPickStatus(ids: [ids[0]], status: .picked).value
+        await app.setPickStatus(ids: [ids[1]], status: .rejected).value
+        await app.setPickStatus(ids: Set(ids), status: .unflagged).value
 
         let db = try ReportDatabase(folderPath: folder)
         for id in ids {
-            #expect(try db.fetchPhoto(id: id)?.isPick == false)
+            #expect(try db.fetchPhoto(id: id)?.pickStatus == .unflagged)
         }
+        #expect(app.picksCount == 0)
+        #expect(app.rejectedCount == 0)
     }
 
-    @Test func setPickSinglePhotoMatchesLegacyToggleSemantics() async throws {
+    @Test func queuedFlagChangesHonorLatestRequestedStatus() async throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
-        let ids = try seedPhotos(1, into: folder)
+        let id = try #require(try seedPhotos(1, into: folder).first)
         let app = AppState()
         app.loadPhotos(for: folder)
 
-        await app.setPick(ids: [ids[0]]).value
-        #expect(app.allPhotosForTesting().first?.isPick == true)
-        await app.setPick(ids: [ids[0]]).value
-        #expect(app.allPhotosForTesting().first?.isPick == false)
+        let pickTask = app.setPickStatus(ids: [id], status: .picked)
+        let unflagTask = app.setPickStatus(ids: [id], status: .unflagged)
+        await pickTask.value
+        await unflagTask.value
+
+        let photo = try #require(try ReportDatabase(folderPath: folder).fetchPhoto(id: id))
+        #expect(photo.pickStatus == .unflagged)
+        #expect(app.allPhotosForTesting().first?.pickStatus == .unflagged)
     }
 
-    @Test func setPickPushesOneUndoEntry() async throws {
+    @Test func setPickStatusPushesOneUndoEntry() async throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let ids = try seedPhotos(3, into: folder)
         let app = AppState()
         app.loadPhotos(for: folder)
 
-        await app.setPick(ids: Set(ids)).value
+        await app.setPickStatus(ids: Set(ids), status: .picked).value
         let stackSizeAfter = app.undoStackSizeForTesting()
         #expect(stackSizeAfter == 1)
 
         await app.undoLastAction().value
         let db = try ReportDatabase(folderPath: folder)
         for id in ids {
-            #expect(try db.fetchPhoto(id: id)?.isPick == false)
+            #expect(try db.fetchPhoto(id: id)?.pickStatus == .unflagged)
         }
     }
 
@@ -134,11 +172,11 @@ struct AppStateBatchMutationTests {
         for id in ids {
             let photo = try db.fetchPhoto(id: id)
             #expect(photo?.starRating == 4)
-            #expect(photo?.isRejected == false)
+            #expect(photo?.pickStatus == .unflagged)
         }
     }
 
-    // MARK: - reject(ids:)
+    // MARK: - Rejected status
 
     @Test func rejectPreservesRatingFilterMembership() async throws {
         let folder = try makeTempFolder()
@@ -152,14 +190,14 @@ struct AppStateBatchMutationTests {
         app.applyFilter()
         #expect(app.photos.count == 3)
 
-        await app.reject(ids: [ids[0]]).value
+        await app.setPickStatus(ids: [ids[0]], status: .rejected).value
         #expect(app.photos.count == 3)
         #expect(app.photos.contains(where: { $0.id == ids[0] }))
 
         let rejected = try #require(try ReportDatabase(folderPath: folder).fetchPhoto(id: ids[0]))
         #expect(rejected.starRating == 3)
         #expect(rejected.isManualRating)
-        #expect(rejected.isRejected)
+        #expect(rejected.pickStatus == .rejected)
         #expect(app.ratingCounts[3] == 3)
         #expect(app.rejectedCount == 1)
     }
@@ -172,7 +210,7 @@ struct AppStateBatchMutationTests {
         app.loadPhotos(for: folder)
 
         await app.setRating(ids: [ids[0]], rating: 0).value
-        await app.reject(ids: [ids[1]]).value
+        await app.setPickStatus(ids: [ids[1]], status: .rejected).value
 
         app.sidebarSelection = .rating(0)
         app.applyFilter()
@@ -182,7 +220,7 @@ struct AppStateBatchMutationTests {
             try ReportDatabase(folderPath: folder).fetchPhoto(id: ids[1])
         )
         #expect(rejectedZero.starRating == 0)
-        #expect(rejectedZero.isRejected)
+        #expect(rejectedZero.pickStatus == .rejected)
         #expect(rejectedZero.isManualRating == false)
 
         app.sidebarSelection = .rejected
@@ -197,7 +235,7 @@ struct AppStateBatchMutationTests {
 
         let updated = try #require(try ReportDatabase(folderPath: folder).fetchPhoto(id: ids[1]))
         #expect(updated.starRating == 4)
-        #expect(updated.isRejected)
+        #expect(updated.pickStatus == .rejected)
     }
 
     @Test func undoRejectRestoresRatingAndRejectedState() async throws {
@@ -208,7 +246,7 @@ struct AppStateBatchMutationTests {
         app.loadPhotos(for: folder)
 
         await app.setRating(ids: [id], rating: 4).value
-        await app.reject(ids: [id]).value
+        await app.setPickStatus(ids: [id], status: .rejected).value
         app.sidebarSelection = .rating(4)
         app.applyFilter()
         #expect(app.photos.map(\.id) == [id])
@@ -217,7 +255,7 @@ struct AppStateBatchMutationTests {
 
         let restored = try #require(try ReportDatabase(folderPath: folder).fetchPhoto(id: id))
         #expect(restored.starRating == 4)
-        #expect(restored.isRejected == false)
+        #expect(restored.pickStatus == .unflagged)
         #expect(app.photos.map(\.id) == [id])
     }
 
@@ -240,7 +278,7 @@ struct AppStateBatchMutationTests {
                 folderPath: folder.path
             )
             photo.starRating = fixture.rating
-            photo.isRejected = fixture.rejected
+            photo.pickStatus = fixture.rejected ? .rejected : .unflagged
             try db.save(&photo)
             photos.append(photo)
         }
@@ -267,11 +305,12 @@ struct AppStateBatchMutationTests {
 
     @Test func commandDeleteRecognizesBackspaceAndForwardDelete() {
         func event(
-            keyCode: UInt16,
-            modifiers: NSEvent.ModifierFlags
+            characters: String = "",
+            keyCode: UInt16 = 0,
+            modifiers: NSEvent.ModifierFlags = []
         ) -> KeyboardMonitor.KeyEvent {
             KeyboardMonitor.KeyEvent(
-                characters: "",
+                characters: characters,
                 keyCode: keyCode,
                 modifiers: modifiers,
                 isEscape: false,
@@ -285,6 +324,10 @@ struct AppStateBatchMutationTests {
         #expect(event(keyCode: 117, modifiers: .command).isCommandDelete)
         #expect(!event(keyCode: 51, modifiers: []).isCommandDelete)
         #expect(!event(keyCode: 0, modifiers: .command).isCommandDelete)
+        #expect(event(characters: "p").photoPickStatus == .picked)
+        #expect(event(characters: "u").photoPickStatus == .unflagged)
+        #expect(event(characters: "x").photoPickStatus == .rejected)
+        #expect(event(characters: "i").photoPickStatus == nil)
     }
 
     // MARK: - correctSpecies(ids:commonName:)

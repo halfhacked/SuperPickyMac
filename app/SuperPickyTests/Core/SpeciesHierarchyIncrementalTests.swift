@@ -231,7 +231,7 @@ import Foundation
         let third = photo(species: [hawk], burstGroupID: groupID)
         first.filename = "first.jpg"
         first.isBurstBest = true
-        first.isPick = true
+        first.pickStatus = .picked
         second.filename = "second.jpg"
 
         var updatedFirst = first

@@ -109,7 +109,7 @@ struct ThumbnailCell: View {
     private var borderColor: Color {
         if isActive { return .accentColor }
         if isSelected { return .accentColor.opacity(0.5) }
-        if photo.isPick { return .orange.opacity(0.6) }
+        if photo.isPicked { return .orange.opacity(0.6) }
         return .clear
     }
 
@@ -126,7 +126,7 @@ struct ThumbnailCell: View {
                 .clipped()
 
             // Flag top-left
-            if photo.isPick {
+            if photo.isPicked {
                 Image(systemName: "flag.fill")
                     .font(.system(size: 8))
                     .foregroundStyle(.orange)
@@ -166,8 +166,7 @@ struct ThumbnailCell: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
                 .padding(2)
         }
-        .animation(.easeInOut(duration: 0.2), value: photo.isPick)
-        .animation(.easeInOut(duration: 0.2), value: photo.isRejected)
+        .animation(.easeInOut(duration: 0.2), value: photo.pickStatus)
         .clipShape(RoundedRectangle(cornerRadius: 4))
         .overlay(
             // strokeBorder draws inside the frame; plain stroke would center
@@ -247,4 +246,3 @@ struct AsyncThumbnailImage: View {
         await ImageLoader.load(path: filePath, maxPixelSize: 160)
     }
 }
-

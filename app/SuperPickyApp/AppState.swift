@@ -110,7 +110,7 @@ private actor PhotoMutationWorker {
         self.trashPhoto = trashPhoto
     }
 
-    /// Full read-modify-write used by pick / rate / reject and field-undo.
+    /// Full read-modify-write used by flag / rate changes and field-undo.
     /// XMP is written synchronously here to preserve existing behavior for
     /// those non-species mutations.
     func apply(
@@ -359,12 +359,12 @@ final class AppState {
     }
     var rejectedCount: Int { allPhotos.lazy.filter(\.isRejected).count }
     var flyingCount: Int { allPhotos.lazy.filter(\.isFlying).count }
-    var picksCount: Int { allPhotos.lazy.filter(\.isPick).count }
+    var picksCount: Int { allPhotos.lazy.filter(\.isPicked).count }
 
     struct UndoAction: Sendable {
         /// Distinguishes species edits (optimistic: observable state is applied
         /// synchronously and only species is persisted) from field mutations
-        /// (pick / rate / reject — persist-first, full-row restore on undo).
+        /// (flag / rate — persist-first, full-row restore on undo).
         enum Kind: Sendable {
             case fields
             case species
@@ -372,9 +372,8 @@ final class AppState {
         struct Entry: Sendable {
             let photoID: UUID
             let previousRating: Int
-            let previousIsPick: Bool
+            let previousPickStatus: PhotoPickStatus
             let previousIsManualRating: Bool
-            let previousIsRejected: Bool
             let previousAssignedSpecies: [SpeciesMatch]
         }
         var kind: Kind = .fields
@@ -388,7 +387,7 @@ final class AppState {
 
     // All photos from the current folder (unfiltered)
     private var allPhotos: [Photo] = []
-    var pickedPhotos: [Photo] { allPhotos.filter { $0.isPick } }
+    var pickedPhotos: [Photo] { allPhotos.filter(\.isPicked) }
     // Filtered photos shown in the UI
     var photos: [Photo] = []
     // O(1) lookup from photo.id → index in allPhotos and photos. Keeping
@@ -702,7 +701,7 @@ final class AppState {
         case .flying:
             return photo.isFlying
         case .picks:
-            return photo.isPick
+            return photo.isPicked
         case .species(let speciesID):
             return photoHasSpeciesID(photo, speciesID: speciesID)
         case .burstGroup(let groupID):
@@ -765,29 +764,32 @@ final class AppState {
     func failedXMPSidecarCountForTesting() -> Int { failedXMPSidecars.count }
     #endif
 
-    // MARK: - Set-based mutation: pick / rate / reject
+    // MARK: - Set-based mutation: flag / rate
 
-    /// Pick semantics across `ids`: if any photo in `ids` is unpicked, pick
-    /// all of them; else unpick all. Explicit-only — does NOT fan out to
-    /// burst members.
+    /// Flag changes apply only to the explicit selection and never fan out to
+    /// burst members. IDs already at the requested state are true no-ops.
     @MainActor
     @discardableResult
-    func setPick(ids: Set<UUID>) -> Task<Void, Never> {
+    func setPickStatus(
+        ids: Set<UUID>,
+        status: PhotoPickStatus
+    ) -> Task<Void, Never> {
         guard !ids.isEmpty, let context = mutationContext() else {
             return completedMutationTask()
         }
         return enqueueMutation { state in
             await state.applyBatch(context: context, ids: Array(ids)) { photos in
-                let newPick = photos.contains(where: { !$0.isPick })
                 for index in photos.indices {
-                    photos[index].isPick = newPick
+                    photos[index].pickStatus = status
                 }
-            } afterEach: { [weak state] photo in
+            } afterEach: { [weak state] result in
                 guard let state else { return }
+                let photo = result.updated
+                guard result.previous.isPicked != photo.isPicked else { return }
                 state.speciesEntries = SpeciesHierarchyBuilder.applyPickToggle(
                     entries: state.speciesEntries,
                     photo: photo,
-                    newIsPick: photo.isPick
+                    newIsPick: photo.isPicked
                 )
             }
         }
@@ -809,22 +811,7 @@ final class AppState {
         }
     }
 
-    @MainActor
-    @discardableResult
-    func reject(ids: Set<UUID>) -> Task<Void, Never> {
-        guard !ids.isEmpty, let context = mutationContext() else {
-            return completedMutationTask()
-        }
-        return enqueueMutation { state in
-            await state.applyBatch(context: context, ids: Array(ids)) { photos in
-                for index in photos.indices {
-                    photos[index].isRejected = true
-                }
-            }
-        }
-    }
-
-    // MARK: - Batch primitive (pick / rate / reject: persist-first)
+    // MARK: - Batch primitive (flag / rate: persist-first)
 
     /// Persist a batch away from the main actor, then commit its resulting
     /// photos and one undo action to observable state. Used only by the
@@ -835,7 +822,7 @@ final class AppState {
         context: MutationContext,
         ids: [UUID],
         _ mutate: @escaping @Sendable (inout [Photo]) -> Void,
-        afterEach: ((Photo) -> Void)? = nil
+        afterEach: ((PhotoMutationResult) -> Void)? = nil
     ) async {
         guard !ids.isEmpty else { return }
         do {
@@ -854,13 +841,12 @@ final class AppState {
                 entries.append(UndoAction.Entry(
                     photoID: previous.id,
                     previousRating: previous.starRating,
-                    previousIsPick: previous.isPick,
+                    previousPickStatus: previous.pickStatus,
                     previousIsManualRating: previous.isManualRating,
-                    previousIsRejected: previous.isRejected,
                     previousAssignedSpecies: previous.assignedSpecies
                 ))
                 if let idx = allPhotoIndex[photo.id] { allPhotos[idx] = photo }
-                afterEach?(photo)
+                afterEach?(result)
             }
             if !entries.isEmpty {
                 undoStack.append(UndoAction(kind: .fields, entries: entries))
@@ -1099,9 +1085,8 @@ final class AppState {
             undoEntries.append(UndoAction.Entry(
                 photoID: photo.id,
                 previousRating: photo.starRating,
-                previousIsPick: photo.isPick,
+                previousPickStatus: photo.pickStatus,
                 previousIsManualRating: photo.isManualRating,
-                previousIsRejected: photo.isRejected,
                 previousAssignedSpecies: before
             ))
             snapshots.append(SpeciesSnapshot(id: photo.id, species: after))
@@ -1497,9 +1482,8 @@ final class AppState {
                 for index in photos.indices {
                     guard let entry = entriesByID[photos[index].id] else { continue }
                     photos[index].starRating = entry.previousRating
-                    photos[index].isPick = entry.previousIsPick
+                    photos[index].pickStatus = entry.previousPickStatus
                     photos[index].isManualRating = entry.previousIsManualRating
-                    photos[index].isRejected = entry.previousIsRejected
                     photos[index].assignedSpecies = entry.previousAssignedSpecies
                 }
             }
@@ -1510,7 +1494,7 @@ final class AppState {
             for result in results {
                 let photo = result.updated
                 guard entriesByID[photo.id] != nil else { continue }
-                let pickChanged = result.previous.isPick != photo.isPick
+                let pickChanged = result.previous.isPicked != photo.isPicked
                 let speciesChanged = result.previous.assignedSpecies.map(\.speciesID)
                     != photo.assignedSpecies.map(\.speciesID)
 
@@ -1521,7 +1505,7 @@ final class AppState {
                     speciesEntries = SpeciesHierarchyBuilder.applyPickToggle(
                         entries: speciesEntries,
                         photo: photo,
-                        newIsPick: photo.isPick
+                        newIsPick: photo.isPicked
                     )
                 }
                 if speciesChanged { anySpeciesChanged = true }

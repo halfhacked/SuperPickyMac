@@ -5,6 +5,7 @@ struct FullscreenViewer: View {
     @Binding var selectedPhotoID: UUID?
     @Binding var isPresented: Bool
     var onRatePhoto: ((UUID, Int) -> Void)?
+    var onSetPickStatus: ((UUID, PhotoPickStatus) -> Void)?
     @State private var showInfo = true
     @Bindable var zoomState: ZoomState
     @State private var image: NSImage?
@@ -100,6 +101,10 @@ struct FullscreenViewer: View {
         }
         if key.isLeftArrow { navigatePhoto(direction: -1); return true }
         if key.isRightArrow { navigatePhoto(direction: 1); return true }
+        if let status = key.photoPickStatus, let id = selectedPhoto?.id {
+            onSetPickStatus?(id, status)
+            return true
+        }
         if let char = key.characters.first,
            let digit = char.wholeNumberValue,
            (0...5).contains(digit),

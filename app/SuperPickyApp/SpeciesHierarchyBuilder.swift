@@ -100,14 +100,14 @@ struct SpeciesHierarchyBuilder {
                 return BurstGroupEntry(
                     id: groupID,
                     count: groupPhotos.count,
-                    pickCount: groupPhotos.lazy.filter(\.isPick).count,
+                    pickCount: groupPhotos.lazy.filter(\.isPicked).count,
                     bestFilename: best?.filename ?? groupPhotos.first?.filename
                 )
             }.sorted { $0.count > $1.count }
 
             var singlePicks = 0
             var speciesPicks = 0
-            for photo in bucket.photos where photo.isPick {
+            for photo in bucket.photos where photo.isPicked {
                 speciesPicks += 1
                 if photo.burstGroupID == nil { singlePicks += 1 }
             }
@@ -159,13 +159,13 @@ struct SpeciesHierarchyBuilder {
                 let isMember = afterKeys.contains(key)
                 var delta = deltas[key, default: BucketDelta()]
                 delta.count += (isMember ? 1 : 0) - (wasMember ? 1 : 0)
-                delta.picks += (isMember && change.updated.isPick ? 1 : 0)
-                    - (wasMember && change.previous.isPick ? 1 : 0)
+                delta.picks += (isMember && change.updated.isPicked ? 1 : 0)
+                    - (wasMember && change.previous.isPicked ? 1 : 0)
 
                 if change.previous.burstGroupID == nil && change.updated.burstGroupID == nil {
                     delta.singlePhotos += (isMember ? 1 : 0) - (wasMember ? 1 : 0)
-                    delta.singlePicks += (isMember && change.updated.isPick ? 1 : 0)
-                        - (wasMember && change.previous.isPick ? 1 : 0)
+                    delta.singlePicks += (isMember && change.updated.isPicked ? 1 : 0)
+                        - (wasMember && change.previous.isPicked ? 1 : 0)
                 }
 
                 if let after = afterMatches[key] {
@@ -197,7 +197,7 @@ struct SpeciesHierarchyBuilder {
             let burst = BurstGroupEntry(
                 id: groupID,
                 count: updatedPhotos.count,
-                pickCount: updatedPhotos.lazy.filter(\.isPick).count,
+                pickCount: updatedPhotos.lazy.filter(\.isPicked).count,
                 bestFilename: best?.filename ?? updatedPhotos.first?.filename
             )
 
@@ -326,7 +326,7 @@ struct SpeciesHierarchyBuilder {
     private static func addPrimary(to entries: inout [SpeciesEntry], of photo: Photo) {
         let primary = photo.assignedSpecies.first
         let key = bucketKey(for: photo)
-        let pickDelta = photo.isPick ? 1 : 0
+        let pickDelta = photo.isPicked ? 1 : 0
         if let idx = indexOfBucket(in: entries, key: key) {
             let existing = entries[idx]
             entries[idx] = SpeciesEntry(
@@ -369,7 +369,7 @@ struct SpeciesHierarchyBuilder {
             entries.remove(at: idx)
             return
         }
-        let pickDelta = photo.isPick ? 1 : 0
+        let pickDelta = photo.isPicked ? 1 : 0
         entries[idx] = SpeciesEntry(
             speciesID: existing.speciesID,
             scientificName: existing.scientificName,

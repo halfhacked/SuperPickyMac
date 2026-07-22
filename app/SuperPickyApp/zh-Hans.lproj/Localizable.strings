@@ -205,7 +205,8 @@
 "Extend selection" = "扩展选择";
 "Select all" = "全选";
 "Collapse selection" = "折叠选择";
-"Pick / unpick selection" = "选择/取消选择";
+"Pick selection" = "选择照片";
+"Unflag selection" = "取消标记";
 "Rate selection" = "评分选择";
 "Reject selection" = "拒绝选择";
 "Editing %lld photos" = "正在编辑 %lld 张照片";

@@ -322,7 +322,7 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
         XCTAssertTrue(preview.exists, "Preview should remain after rating-key sequence")
     }
 
-    func test17_PKeyDoesNotCrash() {
+    func test17_PAndUKeysDoNotCrash() {
         let app = Self.app!
         let preview = app.images[A11y.photoPreview]
         XCTAssertTrue(preview.waitForExistence(timeout: 10))
@@ -332,16 +332,13 @@ final class CullingWorkflowUITests: SuperPickyUITestCase {
         let thumbs = app.images.matching(NSPredicate(format: "identifier BEGINSWITH 'Thumbnail_'"))
         XCTAssertGreaterThan(thumbs.count, 0, "At least one Thumbnail_* image should exist")
 
-        // Asserting PickFlag_* count deltas depends on whether any photo is
-        // actually selected in the shared-app state and whether the CI
-        // window surfaces the flag overlay in the a11y tree. Covering "P is
-        // wired up and doesn't crash the UI" is sufficient at the view
-        // level — state-change coverage is exercised by unit tests.
+        // State transitions are covered against XMP in BatchSelectionUITests;
+        // this shared-app test verifies both shortcuts stay wired in the main view.
         app.typeText("p")
         Thread.sleep(forTimeInterval: 0.5)
-        app.typeText("p")  // toggle back
+        app.typeText("u")
         Thread.sleep(forTimeInterval: 0.5)
-        XCTAssertTrue(preview.exists, "Preview should remain after P-key toggles")
+        XCTAssertTrue(preview.exists, "Preview should remain after P/U flag changes")
     }
 
     func test18_XKeyRejects() {
