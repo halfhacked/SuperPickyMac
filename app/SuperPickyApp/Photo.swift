@@ -1,7 +1,13 @@
 import Foundation
 import GRDB
 
-struct Photo: Identifiable, Codable, Sendable, FetchableRecord, PersistableRecord {
+enum PhotoPickStatus: Int, Codable, Sendable, DatabaseValueConvertible {
+    case rejected = -1
+    case unflagged = 0
+    case picked = 1
+}
+
+struct Photo: Identifiable, Codable, Equatable, Sendable, FetchableRecord, PersistableRecord {
     var id: UUID
     var filename: String
     var filePath: String
@@ -23,8 +29,7 @@ struct Photo: Identifiable, Codable, Sendable, FetchableRecord, PersistableRecor
     var sharpnessScore: Float?
     var exposureStatus: String?
     var starRating: Int
-    var isRejected: Bool
-    var isPick: Bool
+    var pickStatus: PhotoPickStatus
     var speciesScientificName: String?
     var speciesCommonName: String?
     var speciesCnName: String?
@@ -69,11 +74,13 @@ struct Photo: Identifiable, Codable, Sendable, FetchableRecord, PersistableRecor
         self.dateCreated = dateCreated
         self.isFlying = false
         self.starRating = 0
-        self.isRejected = false
-        self.isPick = false
+        self.pickStatus = .unflagged
         self.isBurstBest = false
         self.isManualRating = false
     }
+
+    var isPicked: Bool { pickStatus == .picked }
+    var isRejected: Bool { pickStatus == .rejected }
 
     mutating func applyLocation(_ loc: LocationInfo) {
         locationCity = loc.city

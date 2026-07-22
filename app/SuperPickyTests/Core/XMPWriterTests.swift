@@ -50,12 +50,12 @@ import Foundation
 
     @Test func xmpContainsPickStatusForPicked() {
         var photo = makePhoto(starRating: 5)
-        photo.isPick = true
+        photo.pickStatus = .picked
         let xml = XMPWriter.generate(photo: photo)
         #expect(xml.contains("xmp:PickStatus=\"1\""))
     }
 
-    @Test func xmpContainsPickStatusZeroForUnpicked() {
+    @Test func xmpContainsPickStatusZeroForUnflagged() {
         let photo = makePhoto(starRating: 3)
         let xml = XMPWriter.generate(photo: photo)
         #expect(xml.contains("xmp:PickStatus=\"0\""))
@@ -63,8 +63,7 @@ import Foundation
 
     @Test func xmpPreservesZeroRatingAlongsideRejectedPickStatus() {
         var photo = makePhoto(starRating: 0)
-        photo.isPick = true
-        photo.isRejected = true
+        photo.pickStatus = .rejected
 
         let xml = XMPWriter.generate(photo: photo)
 

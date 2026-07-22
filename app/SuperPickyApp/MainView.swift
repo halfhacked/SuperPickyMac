@@ -107,11 +107,8 @@ struct MainView: View {
                     onRatePhoto: { id, rating in
                         appState.setRating(ids: [id], rating: rating)
                     },
-                    onTogglePick: { id in
-                        appState.setPick(ids: [id])
-                    },
-                    onRejectPhoto: { id in
-                        appState.reject(ids: [id])
+                    onSetPickStatus: { id, status in
+                        appState.setPickStatus(ids: [id], status: status)
                     },
                     onUndo: {
                         appState.undoLastAction()
@@ -306,7 +303,7 @@ struct MainView: View {
 
     private func exportPicks() {
         // Export picks that are also visible in current filter
-        let picks = appState.photos.filter { $0.isPick }
+        let picks = appState.photos.filter(\.isPicked)
         guard !picks.isEmpty else {
             exportResultMessage = config.localized("No picks in the current view")
             showExportComplete = true

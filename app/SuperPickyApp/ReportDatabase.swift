@@ -59,7 +59,7 @@ final class ReportDatabase: Sendable {
                 t.column("exposureStatus", .text)
                 t.column("focusPointStatus", .text)
                 t.column("starRating", .integer).notNull().defaults(to: 0)
-                t.column("isPick", .boolean).notNull().defaults(to: false)
+                t.column("pickStatus", .integer).notNull().defaults(to: PhotoPickStatus.unflagged.rawValue)
                 t.column("speciesScientificName", .text)
                 t.column("speciesCommonName", .text)
                 t.column("speciesConfidence", .double)
@@ -68,6 +68,7 @@ final class ReportDatabase: Sendable {
             }
             try db.create(indexOn: "photos", columns: ["folderPath"])
             try db.create(indexOn: "photos", columns: ["starRating"])
+            try db.create(indexOn: "photos", columns: ["pickStatus"])
             try db.create(indexOn: "photos", columns: ["speciesScientificName"])
             try db.create(indexOn: "photos", columns: ["burstGroupID"])
         }
@@ -160,27 +161,6 @@ final class ReportDatabase: Sendable {
                 }
             }
         }
-        migrator.registerMigration("v9_rejected_state") { db in
-            let hasRejectedColumn = try Int.fetchOne(
-                db,
-                sql: """
-                    SELECT COUNT(*)
-                    FROM pragma_table_info('photos')
-                    WHERE name = 'isRejected'
-                    """
-            ) == 1
-            if !hasRejectedColumn {
-                try db.alter(table: "photos") { t in
-                    t.add(column: "isRejected", .boolean).notNull().defaults(to: false)
-                }
-            }
-            // Legacy zero-star rows are intentionally left non-rejected because
-            // the old schema cannot prove whether the user pressed 0 or X.
-            try db.execute(sql: """
-                CREATE INDEX IF NOT EXISTS index_photos_on_isRejected
-                ON photos(isRejected)
-            """)
-        }
         try migrator.migrate(dbQueue)
     }
 
@@ -220,13 +200,16 @@ final class ReportDatabase: Sendable {
                 updated.map(\.id) == previous.map(\.id),
                 "Photo batch mutations must preserve identity and order"
             )
-            for index in updated.indices {
+            var results: [PhotoMutationResult] = []
+            results.reserveCapacity(updated.count)
+            for index in updated.indices where updated[index] != previous[index] {
                 try updated[index].save(db)
+                results.append(PhotoMutationResult(
+                    previous: previous[index],
+                    updated: updated[index]
+                ))
             }
-
-            return zip(previous, updated).map {
-                PhotoMutationResult(previous: $0.0, updated: $0.1)
-            }
+            return results
         }
     }
 
@@ -328,11 +311,15 @@ final class ReportDatabase: Sendable {
     }
 
     /// Delete photos with no manual culling decision so the pipeline can
-    /// reprocess them. Manual ratings and explicit rejections are preserved.
+    /// reprocess them. Manual ratings and explicit flags are preserved.
     func deleteNonManualPhotos() throws {
         try dbQueue.write { db in
             try db.execute(
-                sql: "DELETE FROM photos WHERE isManualRating = 0 AND isRejected = 0"
+                sql: """
+                    DELETE FROM photos
+                    WHERE isManualRating = 0 AND pickStatus = ?
+                    """,
+                arguments: [PhotoPickStatus.unflagged.rawValue]
             )
         }
     }

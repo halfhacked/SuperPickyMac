@@ -35,7 +35,7 @@ import Foundation
         photo.burstGroupID = burstGroupID
         photo.isBurstBest = isBurstBest
         photo.starRating = starRating
-        photo.isPick = isPick
+        photo.pickStatus = isPick ? .picked : .unflagged
         return photo
     }
 

@@ -205,7 +205,8 @@
 "Extend selection" = "Extend selection";
 "Select all" = "Select all";
 "Collapse selection" = "Collapse selection";
-"Pick / unpick selection" = "Pick / unpick selection";
+"Pick selection" = "Pick selection";
+"Unflag selection" = "Unflag selection";
 "Rate selection" = "Rate selection";
 "Reject selection" = "Reject selection";
 "Editing %lld photos" = "Editing %lld photos";

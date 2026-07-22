@@ -3,9 +3,8 @@ import XCTest
 /// XCUITest coverage for filmstrip multi-select and batch operations.
 ///
 /// Tests share one app instance via `SuperPickyUITestCase`, so each test
-/// must be independent of prior pick / rating state. Helpers here observe
-/// the current state, drive the transition, and assert relative outcomes
-/// (homogeneity, round-trip, etc.) instead of absolute states.
+/// must be independent of prior flag / rating state. P, U, and X are
+/// idempotent setters, so each test can drive the selection to a known state.
 final class BatchSelectionUITests: SuperPickyUITestCase {
 
     override class var testDirPrefix: String { "superpicky_batch" }
@@ -52,9 +51,12 @@ final class BatchSelectionUITests: SuperPickyUITestCase {
         return try String(contentsOfFile: path, encoding: .utf8)
     }
 
-    private func isPicked(_ filename: String) -> Bool {
+    private func pickStatus(_ filename: String) -> Int? {
         let body = (try? xmp(for: filename)) ?? ""
-        return body.contains("xmp:PickStatus=\"1\"")
+        if body.contains("xmp:PickStatus=\"-1\"") { return -1 }
+        if body.contains("xmp:PickStatus=\"0\"") { return 0 }
+        if body.contains("xmp:PickStatus=\"1\"") { return 1 }
+        return nil
     }
 
     private func fixtureFilenames() -> [String] {
@@ -70,19 +72,10 @@ final class BatchSelectionUITests: SuperPickyUITestCase {
         clickThumbnail(names[2], modifiers: .shift)
     }
 
-    /// Drive the batch into a known pick state. `targetPicked = true` means
-    /// "leave all 3 picked". Idempotent: presses 'p' once, observes, and
-    /// presses again only if the resulting state is wrong.
-    private func forceAllPicked(_ names: [String], targetPicked: Bool = true) {
+    private func forceAllPicked(_ names: [String]) {
         selectAllThree(names)
-        // 'p' toggles A-semantics: any-unpicked → pick all; else unpick all.
-        // After one press the 3 are guaranteed homogeneous.
         app.typeKey("p", modifierFlags: [])
         Thread.sleep(forTimeInterval: 0.3)
-        if isPicked(names[0]) != targetPicked {
-            app.typeKey("p", modifierFlags: [])
-            Thread.sleep(forTimeInterval: 0.3)
-        }
     }
 
     // MARK: - Tests
@@ -147,29 +140,40 @@ final class BatchSelectionUITests: SuperPickyUITestCase {
         XCTAssertEqual(a11ySelection(of: names[2]), "active")
     }
 
-    func testBatchPickHomogenizesAllSelectedPhotos() throws {
+    func testBatchPickSetsAllSelectedPhotos() throws {
         let names = fixtureFilenames()
         guard names.count >= 3 else { return }
         selectAllThree(names)
         app.typeKey("p", modifierFlags: [])
         Thread.sleep(forTimeInterval: 0.5)
 
-        // After one A-semantics 'p', all 3 must share the same pick state.
-        let states = names.prefix(3).map { isPicked($0) }
-        XCTAssertEqual(Set(states).count, 1,
-                       "Batch pick should leave all 3 in the same state, got \(states)")
+        for name in names.prefix(3) {
+            XCTAssertEqual(pickStatus(name), 1, "XMP for \(name) should be picked")
+        }
     }
 
-    func testBatchUnpickFromKnownPickedState() throws {
+    func testBatchUnflagClearsPickedState() throws {
         let names = fixtureFilenames()
         guard names.count >= 3 else { return }
-        forceAllPicked(names, targetPicked: true)
-        // Now press 'p' to unpick all.
+        forceAllPicked(names)
         selectAllThree(names)
-        app.typeKey("p", modifierFlags: [])
+        app.typeKey("u", modifierFlags: [])
         Thread.sleep(forTimeInterval: 0.5)
-        for n in names.prefix(3) {
-            XCTAssertFalse(isPicked(n), "XMP for \(n) should be unpicked")
+        for name in names.prefix(3) {
+            XCTAssertEqual(pickStatus(name), 0, "XMP for \(name) should be unflagged")
+        }
+    }
+
+    func testBatchUnflagClearsRejectedState() throws {
+        let names = fixtureFilenames()
+        guard names.count >= 3 else { return }
+        selectAllThree(names)
+        app.typeKey("x", modifierFlags: [])
+        Thread.sleep(forTimeInterval: 0.3)
+        app.typeKey("u", modifierFlags: [])
+        Thread.sleep(forTimeInterval: 0.5)
+        for name in names.prefix(3) {
+            XCTAssertEqual(pickStatus(name), 0, "XMP for \(name) should be unflagged")
         }
     }
 
@@ -189,17 +193,17 @@ final class BatchSelectionUITests: SuperPickyUITestCase {
     func testOneStepUndoForBatchEdit() throws {
         let names = fixtureFilenames()
         guard names.count >= 3 else { return }
-        // Snapshot current pick state per photo, then mutate, then undo,
-        // then assert each photo round-tripped.
+        // Start unflagged, pick the batch, then verify one undo restores 0.
         selectAllThree(names)
-        let before = names.prefix(3).map { isPicked($0) }
+        app.typeKey("u", modifierFlags: [])
+        Thread.sleep(forTimeInterval: 0.3)
         app.typeKey("p", modifierFlags: [])
         Thread.sleep(forTimeInterval: 0.3)
         app.typeKey("z", modifierFlags: .command)
         Thread.sleep(forTimeInterval: 0.5)
-        for (n, was) in zip(names.prefix(3), before) {
-            XCTAssertEqual(isPicked(n), was,
-                           "XMP for \(n) should round-trip pick state after undo")
+        for name in names.prefix(3) {
+            XCTAssertEqual(pickStatus(name), 0,
+                           "XMP for \(name) should restore unflagged state after undo")
         }
     }
 }

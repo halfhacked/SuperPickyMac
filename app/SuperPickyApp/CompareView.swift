@@ -5,7 +5,7 @@ struct CompareView: View {
     @Binding var selectedPhotoID: UUID?
     @Binding var isPresented: Bool
     var onRatePhoto: ((UUID, Int) -> Void)?
-    var onTogglePick: ((UUID) -> Void)?
+    var onSetPickStatus: ((UUID, PhotoPickStatus) -> Void)?
     @Environment(CullingConfig.self) private var config
     @State private var rightIndex: Int = 0
     @State private var activeSide: Side = .left
@@ -90,7 +90,7 @@ struct CompareView: View {
             if let photo {
                 HStack(spacing: 12) {
                     StarRatingView(rating: photo.starRating)
-                    if photo.isPick {
+                    if photo.isPicked {
                         Image(systemName: "flag.fill")
                             .foregroundStyle(.orange)
                             .font(.caption)
@@ -110,8 +110,7 @@ struct CompareView: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
                 .background(.black)
-                .animation(.easeInOut(duration: 0.2), value: photo.isPick)
-                .animation(.easeInOut(duration: 0.2), value: photo.isRejected)
+                .animation(.easeInOut(duration: 0.2), value: photo.pickStatus)
             }
         }
     }
@@ -203,10 +202,10 @@ struct CompareView: View {
             return true
         }
 
-        if key.characters == "p" {
+        if let status = key.photoPickStatus {
             let photo = activeSide == .left ? leftPhoto : rightPhoto
             if let id = photo?.id {
-                onTogglePick?(id)
+                onSetPickStatus?(id, status)
             }
             return true
         }
