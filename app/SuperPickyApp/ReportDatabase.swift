@@ -12,8 +12,8 @@ struct PhotoMutationResult: Sendable {
 struct SpeciesSnapshot: Sendable {
     let id: UUID
     let species: [SpeciesMatch]
-    /// Assignment replaced by this snapshot. Used only to migrate keywords
-    /// from sidecars written before SuperPicky tracked keyword ownership.
+    /// Assignment replaced by this snapshot. Its keyword variants are removed
+    /// before the desired species keywords are written.
     let previousSpecies: [SpeciesMatch]
 }
 

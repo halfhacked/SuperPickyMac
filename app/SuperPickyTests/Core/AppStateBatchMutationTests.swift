@@ -813,7 +813,7 @@ struct AppStateBatchMutationTests {
         #expect(app.speciesXMPFlushToken > flushTokenBefore)
     }
 
-    @Test func removingSpeciesCleansLegacySidecarAndPreservesUserKeywords() async throws {
+    @Test func removingSpeciesDeletesMatchingKeywordsAndPreservesUnrelatedKeywords() async throws {
         let folder = try makeTempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let eagle = match("eagle")
@@ -824,11 +824,8 @@ struct AppStateBatchMutationTests {
         <x:xmpmeta xmlns:x="adobe:ns:meta/">
           <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
             <rdf:Description
-              xmlns:xmp="http://ns.adobe.com/xap/1.0/"
               xmlns:dc="http://purl.org/dc/elements/1.1/"
-              xmlns:lr="http://ns.adobe.com/lightroom/1.0/"
-              xmp:Rating="4"
-              xmp:PickStatus="0">
+              xmlns:lr="http://ns.adobe.com/lightroom/1.0/">
               <dc:subject>
                 <rdf:Bag>
                   <rdf:li>Portfolio</rdf:li>

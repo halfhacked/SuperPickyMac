@@ -241,7 +241,7 @@ import Foundation
         }
     }
 
-    @Test func existingMatchingKeywordRemainsUserOwned() throws {
+    @Test func existingMatchingSpeciesKeywordBecomesSuperPickyManaged() throws {
         try withTempDir { tempDir in
             let filePath = tempDir.appendingPathComponent("IMG_5678.CR3").path
             let sidecarURL = tempDir.appendingPathComponent("IMG_5678.xmp")
@@ -252,6 +252,7 @@ import Foundation
                 <rdf:Description xmlns:dc="http://purl.org/dc/elements/1.1/">
                   <dc:subject>
                     <rdf:Bag>
+                      <rdf:li>Portfolio</rdf:li>
                       <rdf:li>Robin</rdf:li>
                     </rdf:Bag>
                   </dc:subject>
@@ -275,13 +276,14 @@ import Foundation
             _ = try XMPWriter.write(photo: photo)
 
             let content = try String(contentsOf: sidecarURL, encoding: .utf8)
-            #expect(content.contains("<rdf:li>Robin</rdf:li>"))
+            #expect(content.contains("<rdf:li>Portfolio</rdf:li>"))
+            #expect(!content.contains("<rdf:li>Robin</rdf:li>"))
             #expect(content.contains("<rdf:li>Osprey</rdf:li>"))
             #expect(!content.contains("<rdf:li>Turdus migratorius</rdf:li>"))
         }
     }
 
-    @Test func removingSpeciesCleansKeywordsFromLegacySuperPickySidecar() throws {
+    @Test func removingSpeciesDeletesAllMatchingKeywordsFromExistingSidecar() throws {
         try withTempDir { tempDir in
             let filePath = tempDir.appendingPathComponent("IMG_5678.CR3").path
             let sidecarURL = tempDir.appendingPathComponent("IMG_5678.xmp")
@@ -290,13 +292,12 @@ import Foundation
             <x:xmpmeta xmlns:x="adobe:ns:meta/">
               <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
                 <rdf:Description
-                  xmlns:xmp="http://ns.adobe.com/xap/1.0/"
                   xmlns:dc="http://purl.org/dc/elements/1.1/"
-                  xmlns:lr="http://ns.adobe.com/lightroom/1.0/"
-                  xmp:Rating="4"
-                  xmp:PickStatus="0">
+                  xmlns:lr="http://ns.adobe.com/lightroom/1.0/">
                   <dc:subject>
                     <rdf:Bag>
+                      <rdf:li>Portfolio</rdf:li>
+                      <rdf:li>Robin</rdf:li>
                       <rdf:li>Robin</rdf:li>
                       <rdf:li>Turdus migratorius</rdf:li>
                     </rdf:Bag>
@@ -312,7 +313,7 @@ import Foundation
             """
             try Data(legacy.utf8).write(to: sidecarURL)
 
-            let legacySpecies = SpeciesMatch(
+            let removedSpecies = SpeciesMatch(
                 scientificName: "Turdus migratorius",
                 commonName: "Robin",
                 confidence: 0.9,
@@ -328,10 +329,11 @@ import Foundation
             )
             _ = try XMPWriter.write(
                 photo: photo,
-                legacyManagedSpecies: [legacySpecies]
+                replacingSpecies: [removedSpecies]
             )
 
             let content = try String(contentsOf: sidecarURL, encoding: .utf8)
+            #expect(content.contains("<rdf:li>Portfolio</rdf:li>"))
             #expect(!content.contains("<rdf:li>Robin</rdf:li>"))
             #expect(!content.contains("<rdf:li>Turdus migratorius</rdf:li>"))
             #expect(!content.contains("<rdf:li>Bird|Robin</rdf:li>"))

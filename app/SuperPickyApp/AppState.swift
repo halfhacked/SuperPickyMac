@@ -112,15 +112,14 @@ private func mergingSpecies(
 
 private struct XMPWriteRequest: Sendable {
     var photo: Photo
-    /// Prior assignments whose keyword variants may need one-time cleanup
-    /// when this path still contains an unmarked legacy SuperPicky sidecar.
-    var legacyManagedSpecies: [SpeciesMatch]
+    /// Prior assignments whose keyword variants must be removed.
+    var replacedSpecies: [SpeciesMatch]
 
     mutating func merge(_ newer: XMPWriteRequest) {
         photo = newer.photo
-        legacyManagedSpecies = mergingSpecies(
-            legacyManagedSpecies,
-            with: newer.legacyManagedSpecies
+        replacedSpecies = mergingSpecies(
+            replacedSpecies,
+            with: newer.replacedSpecies
         )
     }
 }
@@ -199,9 +198,9 @@ private actor PhotoMutationWorker {
 ///
 /// Species edits are optimistic: SQLite is overlaid on the serialized mutation
 /// chain, but the durable XMP sidecar is written *behind* the UI. Each sidecar
-/// path retains only the latest `Photo` plus accumulated legacy-cleanup
-/// candidates, so rapid edits coalesce into a single write without losing a
-/// removed assignment. Failed writes stay pending. `flush()` drains
+/// path retains only the latest `Photo` plus every replaced assignment, so
+/// rapid edits coalesce without losing keywords that must be removed. Failed
+/// writes stay pending. `flush()` drains
 /// deterministically for tests and termination — no test waits on the timer.
 private actor XMPWriteBehindQueue {
     private var pending: [String: XMPWriteRequest] = [:]
@@ -282,7 +281,7 @@ private actor XMPWriteBehindQueue {
             do {
                 _ = try XMPWriter.write(
                     photo: request.photo,
-                    legacyManagedSpecies: request.legacyManagedSpecies
+                    replacingSpecies: request.replacedSpecies
                 )
                 writeCount += 1
                 succeededSidecarPaths.append(path)
@@ -1254,17 +1253,17 @@ final class AppState {
         let snapshotsByID = Dictionary(uniqueKeysWithValues: snapshots.map { ($0.id, $0) })
         return photos.compactMap { photo in
             guard let snapshot = snapshotsByID[photo.id] else { return nil }
-            var legacySpecies = snapshot.previousSpecies
+            var replacedSpecies = snapshot.previousSpecies
             if let failed = failedSpeciesEdits[photo.id],
                failed.folder.path == photo.folderPath {
-                legacySpecies = mergingSpecies(
+                replacedSpecies = mergingSpecies(
                     failed.snapshot.previousSpecies,
-                    with: legacySpecies
+                    with: replacedSpecies
                 )
             }
             return XMPWriteRequest(
                 photo: photo,
-                legacyManagedSpecies: legacySpecies
+                replacedSpecies: replacedSpecies
             )
         }
     }
@@ -1291,8 +1290,8 @@ final class AppState {
         for snapshot in snapshots {
             var retainedSnapshot = snapshot
             if let existing = failedSpeciesEdits[snapshot.id] {
-                // The newest desired state wins, but every prior assignment is
-                // retained so a later retry can clean all legacy keywords.
+                // The newest desired state wins, but every replaced assignment
+                // is retained so a later retry can remove all of its keywords.
                 guard existing.generation <= generation else { continue }
                 retainedSnapshot = SpeciesSnapshot(
                     id: snapshot.id,
