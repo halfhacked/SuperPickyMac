@@ -112,12 +112,19 @@ struct XMPWriter {
 
     /// Write XMP sidecar file next to the original.
     /// Returns the URL of the written .xmp file.
-    static func write(photo: Photo) throws -> URL {
+    static func write(
+        photo: Photo,
+        legacyManagedSpecies: [SpeciesMatch] = []
+    ) throws -> URL {
         let url = sidecarURL(for: photo)
         let data: Data
         if FileManager.default.fileExists(atPath: url.path) {
             let existing = try Data(contentsOf: url)
-            data = try merge(photo: photo, into: existing)
+            data = try merge(
+                photo: photo,
+                into: existing,
+                legacyManagedSpecies: legacyManagedSpecies
+            )
         } else {
             guard let generated = generate(photo: photo).data(using: .utf8) else {
                 throw MergeError.encodingFailed
@@ -167,7 +174,11 @@ struct XMPWriter {
 
     // MARK: - Private
 
-    private static func merge(photo: Photo, into data: Data) throws -> Data {
+    private static func merge(
+        photo: Photo,
+        into data: Data,
+        legacyManagedSpecies: [SpeciesMatch]
+    ) throws -> Data {
         let document = try XMLDocument(data: data, options: [.nodePreserveAll])
         let descriptions = descendantElements(
             in: document,
@@ -177,6 +188,7 @@ struct XMPWriter {
         guard let primaryDescription = descriptions.first else {
             throw MergeError.missingDescription
         }
+        let isLegacySidecar = isLegacySuperPickySidecar(descriptions: descriptions)
 
         setSimpleProperty(
             localName: "Rating",
@@ -204,6 +216,15 @@ struct XMPWriter {
             descriptions: descriptions
         )
         let assigned = photo.assignedSpecies
+        let legacySpecies = legacyManagedSpecies + assigned.filter {
+            !legacyManagedSpecies.contains($0)
+        }
+        let legacyFlat = isLegacySidecar
+            ? keywordBag(for: legacySpecies, isFlying: photo.isFlying)
+            : []
+        let legacyHierarchical = isLegacySidecar
+            ? hierarchicalBag(for: legacySpecies, isFlying: photo.isFlying)
+            : []
         let desiredFlat = keywordBag(for: assigned, isFlying: photo.isFlying)
         let desiredHierarchical = hierarchicalBag(for: assigned, isFlying: photo.isFlying)
         let managedFlat = try updateKeywordBag(
@@ -211,7 +232,7 @@ struct XMPWriter {
             propertyURI: dcURI,
             preferredPrefix: "dc",
             desired: desiredFlat,
-            previouslyManaged: previousFlat,
+            previouslyManaged: previousFlat ?? legacyFlat,
             descriptions: descriptions,
             fallback: primaryDescription
         )
@@ -220,7 +241,7 @@ struct XMPWriter {
             propertyURI: lrURI,
             preferredPrefix: "lr",
             desired: desiredHierarchical,
-            previouslyManaged: previousHierarchical,
+            previouslyManaged: previousHierarchical ?? legacyHierarchical,
             descriptions: descriptions,
             fallback: primaryDescription
         )
@@ -437,6 +458,34 @@ struct XMPWriter {
             separator: "\0",
             omittingEmptySubsequences: false
         ).map(String.init)
+    }
+
+    private static func isLegacySuperPickySidecar(
+        descriptions: [XMLElement]
+    ) -> Bool {
+        let hasManagedProperties = descriptions.contains {
+            namespacedAttribute(
+                in: $0,
+                localName: managedSubjectName,
+                uri: superPickyURI
+            ) != nil || namespacedAttribute(
+                in: $0,
+                localName: managedHierarchicalSubjectName,
+                uri: superPickyURI
+            ) != nil
+        }
+        guard !hasManagedProperties else { return false }
+
+        // PickStatus was emitted by every pre-ownership SuperPicky sidecar and
+        // is not an Adobe XMP property. It lets us migrate only our old files
+        // without claiming matching keywords from arbitrary existing sidecars.
+        return descriptions.contains {
+            namespacedAttribute(
+                in: $0,
+                localName: "PickStatus",
+                uri: xmpURI
+            ) != nil
+        }
     }
 
     private static func encodeManaged(_ values: [String]) -> String {

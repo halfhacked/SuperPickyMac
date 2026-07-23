@@ -813,6 +813,52 @@ struct AppStateBatchMutationTests {
         #expect(app.speciesXMPFlushToken > flushTokenBefore)
     }
 
+    @Test func removingSpeciesCleansLegacySidecarAndPreservesUserKeywords() async throws {
+        let folder = try makeTempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let eagle = match("eagle")
+        let photo = try seedPhoto(filename: "legacy.CR3", species: eagle, into: folder)
+        let sidecar = XMPWriter.sidecarURL(for: photo)
+        let legacy = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <x:xmpmeta xmlns:x="adobe:ns:meta/">
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+            <rdf:Description
+              xmlns:xmp="http://ns.adobe.com/xap/1.0/"
+              xmlns:dc="http://purl.org/dc/elements/1.1/"
+              xmlns:lr="http://ns.adobe.com/lightroom/1.0/"
+              xmp:Rating="4"
+              xmp:PickStatus="0">
+              <dc:subject>
+                <rdf:Bag>
+                  <rdf:li>Portfolio</rdf:li>
+                  <rdf:li>Eagle</rdf:li>
+                  <rdf:li>Genus eagle</rdf:li>
+                </rdf:Bag>
+              </dc:subject>
+              <lr:hierarchicalSubject>
+                <rdf:Bag>
+                  <rdf:li>Bird|Eagle</rdf:li>
+                </rdf:Bag>
+              </lr:hierarchicalSubject>
+            </rdf:Description>
+          </rdf:RDF>
+        </x:xmpmeta>
+        """
+        try Data(legacy.utf8).write(to: sidecar)
+        let app = AppState()
+        app.loadPhotos(for: folder)
+
+        await app.removeSpecies(ids: [photo.id], species: eagle).value
+        await app.flushPendingPersistence()
+
+        let content = try String(contentsOf: sidecar, encoding: .utf8)
+        #expect(content.contains("<rdf:li>Portfolio</rdf:li>"))
+        #expect(!content.contains("<rdf:li>Eagle</rdf:li>"))
+        #expect(!content.contains("<rdf:li>Genus eagle</rdf:li>"))
+        #expect(!content.contains("<rdf:li>Bird|Eagle</rdf:li>"))
+    }
+
     // MARK: - Retryable XMP failure
 
     @Test func xmpWriteFailureIsRetryableAndKeepsOptimisticState() async throws {

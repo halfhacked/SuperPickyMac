@@ -99,6 +99,32 @@ private struct XMPFlushSummary: Sendable {
     let failedSidecarPaths: [String]
 }
 
+private func mergingSpecies(
+    _ existing: [SpeciesMatch],
+    with additions: [SpeciesMatch]
+) -> [SpeciesMatch] {
+    var merged = existing
+    for species in additions where !merged.contains(species) {
+        merged.append(species)
+    }
+    return merged
+}
+
+private struct XMPWriteRequest: Sendable {
+    var photo: Photo
+    /// Prior assignments whose keyword variants may need one-time cleanup
+    /// when this path still contains an unmarked legacy SuperPicky sidecar.
+    var legacyManagedSpecies: [SpeciesMatch]
+
+    mutating func merge(_ newer: XMPWriteRequest) {
+        photo = newer.photo
+        legacyManagedSpecies = mergingSpecies(
+            legacyManagedSpecies,
+            with: newer.legacyManagedSpecies
+        )
+    }
+}
+
 private actor PhotoMutationWorker {
     private let logger = Logger(
         subsystem: "com.halfhacked.superpicky",
@@ -173,12 +199,12 @@ private actor PhotoMutationWorker {
 ///
 /// Species edits are optimistic: SQLite is overlaid on the serialized mutation
 /// chain, but the durable XMP sidecar is written *behind* the UI. Each sidecar
-/// path retains only the latest `Photo`, so rapid edits coalesce into a single
-/// write. Failed writes stay pending (path-keyed, so a newer edit supersedes
-/// them). `flush()` drains deterministically for tests and termination — no
-/// test ever waits on the debounce timer.
+/// path retains only the latest `Photo` plus accumulated legacy-cleanup
+/// candidates, so rapid edits coalesce into a single write without losing a
+/// removed assignment. Failed writes stay pending. `flush()` drains
+/// deterministically for tests and termination — no test waits on the timer.
 private actor XMPWriteBehindQueue {
-    private var pending: [String: Photo] = [:]
+    private var pending: [String: XMPWriteRequest] = [:]
     private var debounceTask: Task<Void, Never>?
     private let debounceNanoseconds: UInt64
     private let onFlush: @Sendable (XMPFlushSummary) -> Void
@@ -191,10 +217,16 @@ private actor XMPWriteBehindQueue {
         self.onFlush = onFlush
     }
 
-    func enqueue(_ photos: [Photo]) {
-        guard !photos.isEmpty else { return }
-        for photo in photos {
-            pending[XMPWriter.sidecarURL(for: photo).path] = photo
+    func enqueue(_ requests: [XMPWriteRequest]) {
+        guard !requests.isEmpty else { return }
+        for request in requests {
+            let path = XMPWriter.sidecarURL(for: request.photo).path
+            if var existing = pending[path] {
+                existing.merge(request)
+                pending[path] = existing
+            } else {
+                pending[path] = request
+            }
         }
         scheduleDebounce()
     }
@@ -245,17 +277,20 @@ private actor XMPWriteBehindQueue {
         var succeededSidecarPaths: [String] = []
         var failedSidecarPaths: [String] = []
         var slowest = 0.0
-        for (path, photo) in batch {
+        for (path, request) in batch {
             let writeStart = SpeciesEditProfiler.now()
             do {
-                _ = try XMPWriter.write(photo: photo)
+                _ = try XMPWriter.write(
+                    photo: request.photo,
+                    legacyManagedSpecies: request.legacyManagedSpecies
+                )
                 writeCount += 1
                 succeededSidecarPaths.append(path)
             } catch {
                 // Keep the failed write pending unless a newer edit already
                 // superseded this path during the (non-suspending) loop.
-                if pending[path] == nil { pending[path] = photo }
-                failedPhotos.append(photo)
+                if pending[path] == nil { pending[path] = request }
+                failedPhotos.append(request.photo)
                 failedSidecarPaths.append(path)
             }
             slowest = max(slowest, SpeciesEditProfiler.elapsedMilliseconds(since: writeStart))
@@ -1089,7 +1124,11 @@ final class AppState {
                 previousIsManualRating: photo.isManualRating,
                 previousAssignedSpecies: before
             ))
-            snapshots.append(SpeciesSnapshot(id: photo.id, species: after))
+            snapshots.append(SpeciesSnapshot(
+                id: photo.id,
+                species: after,
+                previousSpecies: before
+            ))
             pendingOptimisticSpecies[photo.id] = (generation, after)
         }
 
@@ -1185,7 +1224,10 @@ final class AppState {
                 database: context.database,
                 snapshots: snapshots
             )
-            await xmpQueue.enqueue(result.written)
+            await xmpQueue.enqueue(xmpWriteRequests(
+                for: result.written,
+                snapshots: snapshots
+            ))
             clearOptimisticState(for: snapshots, upTo: generation)
             if var profile {
                 profile.persistedPhotoCount = result.written.count
@@ -1202,6 +1244,28 @@ final class AppState {
                 lastSpeciesEditProfile = profile
             }
             logger.error("species persistence failed (\(operation)): \(error)")
+        }
+    }
+
+    private func xmpWriteRequests(
+        for photos: [Photo],
+        snapshots: [SpeciesSnapshot]
+    ) -> [XMPWriteRequest] {
+        let snapshotsByID = Dictionary(uniqueKeysWithValues: snapshots.map { ($0.id, $0) })
+        return photos.compactMap { photo in
+            guard let snapshot = snapshotsByID[photo.id] else { return nil }
+            var legacySpecies = snapshot.previousSpecies
+            if let failed = failedSpeciesEdits[photo.id],
+               failed.folder.path == photo.folderPath {
+                legacySpecies = mergingSpecies(
+                    failed.snapshot.previousSpecies,
+                    with: legacySpecies
+                )
+            }
+            return XMPWriteRequest(
+                photo: photo,
+                legacyManagedSpecies: legacySpecies
+            )
         }
     }
 
@@ -1225,15 +1289,25 @@ final class AppState {
         generation: Int
     ) {
         for snapshot in snapshots {
-            // Only supersede an older failure — a newer edit's failure wins.
-            if let existing = failedSpeciesEdits[snapshot.id], existing.generation > generation {
-                continue
+            var retainedSnapshot = snapshot
+            if let existing = failedSpeciesEdits[snapshot.id] {
+                // The newest desired state wins, but every prior assignment is
+                // retained so a later retry can clean all legacy keywords.
+                guard existing.generation <= generation else { continue }
+                retainedSnapshot = SpeciesSnapshot(
+                    id: snapshot.id,
+                    species: snapshot.species,
+                    previousSpecies: mergingSpecies(
+                        existing.snapshot.previousSpecies,
+                        with: snapshot.previousSpecies
+                    )
+                )
             }
             failedSpeciesEdits[snapshot.id] = FailedSpeciesEdit(
                 generation: generation,
                 folder: context.folder,
                 database: context.database,
-                snapshot: snapshot
+                snapshot: retainedSnapshot
             )
         }
         speciesPersistenceFailureMessage = Self.persistenceFailureMessage
@@ -1311,7 +1385,10 @@ final class AppState {
                         database: group.database,
                         snapshots: group.snapshots
                     )
-                    await state.xmpQueue.enqueue(result.written)
+                    await state.xmpQueue.enqueue(state.xmpWriteRequests(
+                        for: result.written,
+                        snapshots: group.snapshots
+                    ))
                     for id in group.ids {
                         if let failed = state.failedSpeciesEdits[id],
                            failed.generation <= group.maxGeneration {
@@ -1428,7 +1505,8 @@ final class AppState {
                     }
                     snapshots.append(SpeciesSnapshot(
                         id: previous.id,
-                        species: entry.previousAssignedSpecies
+                        species: entry.previousAssignedSpecies,
+                        previousSpecies: previous.assignedSpecies
                     ))
                     pendingOptimisticSpecies[previous.id] = (
                         generation,
