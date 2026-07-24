@@ -112,12 +112,19 @@ struct XMPWriter {
 
     /// Write XMP sidecar file next to the original.
     /// Returns the URL of the written .xmp file.
-    static func write(photo: Photo) throws -> URL {
+    static func write(
+        photo: Photo,
+        replacingSpecies: [SpeciesMatch] = []
+    ) throws -> URL {
         let url = sidecarURL(for: photo)
         let data: Data
         if FileManager.default.fileExists(atPath: url.path) {
             let existing = try Data(contentsOf: url)
-            data = try merge(photo: photo, into: existing)
+            data = try merge(
+                photo: photo,
+                into: existing,
+                replacingSpecies: replacingSpecies
+            )
         } else {
             guard let generated = generate(photo: photo).data(using: .utf8) else {
                 throw MergeError.encodingFailed
@@ -167,7 +174,11 @@ struct XMPWriter {
 
     // MARK: - Private
 
-    private static func merge(photo: Photo, into data: Data) throws -> Data {
+    private static func merge(
+        photo: Photo,
+        into data: Data,
+        replacingSpecies: [SpeciesMatch]
+    ) throws -> Data {
         let document = try XMLDocument(data: data, options: [.nodePreserveAll])
         let descriptions = descendantElements(
             in: document,
@@ -204,6 +215,11 @@ struct XMPWriter {
             descriptions: descriptions
         )
         let assigned = photo.assignedSpecies
+        let replacedFlat = keywordBag(for: replacingSpecies, isFlying: photo.isFlying)
+        let replacedHierarchical = hierarchicalBag(
+            for: replacingSpecies,
+            isFlying: photo.isFlying
+        )
         let desiredFlat = keywordBag(for: assigned, isFlying: photo.isFlying)
         let desiredHierarchical = hierarchicalBag(for: assigned, isFlying: photo.isFlying)
         let managedFlat = try updateKeywordBag(
@@ -211,7 +227,7 @@ struct XMPWriter {
             propertyURI: dcURI,
             preferredPrefix: "dc",
             desired: desiredFlat,
-            previouslyManaged: previousFlat,
+            removing: (previousFlat ?? []) + replacedFlat,
             descriptions: descriptions,
             fallback: primaryDescription
         )
@@ -220,7 +236,7 @@ struct XMPWriter {
             propertyURI: lrURI,
             preferredPrefix: "lr",
             desired: desiredHierarchical,
-            previouslyManaged: previousHierarchical,
+            removing: (previousHierarchical ?? []) + replacedHierarchical,
             descriptions: descriptions,
             fallback: primaryDescription
         )
@@ -290,7 +306,7 @@ struct XMPWriter {
         propertyURI: String,
         preferredPrefix: String,
         desired: [String],
-        previouslyManaged: [String]?,
+        removing: [String],
         descriptions: [XMLElement],
         fallback: XMLElement
     ) throws -> [String] {
@@ -327,17 +343,13 @@ struct XMPWriter {
             fallback.addChild(property)
         }
 
-        if let previouslyManaged {
-            var remainingCounts = previouslyManaged.reduce(into: [String: Int]()) {
-                $0[$1, default: 0] += 1
-            }
+        if !removing.isEmpty {
+            let removedValues = Set(removing)
             let items = directElements(in: bag, localName: "li", uri: rdfURI)
             for item in items.reversed() {
                 guard let value = item.stringValue,
-                      let count = remainingCounts[value],
-                      count > 0 else { continue }
+                      removedValues.contains(value) else { continue }
                 item.detach()
-                remainingCounts[value] = count - 1
             }
         }
 
@@ -348,10 +360,12 @@ struct XMPWriter {
         var managed: [String] = []
         let owner = property.parent as? XMLElement ?? fallback
         let rdfPrefix = ensureNamespace("rdf", uri: rdfURI, on: owner)
-        for value in desired where present.insert(value).inserted {
-            let item = XMLElement(name: "\(rdfPrefix):li", uri: rdfURI)
-            item.stringValue = value
-            bag.addChild(item)
+        for value in desired {
+            if present.insert(value).inserted {
+                let item = XMLElement(name: "\(rdfPrefix):li", uri: rdfURI)
+                item.stringValue = value
+                bag.addChild(item)
+            }
             managed.append(value)
         }
         return managed

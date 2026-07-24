@@ -12,6 +12,9 @@ struct PhotoMutationResult: Sendable {
 struct SpeciesSnapshot: Sendable {
     let id: UUID
     let species: [SpeciesMatch]
+    /// Assignment replaced by this snapshot. Its keyword variants are removed
+    /// before the desired species keywords are written.
+    let previousSpecies: [SpeciesMatch]
 }
 
 final class ReportDatabase: Sendable {
