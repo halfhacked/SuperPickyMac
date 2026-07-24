@@ -430,7 +430,7 @@ struct ContentView: View {
             return true
         case "x":
             guard !ids.isEmpty else { return false }
-            if !isMulti { navigatePhoto(direction: 1, fallbackToPrevious: true) }
+            if !isMulti { navigatePhoto(direction: 1) }
             appState.setPickStatus(ids: ids, status: .rejected)
             return true
         case "0", "1", "2", "3", "4", "5":
