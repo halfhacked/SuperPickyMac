@@ -140,6 +140,30 @@ final class BatchSelectionUITests: SuperPickyUITestCase {
         XCTAssertEqual(a11ySelection(of: names[2]), "active")
     }
 
+    func testRejectingLastThumbnailKeepsItActive() {
+        let names = fixtureFilenames()
+        guard let last = names.last else {
+            XCTFail("Need at least one fixture")
+            return
+        }
+        clickThumbnail(last)
+
+        app.typeKey("x", modifierFlags: [])
+
+        let remainsActive = XCTNSPredicateExpectation(
+            predicate: NSPredicate(
+                format: "value == %@",
+                A11y.ThumbnailSelection.active.rawValue
+            ),
+            object: thumbnail(last)
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [remainsActive], timeout: 2),
+            .completed,
+            "Rejecting the last thumbnail should leave it active"
+        )
+    }
+
     func testBatchPickSetsAllSelectedPhotos() throws {
         let names = fixtureFilenames()
         guard names.count >= 3 else { return }
